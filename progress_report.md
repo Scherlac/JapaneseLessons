@@ -63,13 +63,14 @@ Researched and documented multiple options for each technology choice:
 - **CLI Integration** — Added `--render-video` flag to `generate_lesson.py`
 - **Module Packaging** — Updated `pyproject.toml` to include new modules
 
-### 10. LLM Integration
+### 10. LLM Integration (Code Written — Not Yet Validated End-to-End)
 - **LLM Client**: Created `llm_client.py` with universal OpenAI SDK interface
-- **Configuration**: Added `config.py` for LLM provider settings (Ollama default)
-- **Enhanced Grammar**: Added `--llm` flag for natural sentence generation
-- **Fallback Safety**: Automatic fallback to deterministic if LLM fails
-- **Dependencies**: Added `openai` to optional dependencies
-- **Evaluation Spike**: Created `spike_06_llm_evaluation.py` to test different LLM providers
+- **Configuration**: Added `config.py` for LLM provider settings
+- **Enhanced Grammar**: Added `--llm` flag — falls back silently to deterministic if LLM fails
+- **Fallback Safety**: Automatic fallback to deterministic if LLM fails (masks broken state)
+- **Dependencies**: Added `openai` to requirements
+- **Evaluation Spike**: Created `spike_06_llm_evaluation.py` — not yet run
+- **⚠️ Status**: Code compiles and imports; basic connectivity to LM Studio confirmed; actual sentence generation with `--llm` flag **not yet tested or validated**
 
 ---
 
@@ -165,9 +166,9 @@ This project follows an **iterative, research-driven development cycle** designe
 
 ### Current Cycle Status
 
-- ✅ **Completed**: Research, design, spikes, core CLI, lesson generation, video pipeline, LLM integration
-- 🔄 **Active**: LLM evaluation spike created, ready for testing
-- 📋 **Planned**: More vocab themes, performance optimizations, Anki export
+- ✅ **Completed**: Research, design, spikes, core CLI, lesson generation, video pipeline
+- 🔄 **In Progress**: LLM integration — code written, LM Studio connected; `--llm` flag end-to-end **not yet validated**
+- 📋 **Planned**: Run evaluation spike, validate LLM sentence generation, expand vocab themes, Anki export
 
 ---
 
@@ -185,10 +186,10 @@ This project follows an **iterative, research-driven development cycle** designe
 | **ffmpeg** | 4.3.1 | conda-forge | Video encoding backend |
 | **Internet** | - | Required | Microsoft Edge TTS service access |
 
-### LLM Integration (planned)
+### LLM Integration
 | Library | Version | Purpose |
 |---------|---------|---------|
-| **openai** | 2.28.0 | Universal LLM client (OpenAI, Ollama, llama.cpp) |
+| **openai** | 2.28.0 | Universal LLM client (OpenAI, LM Studio, Ollama) |
 
 ### System Fonts
 - `C:/Windows/Fonts/YuGothB.ttc` (Yu Gothic Bold) — Japanese text
@@ -207,7 +208,8 @@ This project follows an **iterative, research-driven development cycle** designe
 | `python generate_lesson.py --create --theme food --no-shuffle` | ✓ 87 items (JSON + MD) |
 | `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --render-video --video-method ffmpeg` | ✓ Video generated (69.9 KB, fast method) |
 | `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --render-video --video-method moviepy` | ✓ Video generated (slower method, compatible) |
-| `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --llm` | ✓ LLM-enhanced lesson generated (requires Ollama) |
+| `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --llm` | ⚠️ Ran but fell back to deterministic (no LLM server running at the time) |
+| `python -c "from llm_client import LLMClient; LLMClient().generate_text('Hello')"` | ✓ LM Studio basic connectivity confirmed (qwen/qwen3-14b) — sentence generation not yet tested |
 
 ---
 
@@ -228,7 +230,14 @@ This project follows an **iterative, research-driven development cycle** designe
 ### ✅ Installed Dependencies
 - **Pillow** — Text card rendering
 - **moviepy** — Video composition
-- **openai** — LLM client (universal interface)
+- **openai** — LLM client (universal interface, confirmed working)
+
+### ✅ LLM Provider (LM Studio)
+- **Provider**: LM Studio running locally on port 1234
+- **Active model**: `qwen/qwen3-14b`
+- **Available models**: qwen3-14b, phi-4-reasoning-plus, meta-llama-3.1-8b-instruct, mistral-7b-instruct-v0.3, ministral-3b, stable-code-3b
+- **Config**: `config.py` → `LLM_BASE_URL=http://localhost:1234/v1`, `LLM_MODEL=qwen/qwen3-14b`
+- **Status**: ✅ Connected and responding
 
 ### 📦 Installation
 Run `install.ps1` to install missing dependencies:
@@ -319,8 +328,10 @@ Estimated video length: 87 touches × 7.5s ≈ **~11 minutes** per unit.
   - **Tested**: Successfully generated 5-item video; full pipeline now works
   - **Note**: TTS requires internet access to Microsoft servers; may fail in restricted networks
   - **🚀 Performance**: Video composition optimized with FFmpeg stream copying (12.5x faster)
-- [x] **LLM Integration**: Add OpenAI/Ollama for enhanced natural sentences
-- [ ] **LLM Evaluation**: Run `spike_06_llm_evaluation.py` to test provider performance (requires Ollama running)
+- [~] **LLM Integration**: Code written (`llm_client.py`, `config.py`, `--llm` flag) — falls back to deterministic; end-to-end not yet validated
+- [~] **LLM Provider Setup**: LM Studio running with `qwen/qwen3-14b`; basic HTTP connection confirmed
+- [ ] **LLM Validation**: Test `--llm` flag produces actual LLM sentences (not fallback)
+- [ ] **LLM Evaluation**: Run `spike_06_llm_evaluation.py` to benchmark sentence quality across models
 - [ ] **More Vocab Themes**: Expand beyond food/travel themes
 - [ ] **Performance Optimization**: Video generation speed improvements
 - [ ] Optional: export generated lessons to Anki-compatible format

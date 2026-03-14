@@ -9,9 +9,10 @@ import os
 
 # LLM Provider Configuration
 # Default to Ollama (local, free) for development
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
-LLM_API_KEY = os.getenv("LLM_API_KEY", "ollama")  # Ollama doesn't need real key
-LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:14b")
+# For LM Studio, use: http://localhost:1234/v1
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")  # LM Studio default port
+LLM_API_KEY = os.getenv("LLM_API_KEY", "lm-studio")  # LM Studio API key
+LLM_MODEL = os.getenv("LLM_MODEL", "qwen/qwen3-14b")  # Updated to match LM Studio model name
 
 # Model-specific settings
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))

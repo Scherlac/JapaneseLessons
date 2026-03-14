@@ -10,7 +10,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from openai import OpenAI
-from openai._exceptions import APIError, RateLimitError, Timeout
+from openai._exceptions import APIError, RateLimitError
 
 from config import (
     LLM_API_KEY,
@@ -60,7 +60,7 @@ class LLMClient:
         Raises:
             APIError: For API-related errors
             RateLimitError: For rate limiting
-            Timeout: For request timeouts
+            Exception: For timeouts and other connection errors
         """
         if temperature is None:
             temperature = LLM_TEMPERATURE
@@ -93,11 +93,15 @@ class LLMClient:
         except RateLimitError as e:
             logger.error(f"Rate limit exceeded: {e}")
             raise
-        except Timeout as e:
-            logger.error(f"Request timeout: {e}")
-            raise
         except APIError as e:
             logger.error(f"API error: {e}")
+            raise
+        except Exception as e:
+            # Handle timeouts and other connection errors
+            if "timeout" in str(e).lower():
+                logger.error(f"Request timeout: {e}")
+            else:
+                logger.error(f"Unexpected error: {e}")
             raise
 
     def generate_json(

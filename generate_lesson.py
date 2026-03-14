@@ -36,14 +36,23 @@ def _resolve_grammar_pairs(
     """Resolve explicit grammar_pairs from vocab, or return None for auto-pairing."""
     if "grammar_pairs" not in vocab:
         return None
-    noun_by_en = {item["english"]: item for item in nouns}
-    verb_by_en = {item["english"]: item for item in verbs}
+
+    # Use all available nouns/verbs for lookup, not just selected ones
+    all_nouns = vocab.get("nouns", [])
+    all_verbs = vocab.get("verbs", [])
+
+    noun_by_en = {item["english"]: item for item in all_nouns}
+    verb_by_en = {item["english"]: item for item in all_verbs}
+
     pairs = []
     for pair in vocab["grammar_pairs"]:
         verb = verb_by_en.get(pair["verb"])
         noun = noun_by_en.get(pair["noun"])
         if verb and noun:
-            pairs.append((verb, noun))
+            # Only include if both verb and noun are in the selected lists
+            if verb in verbs and noun in nouns:
+                pairs.append((verb, noun))
+
     return pairs[:n] if pairs else None
 
 

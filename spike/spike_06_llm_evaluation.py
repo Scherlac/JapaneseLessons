@@ -107,14 +107,15 @@ def evaluate_provider(provider_name: str, base_url: str, api_key: str, model: st
 
         if result['success']:
             success_count += 1
-            print("  ✅ Success"            print(f"     English: {result['response']['english']}")
+            print("  ✅ Success")
+            print(f"     English: {result['response']['english']}")
             print(f"     Japanese: {result['response']['japanese']}")
             print(f"     Romaji: {result['response']['romaji']}")
             print(f"     Context: {result['response'].get('context', 'N/A')}")
         else:
             print(f"  ❌ Failed: {result['error']}")
 
-        print(".2f"
+        print(f"     Time: {result['time']:.2f}s")
     # Summary
     avg_time = total_time / len(test_cases) if test_cases else 0
     success_rate = success_count / len(test_cases) * 100 if test_cases else 0
@@ -130,9 +131,10 @@ def evaluate_provider(provider_name: str, base_url: str, api_key: str, model: st
         "results": results
     }
 
-    print("
-📊 Summary:"    print(f"   Success Rate: {success_rate:.1f}%")
-    print(".2f"    print(".2f"
+    print("\n📊 Summary:")
+    print(f"   Success Rate: {success_rate:.1f}%")
+    print(f"   Average Time: {avg_time:.2f}s")
+    print(f"   Total Time: {total_time:.2f}s")
     return summary
 
 def main():
@@ -243,10 +245,10 @@ def main():
         # Sort by success rate, then by speed
         successful_providers.sort(key=lambda x: (-x["success_rate"], x["avg_time"]))
 
-        print("<10")
+        print(f"{'Provider':<20} {'Success %':<10} {'Avg Time':<10} {'Total Time':<10}")
         print("-" * 60)
         for result in successful_providers:
-            print("<10")
+            print(f"{result['provider']:<20} {result['success_rate']:<10.1f} {result['avg_time']:<10.2f} {result['total_time']:<10.2f}")
     else:
         print("❌ No providers completed successfully")
 
@@ -269,7 +271,7 @@ def main():
         best = successful_providers[0]
         print(f"🏅 Best Overall: {best['provider']}")
         print(f"   Success Rate: {best['success_rate']:.1f}%")
-        print(".2f"
+        print(f"   Average Time: {best['avg_time']:.2f}s")
         if best['success_rate'] >= 90:
             print("   ✅ Excellent performance - ready for production")
         elif best['success_rate'] >= 75:
@@ -280,7 +282,8 @@ def main():
         # Cost analysis
         if "OpenAI" in best['provider']:
             estimated_cost = len(test_cases) * 0.001  # Rough estimate for gpt-4o-mini
-            print(".4f"        elif "Ollama" in best['provider']:
+            print(f"   💰 Estimated Cost: ${estimated_cost:.4f}")
+        elif "Ollama" in best['provider']:
             print("   💰 Cost: Free (local hardware)")
     else:
         print("❌ No working providers found")
