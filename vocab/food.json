@@ -1,0 +1,29 @@
+{
+  "theme": "food",
+  "nouns": [
+    {"english": "water", "japanese": "みず", "kanji": "水", "romaji": "mizu"},
+    {"english": "rice", "japanese": "ごはん", "kanji": "ご飯", "romaji": "gohan"},
+    {"english": "fish", "japanese": "さかな", "kanji": "魚", "romaji": "sakana"},
+    {"english": "meat", "japanese": "にく", "kanji": "肉", "romaji": "niku"},
+    {"english": "vegetable", "japanese": "やさい", "kanji": "野菜", "romaji": "yasai"},
+    {"english": "egg", "japanese": "たまご", "kanji": "卵", "romaji": "tamago"},
+    {"english": "tea", "japanese": "おちゃ", "kanji": "お茶", "romaji": "ocha"},
+    {"english": "bread", "japanese": "パン", "kanji": "パン", "romaji": "pan"},
+    {"english": "milk", "japanese": "ぎゅうにゅう", "kanji": "牛乳", "romaji": "gyuunyuu"},
+    {"english": "fruit", "japanese": "くだもの", "kanji": "果物", "romaji": "kudamono"},
+    {"english": "soup", "japanese": "スープ", "kanji": "スープ", "romaji": "suupu"},
+    {"english": "salt", "japanese": "しお", "kanji": "塩", "romaji": "shio"}
+  ],
+  "verbs": [
+    {"english": "to eat", "japanese": "たべる", "kanji": "食べる", "romaji": "taberu", "type": "る-verb", "masu_form": "食べます"},
+    {"english": "to drink", "japanese": "のむ", "kanji": "飲む", "romaji": "nomu", "type": "う-verb", "masu_form": "飲みます"},
+    {"english": "to cook", "japanese": "りょうりする", "kanji": "料理する", "romaji": "ryouri suru", "type": "irregular", "masu_form": "料理します"},
+    {"english": "to buy", "japanese": "かう", "kanji": "買う", "romaji": "kau", "type": "う-verb", "masu_form": "買います"},
+    {"english": "to make", "japanese": "つくる", "kanji": "作る", "romaji": "tsukuru", "type": "う-verb", "masu_form": "作ります"},
+    {"english": "to like", "japanese": "すき", "kanji": "好き", "romaji": "suki", "type": "な-adj", "masu_form": "好きです"},
+    {"english": "to cut", "japanese": "きる", "kanji": "切る", "romaji": "kiru", "type": "う-verb", "masu_form": "切ります"},
+    {"english": "to wash", "japanese": "あらう", "kanji": "洗う", "romaji": "arau", "type": "う-verb", "masu_form": "洗います"},
+    {"english": "to order", "japanese": "ちゅうもんする", "kanji": "注文する", "romaji": "chuumon suru", "type": "irregular", "masu_form": "注文します"},
+    {"english": "to give", "japanese": "あげる", "kanji": "あげる", "romaji": "ageru", "type": "る-verb", "masu_form": "あげます"}
+  ]
+}

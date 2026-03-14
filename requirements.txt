@@ -1,0 +1,7 @@
+# Japanese Lesson Generator
+#
+# No external dependencies — stdlib only (YAGNI).
+# This file exists as a placeholder to document that fact.
+#
+# If future features need external packages, add them here:
+# e.g. click, rich, openai
