@@ -36,6 +36,10 @@ python generate_lesson.py --create --theme food
 python generate_lesson.py --create --theme food --nouns 4 --verbs 4
 python generate_lesson.py --create --theme food --seed 42
 
+# Generate video from lesson (fast FFmpeg method by default)
+python generate_lesson.py --create --theme food --render-video
+python generate_lesson.py --create --theme food --render-video --video-method moviepy
+
 # Generate an LLM prompt instead (for pasting into ChatGPT etc.)
 python generate_lesson.py --theme food -o prompt.md
 
@@ -118,6 +122,8 @@ This installs:
 - **Video pipeline**: `edge-tts`, `moviepy`, `Pillow`
 - **LLM integration**: `openai`
 - **System dependency**: `ffmpeg`
+
+**⚠️ Note**: Video generation requires internet access for TTS (Microsoft Edge TTS service).
 
 ## Design Principles
 

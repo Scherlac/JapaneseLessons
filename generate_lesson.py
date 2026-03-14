@@ -152,11 +152,17 @@ examples:
         action="store_true",
         help="Render video from lesson items (requires --create and video dependencies).",
     )
+    parser.add_argument(
+        "--video-method",
+        type=str, default="ffmpeg",
+        choices=["ffmpeg", "moviepy"],
+        help="Video composition method: ffmpeg (fast, default) or moviepy (compatible).",
+    )
 
     return parser
 
 
-def _render_video_from_lesson(lesson_data: dict, output_dir: Path) -> None:
+def _render_video_from_lesson(lesson_data: dict, output_dir: Path, video_method: str = "ffmpeg") -> None:
     """Render video from lesson data using the video pipeline."""
     try:
         from tts_engine import create_engine
@@ -203,8 +209,25 @@ def _render_video_from_lesson(lesson_data: dict, output_dir: Path) -> None:
 
             audio_filename = f"audio_{i+1:03d}.mp3"
             audio_path = audio_dir / audio_filename
-            await item_engine.generate_audio(text, audio_path)
+            
+            # Retry TTS generation up to 3 times with increasing delay
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    await item_engine.generate_audio(text, audio_path)
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        print(f"      TTS failed (attempt {attempt+1}/{max_retries}): {e}")
+                        await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    else:
+                        print(f"      TTS failed after {max_retries} attempts: {e}")
+                        raise
+            
             audio_paths.append(audio_path)
+            
+            # Add delay to avoid overwhelming TTS service
+            await asyncio.sleep(1.0)
 
         # Generate cards for all items
         print("    Generating cards...")
@@ -262,7 +285,7 @@ def _render_video_from_lesson(lesson_data: dict, output_dir: Path) -> None:
             clips.append(clip)
 
         # Build final video
-        video_builder.build_video(clips, video_path)
+        video_builder.build_video(clips, video_path, method=video_method)
         print(f"  Video:  {video_path}")
 
     # Run async video rendering
@@ -350,7 +373,7 @@ def main() -> None:
         # Render video if requested
         if args.render_video:
             print("  Rendering video...")
-            _render_video_from_lesson(lesson_data, output_dir)
+            _render_video_from_lesson(lesson_data, output_dir, args.video_method)
 
         return
 
