@@ -13,6 +13,10 @@ This tool produces lessons where every word gets **5 touches** (introduce → re
 ## Quick Start
 
 ```bash
+# Install dependencies (optional, for video/LLM features)
+pip install -e .[all]
+conda install -c conda-forge ffmpeg
+
 # No dependencies needed for core CLI (stdlib only)
 python generate_lesson.py --create --theme food
 
@@ -77,21 +81,43 @@ japanese/
 └── output/               # Generated lessons (gitignored)
 ```
 
-## Video Pipeline (In Progress)
+## Installation
 
-The tool can also generate learning videos from lessons:
-
-```
-Lesson items → TTS audio (edge-tts) → Card images (Pillow) → Video (moviepy) → .mp4
-```
-
-All components have been validated via spike implementations. Production modules are next.
-
-Install video dependencies:
+### Core CLI (No Dependencies)
+The core CLI works with Python 3.10+ stdlib only:
 ```bash
-pip install edge-tts moviepy Pillow
+python generate_lesson.py --create --theme food
+```
+
+### Full Installation (Video + LLM Features)
+Install all dependencies using the project's pyproject.toml:
+```bash
+# Install Python dependencies
+pip install -e .[all]
+
+# Install ffmpeg (required for video encoding)
 conda install -c conda-forge ffmpeg
 ```
+
+Or install components separately:
+```bash
+# Video features only
+pip install -e .[video]
+conda install -c conda-forge ffmpeg
+
+# LLM features only  
+pip install -e .[llm]
+```
+
+Or use the automated script:
+```powershell
+.\install.ps1
+```
+
+This installs:
+- **Video pipeline**: `edge-tts`, `moviepy`, `Pillow`
+- **LLM integration**: `openai`
+- **System dependency**: `ffmpeg`
 
 ## Design Principles
 
@@ -107,6 +133,8 @@ conda install -c conda-forge ffmpeg
 - No pip dependencies for core CLI
 - Video pipeline: `edge-tts`, `moviepy`, `Pillow`, `ffmpeg`
 - LLM integration (planned): `openai` + Ollama server
+
+Install all dependencies with: `pip install -e .[all]` and `conda install -c conda-forge ffmpeg`
 
 ## License
 

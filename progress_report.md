@@ -144,6 +144,39 @@ japanese/
 
 ---
 
+## Repo Status Verification (2026-03-14)
+
+### ✅ Working Features
+- Core CLI fully functional (stdlib only)
+- Lesson generation (deterministic)
+- LLM prompt generation
+- Vocab prompt generation
+- Output file creation (JSON + Markdown)
+
+### ❌ Missing Dependencies
+- **edge-tts** — Required for TTS audio generation (video pipeline)
+- **ffmpeg** — Required for video encoding (moviepy backend)
+- **openai** — Required for LLM integration (planned feature)
+
+### ✅ Installed Dependencies
+- **Pillow** — Text card rendering
+- **moviepy** — Video composition
+
+### 📦 Installation
+Run `install.ps1` to install missing dependencies:
+```powershell
+.\install.ps1
+```
+
+This installs:
+- `pip install edge-tts`
+- `conda install -c conda-forge ffmpeg`
+- `pip install openai`
+
+After installation, video pipeline spikes should work.
+
+---
+
 ## Video Generation Pipeline — Plan
 
 ### Goal
