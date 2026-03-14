@@ -1,5 +1,10 @@
 {
   "theme": "food",
+  "grammar_pairs": [
+    {"verb": "to eat", "noun": "fish"},
+    {"verb": "to drink", "noun": "water"},
+    {"verb": "to cook", "noun": "meat"}
+  ],
   "nouns": [
     {"english": "water", "japanese": "みず", "kanji": "水", "romaji": "mizu"},
     {"english": "rice", "japanese": "ごはん", "kanji": "ご飯", "romaji": "gohan"},

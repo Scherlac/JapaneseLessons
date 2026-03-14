@@ -18,6 +18,7 @@ import random
 import sys
 from pathlib import Path
 
+from lesson_generator import generate_lesson_items, render_lesson_markdown
 from prompt_template import (
     DIMENSIONS_BEGINNER,
     GRAMMAR_PATTERNS_BEGINNER,
@@ -27,6 +28,23 @@ from prompt_template import (
 )
 
 VOCAB_DIR = Path(__file__).parent / "vocab"
+
+
+def _resolve_grammar_pairs(
+    vocab: dict, nouns: list[dict], verbs: list[dict], n: int = 3,
+) -> list[tuple[dict, dict]] | None:
+    """Resolve explicit grammar_pairs from vocab, or return None for auto-pairing."""
+    if "grammar_pairs" not in vocab:
+        return None
+    noun_by_en = {item["english"]: item for item in nouns}
+    verb_by_en = {item["english"]: item for item in verbs}
+    pairs = []
+    for pair in vocab["grammar_pairs"]:
+        verb = verb_by_en.get(pair["verb"])
+        noun = noun_by_en.get(pair["noun"])
+        if verb and noun:
+            pairs.append((verb, noun))
+    return pairs[:n] if pairs else None
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +142,11 @@ examples:
         choices=["beginner", "intermediate", "advanced"],
         help="Difficulty level for vocab generation (default: beginner).",
     )
+    parser.add_argument(
+        "--create",
+        action="store_true",
+        help="Generate a complete lesson (JSON + Markdown) instead of an LLM prompt.",
+    )
 
     return parser
 
@@ -157,6 +180,54 @@ def main() -> None:
             print(f"Vocab prompt written to: {out_path}", file=sys.stderr)
         else:
             print(prompt)
+        return
+
+    # --create: generate a complete lesson (JSON + Markdown)
+    if args.create:
+        if not args.theme:
+            parser.error("--theme is required with --create")
+
+        if args.seed is not None:
+            random.seed(args.seed)
+
+        vocab = load_vocab(args.theme)
+        nouns = pick_items(vocab["nouns"], args.nouns, shuffle=not args.no_shuffle)
+        verbs = pick_items(vocab["verbs"], args.verbs, shuffle=not args.no_shuffle)
+
+        # Resolve grammar pairs: explicit from vocab or auto-paired
+        grammar_pairs = _resolve_grammar_pairs(vocab, nouns, verbs)
+
+        items = generate_lesson_items(nouns, verbs, grammar_pairs=grammar_pairs)
+
+        # Save JSON
+        output_dir = Path("output")
+        output_dir.mkdir(exist_ok=True)
+
+        lesson_data = {
+            "theme": args.theme,
+            "total_items": len(items),
+            "items": items,
+        }
+        json_path = output_dir / f"lesson_{args.theme}.json"
+        json_path.write_text(
+            json.dumps(lesson_data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        # Save Markdown
+        md_path = output_dir / f"lesson_{args.theme}.md"
+        md_content = render_lesson_markdown(items, args.theme)
+        md_path.write_text(md_content, encoding="utf-8")
+
+        # Summary
+        phase_counts: dict[str, int] = {}
+        for item in items:
+            phase_counts[item["phase"]] = phase_counts.get(item["phase"], 0) + 1
+
+        summary = " + ".join(f"{c} {p}" for p, c in phase_counts.items())
+        print(f"Created lesson: {args.theme}")
+        print(f"  Items:  {len(items)} ({summary})")
+        print(f"  JSON:   {json_path}")
+        print(f"  Review: {md_path}")
         return
 
     # --theme is required for lesson generation
