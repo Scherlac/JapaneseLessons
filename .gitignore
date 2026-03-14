@@ -3,6 +3,7 @@ lesson_*.md
 
 # Generated video/audio output
 output/
+spike/output/
 
 # Python
 __pycache__/
