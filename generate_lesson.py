@@ -148,6 +148,11 @@ examples:
         help="Generate a complete lesson (JSON + Markdown) instead of an LLM prompt.",
     )
     parser.add_argument(
+        "--llm",
+        action="store_true",
+        help="Use LLM for enhanced natural grammar sentences (requires LLM setup).",
+    )
+    parser.add_argument(
         "--render-video",
         action="store_true",
         help="Render video from lesson items (requires --create and video dependencies).",
@@ -338,7 +343,7 @@ def main() -> None:
         # Resolve grammar pairs: explicit from vocab or auto-paired
         grammar_pairs = _resolve_grammar_pairs(vocab, nouns, verbs)
 
-        items = generate_lesson_items(nouns, verbs, grammar_pairs=grammar_pairs)
+        items = generate_lesson_items(nouns, verbs, grammar_pairs=grammar_pairs, use_llm=args.llm)
 
         # Save JSON
         output_dir = Path("output")

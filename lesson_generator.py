@@ -13,6 +13,11 @@ Usage:
 
 from __future__ import annotations
 
+import random
+from typing import Optional
+
+from llm_client import ask_llm_json
+
 
 # ── Polite-form conjugation (Japanese) ───────────────────────────────────
 
@@ -332,6 +337,85 @@ def _grammar_cycle(
     return items
 
 
+def _llm_grammar_cycle(
+    verb: dict,
+    noun: dict,
+    person_en: str,
+    person_jp: str,
+    person_rm: str,
+    tense: str,
+    polarity: str,
+    start_index: int,
+    total: int,
+) -> list[dict]:
+    """Generate 3 repetition touches for one LLM-enhanced grammar sentence."""
+    # Use LLM to generate a natural sentence
+    prompt = f"""
+Generate a natural Japanese sentence using the following vocabulary and grammar pattern.
+
+Vocabulary:
+- Verb: {verb['english']} ({verb['japanese']}, {verb['romaji']})
+- Noun: {noun['english']} ({noun['kanji']}, {noun['romaji']})
+- Person: {person_en} ({person_jp}, {person_rm})
+
+Grammar requirements:
+- Tense: {tense}
+- Polarity: {polarity}
+- Use polite form (ます-form)
+- Make it a natural, contextual sentence (not just "I eat fish")
+
+Return a JSON object with:
+{{
+  "english": "Natural English sentence",
+  "japanese": "自然な日本語の文",
+  "romaji": "Nihongo na bun",
+  "context": "Brief explanation of grammar point or context"
+}}
+
+Make the sentence natural and varied - avoid formulaic patterns.
+""".strip()
+
+    try:
+        response = ask_llm_json(prompt)
+        en_sentence = response["english"]
+        jp_sentence = response["japanese"]
+        rm_sentence = response["romaji"]
+        context = response.get("context", f"{person_en} / {tense} / {polarity}")
+    except Exception as e:
+        # Fallback to deterministic if LLM fails
+        print(f"LLM generation failed ({e}), falling back to deterministic")
+        return _grammar_cycle(
+            verb, noun, person_en, person_jp, person_rm,
+            tense, polarity, start_index, total
+        )
+
+    # Use Japanese for TTS reveal, English for comprehension
+    steps = [
+        ("TRANSLATE", en_sentence, jp_sentence, rm_sentence, jp_sentence, "ja-JP-NanamiNeural"),
+        ("COMPREHEND", jp_sentence, en_sentence, rm_sentence, en_sentence, "en-US-AriaNeural"),
+        ("REINFORCE", en_sentence, jp_sentence, rm_sentence, jp_sentence, "ja-JP-NanamiNeural"),
+    ]
+
+    items = []
+    idx = start_index
+    for step, prompt, reveal, annotation, tts_text, tts_voice in steps:
+        idx += 1
+        items.append({
+            "phase": "grammar",
+            "step": step,
+            "index": idx,
+            "total": total,
+            "counter": f"{idx}/{total}",
+            "prompt": prompt,
+            "reveal": reveal,
+            "annotation": annotation,
+            "context": context,
+            "tts_text": tts_text,
+            "tts_voice": tts_voice,
+        })
+    return items
+
+
 # ── Main generator ───────────────────────────────────────────────────────
 
 
@@ -344,6 +428,7 @@ def generate_lesson_items(
     polarities: tuple[str, ...] = ("affirmative",),
     grammar_pairs: list[tuple[dict, dict]] | None = None,
     num_grammar_pairs: int = 3,
+    use_llm: bool = False,
 ) -> list[dict]:
     """
     Generate a complete lesson as a list of structured item dicts.
@@ -359,6 +444,8 @@ def generate_lesson_items(
         grammar_pairs: Explicit (verb, noun) pairs for grammar sentences.
                        Auto-paired by index if None.
         num_grammar_pairs: Number of auto-generated verb-noun pairs (default 3).
+        use_llm: If True, use LLM to generate natural grammar sentences.
+                 If False, use deterministic conjugation (default).
 
     Returns:
         List of item dicts with: phase, step, index, total, counter,
@@ -395,12 +482,20 @@ def generate_lesson_items(
         for person_en, person_jp, person_rm in persons:
             for tense in tenses:
                 for polarity in polarities:
-                    items.extend(
-                        _grammar_cycle(
-                            verb, noun, person_en, person_jp, person_rm,
-                            tense, polarity, len(items), total,
+                    if use_llm:
+                        items.extend(
+                            _llm_grammar_cycle(
+                                verb, noun, person_en, person_jp, person_rm,
+                                tense, polarity, len(items), total,
+                            )
                         )
-                    )
+                    else:
+                        items.extend(
+                            _grammar_cycle(
+                                verb, noun, person_en, person_jp, person_rm,
+                                tense, polarity, len(items), total,
+                            )
+                        )
 
     return items
 

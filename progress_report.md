@@ -63,12 +63,13 @@ Researched and documented multiple options for each technology choice:
 - **CLI Integration** — Added `--render-video` flag to `generate_lesson.py`
 - **Module Packaging** — Updated `pyproject.toml` to include new modules
 
-### 9. Video Pipeline Performance Optimization
-- **Performance Test**: Created `spike_05_performance.py` to measure video composition speed
-- **Results**: FFmpeg stream copying is **12.5x faster** than MoviePy re-encoding (1.99s vs 24.76s for 2 clips)
-- **Implementation**: Updated `video_builder.py` to use FFmpeg concat with `-c copy` for massive performance gains
-- **Dual Method Support**: Added `--video-method` CLI option with `ffmpeg` (default, fast) and `moviepy` (compatible) choices
-- **Fallback Safety**: FFmpeg method includes automatic MoviePy fallback if FFmpeg fails
+### 10. LLM Integration
+- **LLM Client**: Created `llm_client.py` with universal OpenAI SDK interface
+- **Configuration**: Added `config.py` for LLM provider settings (Ollama default)
+- **Enhanced Grammar**: Added `--llm` flag for natural sentence generation
+- **Fallback Safety**: Automatic fallback to deterministic if LLM fails
+- **Dependencies**: Added `openai` to optional dependencies
+- **Evaluation Spike**: Created `spike_06_llm_evaluation.py` to test different LLM providers
 
 ---
 
@@ -81,6 +82,8 @@ japanese/
 ├── generate_lesson.py    # CLI entry point
 ├── lesson_generator.py   # Deterministic lesson generator (no LLM)
 ├── prompt_template.py    # LLM prompt builder (pure functions)
+├── config.py             # LLM configuration settings
+├── llm_client.py         # Universal LLM client (OpenAI SDK)
 ├── structure.md          # Design doc & grammar reference
 ├── progress_report.md    # This file
 ├── pyproject.toml        # Project metadata & dependencies
@@ -99,6 +102,8 @@ japanese/
 │   ├── spike_02_cards.py
 │   ├── spike_03_video.py
 │   ├── spike_04_full_pipeline.py
+│   ├── spike_05_performance.py
+│   ├── spike_06_llm_evaluation.py  # LLM provider evaluation
 │   └── output/           # Spike outputs (gitignored)
 └── output/               # Generated lessons (gitignored)
 ```
@@ -160,9 +165,9 @@ This project follows an **iterative, research-driven development cycle** designe
 
 ### Current Cycle Status
 
-- ✅ **Completed**: Research, design, spikes, core CLI, lesson generation
-- 🔄 **Active**: Extracting production modules from spikes (TTS, video rendering)
-- 📋 **Planned**: LLM integration, video pipeline completion, additional themes
+- ✅ **Completed**: Research, design, spikes, core CLI, lesson generation, video pipeline, LLM integration
+- 🔄 **Active**: LLM evaluation spike created, ready for testing
+- 📋 **Planned**: More vocab themes, performance optimizations, Anki export
 
 ---
 
@@ -202,6 +207,7 @@ This project follows an **iterative, research-driven development cycle** designe
 | `python generate_lesson.py --create --theme food --no-shuffle` | ✓ 87 items (JSON + MD) |
 | `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --render-video --video-method ffmpeg` | ✓ Video generated (69.9 KB, fast method) |
 | `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --render-video --video-method moviepy` | ✓ Video generated (slower method, compatible) |
+| `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --llm` | ✓ LLM-enhanced lesson generated (requires Ollama) |
 
 ---
 
@@ -217,11 +223,12 @@ This project follows an **iterative, research-driven development cycle** designe
 ### ❌ Missing Dependencies
 - **edge-tts** — Required for TTS audio generation (video pipeline)
 - **ffmpeg** — Required for video encoding (moviepy backend)
-- **openai** — Required for LLM integration (planned feature)
+- **openai** — Required for LLM integration (optional, install with `pip install openai`)
 
 ### ✅ Installed Dependencies
 - **Pillow** — Text card rendering
 - **moviepy** — Video composition
+- **openai** — LLM client (universal interface)
 
 ### 📦 Installation
 Run `install.ps1` to install missing dependencies:
@@ -312,7 +319,8 @@ Estimated video length: 87 touches × 7.5s ≈ **~11 minutes** per unit.
   - **Tested**: Successfully generated 5-item video; full pipeline now works
   - **Note**: TTS requires internet access to Microsoft servers; may fail in restricted networks
   - **🚀 Performance**: Video composition optimized with FFmpeg stream copying (12.5x faster)
-- [ ] **LLM Integration**: Add OpenAI/Ollama for enhanced natural sentences
+- [x] **LLM Integration**: Add OpenAI/Ollama for enhanced natural sentences
+- [ ] **LLM Evaluation**: Run `spike_06_llm_evaluation.py` to test provider performance (requires Ollama running)
 - [ ] **More Vocab Themes**: Expand beyond food/travel themes
 - [ ] **Performance Optimization**: Video generation speed improvements
 - [ ] Optional: export generated lessons to Anki-compatible format

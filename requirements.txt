@@ -5,3 +5,6 @@
 #
 # If future features need external packages, add them here:
 # e.g. click, rich, openai
+
+# LLM Integration (optional)
+openai>=1.0
