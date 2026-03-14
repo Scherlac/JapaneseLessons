@@ -20,7 +20,7 @@ import json
 import re
 import sys
 import time
-from pathlib import Path
+import pathlib
 
 import requests
 
@@ -85,6 +85,14 @@ def check_connectivity() -> bool:
         return False
 
 
+EMBEDDING_KEYWORDS = ("embed", "embedding")
+
+
+def is_generation_model(model_id: str) -> bool:
+    """Return False for embedding-only models that can't do chat completions."""
+    return not any(kw in model_id.lower() for kw in EMBEDDING_KEYWORDS)
+
+
 def list_models() -> list[dict]:
     section("2. Available models")
     try:
@@ -95,28 +103,28 @@ def list_models() -> list[dict]:
             print("  ⚠️  No models loaded. Load a model in LM Studio first.")
         else:
             for m in models:
-                print(f"  • {m['id']}")
+                tag = "" if is_generation_model(m["id"]) else "  [embedding — skip]"
+                print(f"  • {m['id']}{tag}")
         return models
     except Exception as e:
         print(f"  ❌ Failed to list models: {e}")
         return []
 
 
-def check_loaded_model(models: list[dict]) -> str | None:
-    """Return the id of the currently loaded model, or None."""
-    section("3. Loaded model")
-    if not models:
-        print("  ⚠️  No model is currently loaded in LM Studio.")
-        print("     → In LM Studio: go to the Chat tab, pick a model, click Load.")
-        return None
-    # LM Studio typically lists only the loaded model(s)
-    model_id = models[0]["id"]
-    print(f"  ✅ Active model: {model_id}")
-    return model_id
+def get_generation_models(models: list[dict]) -> list[str]:
+    """Return IDs of all models capable of chat completions."""
+    section("3. Generation models")
+    gen_models = [m["id"] for m in models if is_generation_model(m["id"])]
+    if not gen_models:
+        print("  ⚠️  No generation models found in LM Studio.")
+    else:
+        for mid in gen_models:
+            print(f"  ✅ {mid}")
+    return gen_models
 
 
-def test_plain_text(model_id: str) -> bool:
-    section("4. Plain text generation")
+def test_plain_text(model_id: str, timeout: int = 120) -> bool:
+    section(f"Plain text generation — {model_id}")
     body = {
         "model": model_id,
         "messages": [
@@ -128,7 +136,7 @@ def test_plain_text(model_id: str) -> bool:
     }
     try:
         t0 = time.time()
-        r = post("/chat/completions", body, timeout=30)
+        r = post("/chat/completions", body, timeout=timeout)
         elapsed = time.time() - t0
         r.raise_for_status()
         content = strip_think(r.json()["choices"][0]["message"]["content"])
@@ -139,8 +147,8 @@ def test_plain_text(model_id: str) -> bool:
         return False
 
 
-def test_json_object_mode(model_id: str) -> bool:
-    section("5. JSON object mode (response_format)")
+def test_json_object_mode(model_id: str, timeout: int = 120) -> bool:
+    section(f"JSON object mode — {model_id}")
     body = {
         "model": model_id,
         "messages": [
@@ -156,7 +164,7 @@ def test_json_object_mode(model_id: str) -> bool:
     }
     try:
         t0 = time.time()
-        r = post("/chat/completions", body, timeout=30)
+        r = post("/chat/completions", body, timeout=timeout)
         elapsed = time.time() - t0
         if r.status_code == 400:
             print(f"  ⚠️  json_object not supported (HTTP 400): {r.json()}")
@@ -177,9 +185,9 @@ def test_json_object_mode(model_id: str) -> bool:
         return False
 
 
-def test_json_via_prompt(model_id: str) -> bool:
+def test_json_via_prompt(model_id: str, timeout: int = 120) -> bool:
     """Fallback: ask for JSON in plain text mode (no response_format)."""
-    section("6. JSON via prompt (text mode fallback)")
+    section(f"JSON via prompt fallback — {model_id}")
     body = {
         "model": model_id,
         "messages": [
@@ -195,7 +203,7 @@ def test_json_via_prompt(model_id: str) -> bool:
     }
     try:
         t0 = time.time()
-        r = post("/chat/completions", body, timeout=30)
+        r = post("/chat/completions", body, timeout=timeout)
         elapsed = time.time() - t0
         r.raise_for_status()
         content = strip_think(r.json()["choices"][0]["message"]["content"])
@@ -218,61 +226,94 @@ def test_json_via_prompt(model_id: str) -> bool:
         return False
 
 
+def evaluate_model(model_id: str) -> dict:
+    """Run all three tests for one model and return a result dict."""
+    print(f"\n{'#'*55}")
+    print(f"  EVALUATING: {model_id}",flush=True)
+    print(f"{'#'*55}")
+    # First request to a new model may trigger LM Studio to swap it in — allow extra time
+    plain_ok = test_plain_text(model_id, timeout=180)
+    json_mode_ok = test_json_object_mode(model_id, timeout=120)
+    json_prompt_ok: bool | None
+    if not json_mode_ok:
+        json_prompt_ok = test_json_via_prompt(model_id, timeout=120)
+    else:
+        json_prompt_ok = None  # not needed
+
+    json_capable = json_mode_ok or bool(json_prompt_ok)
+
+    print(f"\n  {'─'*45}")
+    print(f"  Plain text:       {'✅' if plain_ok else '❌'}")
+    print(f"  JSON object mode: {'✅' if json_mode_ok else '⚠️  not supported'}")
+    if json_prompt_ok is not None:
+        print(f"  JSON via prompt:  {'✅' if json_prompt_ok else '❌'}")
+    if not json_capable:
+        verdict = "❌ Cannot reliably produce JSON — not suitable"
+    elif not json_mode_ok and json_prompt_ok:
+        verdict = "ℹ️  Use prompt-based JSON (llm_client.py fallback path)"
+    else:
+        verdict = "✅ Ready — JSON object mode supported"
+    print(f"  Verdict:          {verdict}", flush=True)
+
+    return {
+        "model_id": model_id,
+        "plain_text_ok": plain_ok,
+        "json_mode_ok": json_mode_ok,
+        "json_prompt_ok": json_prompt_ok,
+        "json_capable": json_capable,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
-    print("🚀 Spike 07: LM Studio API Evaluation")
+    print("🚀 Spike 07: LM Studio API Evaluation (all models)")
     print(f"   Target: {BASE_URL}")
 
     if not check_connectivity():
         sys.exit(1)
 
     models = list_models()
-    model_id = check_loaded_model(models)
+    gen_model_ids = get_generation_models(models)
 
-    if not model_id:
-        print("\n⛔ No model loaded — cannot run generation tests.")
-        print("   Load a model in LM Studio and re-run this spike.")
+    if not gen_model_ids:
+        print("\n⛔ No generation models available — cannot run tests.")
         sys.exit(1)
 
-    plain_ok = test_plain_text(model_id)
-    json_mode_ok = test_json_object_mode(model_id)
-    if not json_mode_ok:
-        json_prompt_ok = test_json_via_prompt(model_id)
-    else:
-        json_prompt_ok = None  # not needed
+    all_results = []
+    for mid in gen_model_ids:
+        result = evaluate_model(mid)
+        all_results.append(result)
 
-    # Summary
-    section("Summary")
-    print(f"  Model loaded:        ✅ {model_id}")
-    print(f"  Plain text:          {'✅' if plain_ok else '❌'}")
-    print(f"  JSON object mode:    {'✅' if json_mode_ok else '⚠️  not supported'}")
-    if json_prompt_ok is not None:
-        print(f"  JSON via prompt:     {'✅' if json_prompt_ok else '❌'}")
-
-    if not json_mode_ok and not json_prompt_ok:
-        print("\n  ❌ Model cannot reliably produce JSON — consider a different model.")
-    elif not json_mode_ok and json_prompt_ok:
-        print("\n  ℹ️  Use prompt-based JSON (no response_format). llm_client.py already has this fallback.")
-    else:
-        print("\n  ✅ LM Studio is ready for use with this project.")
+    # Summary table
+    section("Final Summary")
+    print(f"  {'Model':<45} {'Plain':^7} {'JSON mode':^10} {'JSON prompt':^12} {'Usable':^7}")
+    print(f"  {'─'*45} {'─'*7} {'─'*10} {'─'*12} {'─'*7}")
+    for r in all_results:
+        plain  = "✅" if r["plain_text_ok"] else "❌"
+        jmode  = "✅" if r["json_mode_ok"] else "—"
+        jprompt = ("✅" if r["json_prompt_ok"] else "❌") if r["json_prompt_ok"] is not None else "—"
+        usable = "✅" if r["json_capable"] else "❌"
+        print(f"  {r['model_id']:<45} {plain:^7} {jmode:^10} {jprompt:^12} {usable:^7}", flush=True)
 
     # Save results
-    output_dir = Path("spike/output")
+    output_dir = pathlib.Path(__file__).parent / "output"
     output_dir.mkdir(exist_ok=True)
-    results = {
-        "base_url": BASE_URL,
-        "model_id": model_id,
-        "plain_text_ok": plain_ok,
-        "json_mode_ok": json_mode_ok,
-        "json_prompt_ok": json_prompt_ok,
-    }
+    results_payload = {"base_url": BASE_URL, "models": all_results}
     out_file = output_dir / "spike_07_lmstudio_api.json"
-    out_file.write_text(json.dumps(results, indent=2, ensure_ascii=False))
+    out_file.write_text(json.dumps(results_payload, indent=2, ensure_ascii=False))
     print(f"\n  💾 Results saved to {out_file}")
 
 
 if __name__ == "__main__":
-    main()
+    import pathlib
+
+    # Redirect output to a log file for easier review
+    log_dir = pathlib.Path(__file__).parent / "output" / "logs"
+    log_dir.mkdir(exist_ok=True)
+    log_file = log_dir / f"spike_07_lmstudio_api_{int(time.time())}.log"
+    with log_file.open("w", encoding="utf-8") as f:
+        sys.stdout = f
+        main()
