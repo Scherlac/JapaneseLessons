@@ -23,6 +23,7 @@ from prompt_template import (
     GRAMMAR_PATTERNS_BEGINNER,
     PERSONS_BEGINNER,
     build_lesson_prompt,
+    build_vocab_prompt,
 )
 
 VOCAB_DIR = Path(__file__).parent / "vocab"
@@ -72,6 +73,8 @@ examples:
   python generate_lesson.py --theme travel --nouns 4 --verbs 4
   python generate_lesson.py --theme food -o lesson_food.md
   python generate_lesson.py --list-themes
+  python generate_lesson.py --generate-vocab shopping
+  python generate_lesson.py --generate-vocab school --nouns 15 --verbs 12
         """,
     )
 
@@ -109,6 +112,18 @@ examples:
         type=str, default=None,
         help="Write prompt to file instead of stdout.",
     )
+    parser.add_argument(
+        "--generate-vocab",
+        type=str, default=None,
+        metavar="THEME",
+        help="Generate an LLM prompt to create vocabulary for a new theme.",
+    )
+    parser.add_argument(
+        "--level",
+        type=str, default="beginner",
+        choices=["beginner", "intermediate", "advanced"],
+        help="Difficulty level for vocab generation (default: beginner).",
+    )
 
     return parser
 
@@ -128,9 +143,25 @@ def main() -> None:
             print(f"No themes found. Add JSON files to: {VOCAB_DIR}")
         return
 
-    # --theme is required for generation
+    # --generate-vocab
+    if args.generate_vocab:
+        prompt = build_vocab_prompt(
+            theme=args.generate_vocab,
+            num_nouns=args.nouns if args.nouns != 6 else 12,
+            num_verbs=args.verbs if args.verbs != 6 else 10,
+            level=args.level,
+        )
+        if args.output:
+            out_path = Path(args.output)
+            out_path.write_text(prompt, encoding="utf-8")
+            print(f"Vocab prompt written to: {out_path}", file=sys.stderr)
+        else:
+            print(prompt)
+        return
+
+    # --theme is required for lesson generation
     if not args.theme:
-        parser.error("--theme is required (or use --list-themes)")
+        parser.error("--theme is required (or use --list-themes / --generate-vocab)")
 
     # Seed
     if args.seed is not None:

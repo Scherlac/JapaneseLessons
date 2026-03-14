@@ -182,3 +182,54 @@ def _build_combination_instruction(
             for polarity in polarities:
                 lines.append(f"    - {label} / {tense} / {polarity}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Vocabulary generation prompt
+# ---------------------------------------------------------------------------
+
+_VOCAB_EXAMPLE = """{
+  "theme": "food",
+  "nouns": [
+    {"english": "water", "japanese": "みず", "kanji": "水", "romaji": "mizu"}
+  ],
+  "verbs": [
+    {"english": "to eat", "japanese": "たべる", "kanji": "食べる", "romaji": "taberu", "type": "る-verb", "masu_form": "食べます"}
+  ]
+}"""
+
+
+def build_vocab_prompt(
+    theme: str,
+    num_nouns: int = 12,
+    num_verbs: int = 10,
+    level: str = "beginner",
+) -> str:
+    """
+    Build an LLM prompt that asks for a new vocabulary JSON file.
+
+    The output from the LLM can be saved directly as vocab/<theme>.json.
+    """
+    prompt = f"""\
+You are a Japanese language expert building vocabulary lists for {level}-level learners.
+
+Generate a JSON vocabulary file for the theme: **{theme}**
+
+Requirements:
+- Exactly {num_nouns} nouns and {num_verbs} verbs.
+- All words should be common, practical, {level}-appropriate.
+- Include a mix of verb types: る-verbs (ichidan), う-verbs (godan), and irregulars (する/来る compounds) where natural.
+- Each noun must have: english, japanese (kana), kanji, romaji.
+- Each verb must have: english, japanese (kana), kanji, romaji, type ("る-verb", "う-verb", "irregular", or "な-adj"), masu_form.
+- The "type" field must be exactly one of: "る-verb", "う-verb", "irregular", "な-adj".
+- Output ONLY valid JSON, no commentary before or after.
+- Use the exact schema below.
+
+Schema example:
+```json
+{_VOCAB_EXAMPLE}
+```
+
+Now generate the complete JSON for theme "{theme}" with {num_nouns} nouns and {num_verbs} verbs.
+"""
+    return prompt
