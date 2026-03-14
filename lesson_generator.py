@@ -364,15 +364,13 @@ Grammar requirements:
 - Use polite form (ます-form)
 - Make it a natural, contextual sentence (not just "I eat fish")
 
-Return a JSON object with:
+Return ONLY a raw JSON object with no markdown fences, no explanation:
 {{
   "english": "Natural English sentence",
   "japanese": "自然な日本語の文",
   "romaji": "Nihongo na bun",
   "context": "Brief explanation of grammar point or context"
 }}
-
-Make the sentence natural and varied - avoid formulaic patterns.
 """.strip()
 
     try:

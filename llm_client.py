@@ -19,6 +19,7 @@ from config import (
     LLM_DEBUG,
     LLM_MAX_TOKENS,
     LLM_MODEL,
+    LLM_NO_THINK,
     LLM_REQUEST_TIMEOUT,
     LLM_TEMPERATURE,
 )
@@ -27,6 +28,17 @@ from config import (
 logger = logging.getLogger(__name__)
 if LLM_DEBUG:
     logging.basicConfig(level=logging.DEBUG)
+
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def _strip_think(text: str) -> str:
+    """Remove <think> blocks (complete or truncated) from reasoning models."""
+    text = _THINK_RE.sub("", text)
+    # Handle truncated block where </think> is missing (model was cut off mid-thought)
+    text = re.sub(r"<think>.*", "", text, flags=re.DOTALL)
+    return text.strip()
+
 
 class LLMClient:
     """Universal LLM client using OpenAI-compatible interface."""
@@ -39,6 +51,15 @@ class LLMClient:
             max_retries=0,
         )
         self.model = LLM_MODEL
+        self.no_think = LLM_NO_THINK
+
+    def _build_messages(self, prompt: str) -> list[dict]:
+        """Build message list, prepending /no_think system message when enabled."""
+        messages = []
+        if self.no_think:
+            messages.append({"role": "system", "content": "/no_think"})
+        messages.append({"role": "user", "content": prompt})
+        return messages
 
     def generate_text(
         self,
@@ -71,7 +92,7 @@ class LLMClient:
 
         kwargs = {
             "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": self._build_messages(prompt),
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
@@ -88,7 +109,7 @@ class LLMClient:
 
             content = response.choices[0].message.content
             # Strip <think>...</think> blocks produced by reasoning/thinking models
-            content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+            content = _strip_think(content)
             if LLM_DEBUG:
                 logger.debug(f"Received response: {content[:200]}...")
 
@@ -105,7 +126,7 @@ class LLMClient:
                 kwargs.pop("response_format", None)
                 response = self.client.chat.completions.create(**kwargs)
                 content = response.choices[0].message.content
-                return re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+                return _strip_think(content)
             logger.error(f"API error: {e}")
             raise
         except Exception as e:
@@ -148,8 +169,16 @@ class LLMClient:
             max_tokens=max_tokens,
         )
 
+        # Strip markdown fences that some models add even when asked not to
+        text = response_text.strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.rstrip("`").strip()
+
         try:
-            return json.loads(response_text)
+            return json.loads(text)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {response_text}")
             raise ValueError(f"LLM returned invalid JSON: {e}") from e
