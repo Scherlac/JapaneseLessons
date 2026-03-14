@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "japanese-lesson-generator"
+version = "0.1.0"
+description = "CLI tool for generating structured Japanese learning lessons with high repetition"
+requires-python = ">=3.10"
+license = "MIT"
+readme = "README.md"
+
+dependencies = []  # Core CLI is stdlib-only
+
+[project.optional-dependencies]
+video = [
+    "edge-tts>=7.0",
+    "moviepy>=2.0",
+    "Pillow>=10.0",
+]
+llm = [
+    "openai>=1.0",
+]
+all = [
+    "japanese-lesson-generator[video,llm]",
+]
+
+[project.scripts]
+japanese-lesson = "generate_lesson:main"
+
+[tool.setuptools]
+py-modules = [
+    "generate_lesson",
+    "lesson_generator",
+    "prompt_template",
+]
+
+[tool.setuptools.package-data]
+"*" = ["vocab/*.json"]
