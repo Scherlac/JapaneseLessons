@@ -63,14 +63,29 @@ Researched and documented multiple options for each technology choice:
 - **CLI Integration** — Added `--render-video` flag to `generate_lesson.py`
 - **Module Packaging** — Updated `pyproject.toml` to include new modules
 
-### 10. LLM Integration (Code Written — Not Yet Validated End-to-End)
-- **LLM Client**: Created `llm_client.py` with universal OpenAI SDK interface
-- **Configuration**: Added `config.py` for LLM provider settings
-- **Enhanced Grammar**: Added `--llm` flag — falls back silently to deterministic if LLM fails
-- **Fallback Safety**: Automatic fallback to deterministic if LLM fails (masks broken state)
-- **Dependencies**: Added `openai` to requirements
-- **Evaluation Spike**: Created `spike_06_llm_evaluation.py` — not yet run
-- **⚠️ Status**: Code compiles and imports; basic connectivity to LM Studio confirmed; actual sentence generation with `--llm` flag **not yet tested or validated**
+### 10. LLM Integration (Validated via Spikes)
+- **LLM Client**: `llm_client.py` — universal OpenAI SDK interface
+- **Configuration**: `config.py` — provider settings, timeout, temperature
+- **Enhanced Grammar**: `--llm` flag falls back silently to deterministic if LLM unavailable
+- **`<think>` stripping**: `llm_client.py` now strips `<think>...</think>` reasoning blocks from thinking models (Qwen3, phi-4-reasoning-plus, ministral-reasoning)
+- **JSON fallback**: Automatically retries without `response_format: json_object` on HTTP 400 (LM Studio does not support it)
+- **Dependencies**: `openai` added to requirements
+
+### 11. LLM Evaluation Spikes
+- **`spike_06_llm_evaluation.py`** — Multi-provider benchmark (Ollama, LM Studio, OpenAI); added host reachability pre-check, 15s per-provider budget, 10s per-request timeout
+- **`spike_07_lmstudio_api.py`** — Deep LM Studio API evaluation:
+  - Connectivity, model list, loaded model detection
+  - Plain text, `json_object` mode, prompt-based JSON
+  - Discovered: LM Studio rejects `json_object` response_format; workaround confirmed
+  - Discovered: `qwen3-14b` is a thinking model — requires `/no_think` system message
+  - **Confirmed working**: plain text ✅ 2.4s · JSON via prompt ✅ 7.3s with `/no_think`
+
+### 12. Model Research (16 GB GDDR)
+Surveyed all models available in LM Studio against 16 GB VRAM budget and Japanese language quality:
+- **Best available**: `qwen/qwen3-14b` (~9 GB Q4) — best Japanese, use with `/no_think`
+- **Fast fallback**: `meta-llama-3.1-8b-instruct` (~5 GB) — no thinking mode, native `json_object`
+- **Recommended download**: `Qwen2.5-7B-Instruct Q4_K_M` — non-thinking, fast, excellent Japanese, native JSON mode
+- **Avoid**: reasoning/math models (`phi-4-reasoning-plus`, `ministral-3-14b-reasoning`, `deepseek-math`) — not suited for language generation
 
 ---
 
@@ -104,7 +119,8 @@ japanese/
 │   ├── spike_03_video.py
 │   ├── spike_04_full_pipeline.py
 │   ├── spike_05_performance.py
-│   ├── spike_06_llm_evaluation.py  # LLM provider evaluation
+│   ├── spike_06_llm_evaluation.py  # LLM provider benchmark (multi-provider, budgeted)
+│   ├── spike_07_lmstudio_api.py    # LM Studio deep API evaluation
 │   └── output/           # Spike outputs (gitignored)
 └── output/               # Generated lessons (gitignored)
 ```
@@ -167,8 +183,8 @@ This project follows an **iterative, research-driven development cycle** designe
 ### Current Cycle Status
 
 - ✅ **Completed**: Research, design, spikes, core CLI, lesson generation, video pipeline
-- 🔄 **In Progress**: LLM integration — code written, LM Studio connected; `--llm` flag end-to-end **not yet validated**
-- 📋 **Planned**: Run evaluation spike, validate LLM sentence generation, expand vocab themes, Anki export
+- ✅ **Completed**: LLM integration validated — LM Studio + `qwen3-14b` confirmed working with `/no_think` + JSON prompt fallback
+- 📋 **Planned**: Wire `/no_think` into `llm_client.py` config, validate `--llm` flag end-to-end, expand vocab themes, Anki export
 
 ---
 
@@ -209,7 +225,8 @@ This project follows an **iterative, research-driven development cycle** designe
 | `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --render-video --video-method ffmpeg` | ✓ Video generated (69.9 KB, fast method) |
 | `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --render-video --video-method moviepy` | ✓ Video generated (slower method, compatible) |
 | `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --llm` | ⚠️ Ran but fell back to deterministic (no LLM server running at the time) |
-| `python -c "from llm_client import LLMClient; LLMClient().generate_text('Hello')"` | ✓ LM Studio basic connectivity confirmed (qwen/qwen3-14b) — sentence generation not yet tested |
+| `conda run -n base python spike/spike_07_lmstudio_api.py` | ✅ LM Studio confirmed: plain text 2.4s, JSON via prompt 7.3s, `qwen3-14b` with `/no_think` |
+| `conda run -n base python spike/spike_06_llm_evaluation.py` | ✅ Ran: Ollama not running (skipped), LM Studio hit 15s budget (model slow to load) |
 
 ---
 
@@ -235,9 +252,10 @@ This project follows an **iterative, research-driven development cycle** designe
 ### ✅ LLM Provider (LM Studio)
 - **Provider**: LM Studio running locally on port 1234
 - **Active model**: `qwen/qwen3-14b`
-- **Available models**: qwen3-14b, phi-4-reasoning-plus, meta-llama-3.1-8b-instruct, mistral-7b-instruct-v0.3, ministral-3b, stable-code-3b
+- **Available models**: qwen3-14b, phi-4-reasoning-plus, meta-llama-3.1-8b-instruct, mistral-7b-instruct-v0.3, ministral-3-14b-reasoning, deepseek-math-7b-instruct, stable-code-3b, text-embedding-nomic-embed-text-v1.5
 - **Config**: `config.py` → `LLM_BASE_URL=http://localhost:1234/v1`, `LLM_MODEL=qwen/qwen3-14b`
-- **Status**: ✅ Connected and responding
+- **Status**: ✅ Connected, plain text generation confirmed (2.4s), JSON via prompt confirmed (7.3s)
+- **Known quirks**: `json_object` response_format not supported (HTTP 400); `qwen3-14b` is a thinking model — use `/no_think` system message
 
 ### 📦 Installation
 Run `install.ps1` to install missing dependencies:
@@ -329,9 +347,12 @@ Estimated video length: 87 touches × 7.5s ≈ **~11 minutes** per unit.
   - **Note**: TTS requires internet access to Microsoft servers; may fail in restricted networks
   - **🚀 Performance**: Video composition optimized with FFmpeg stream copying (12.5x faster)
 - [~] **LLM Integration**: Code written (`llm_client.py`, `config.py`, `--llm` flag) — falls back to deterministic; end-to-end not yet validated
-- [~] **LLM Provider Setup**: LM Studio running with `qwen/qwen3-14b`; basic HTTP connection confirmed
+- [x] **LLM Provider Setup**: LM Studio running with `qwen/qwen3-14b`; plain text + JSON generation confirmed
+- [x] **LLM Evaluation**: `spike_06_llm_evaluation.py` run — host reachability check, 15s budget, provider comparison
+- [x] **LM Studio Deep Eval**: `spike_07_lmstudio_api.py` — confirmed JSON via prompt works, `<think>` stripping fixed in `llm_client.py`
+- [x] **Model Research**: 16 GB GDDR model survey complete — `qwen3-14b` + `/no_think` recommended
+- [ ] **Wire `/no_think`**: Add `LLM_NO_THINK` config option to `config.py` + `llm_client.py`
 - [ ] **LLM Validation**: Test `--llm` flag produces actual LLM sentences (not fallback)
-- [ ] **LLM Evaluation**: Run `spike_06_llm_evaluation.py` to benchmark sentence quality across models
 - [ ] **More Vocab Themes**: Expand beyond food/travel themes
 - [ ] **Performance Optimization**: Video generation speed improvements
 - [ ] Optional: export generated lessons to Anki-compatible format

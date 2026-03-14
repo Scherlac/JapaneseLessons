@@ -7,6 +7,7 @@ Provides simple interface for text generation with optional JSON mode.
 
 import json
 import logging
+import re
 from typing import Any, Dict, Optional
 
 from openai import OpenAI
@@ -35,6 +36,7 @@ class LLMClient:
             base_url=LLM_BASE_URL,
             api_key=LLM_API_KEY,
             timeout=LLM_REQUEST_TIMEOUT,
+            max_retries=0,
         )
         self.model = LLM_MODEL
 
@@ -85,6 +87,8 @@ class LLMClient:
             response = self.client.chat.completions.create(**kwargs)
 
             content = response.choices[0].message.content
+            # Strip <think>...</think> blocks produced by reasoning/thinking models
+            content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
             if LLM_DEBUG:
                 logger.debug(f"Received response: {content[:200]}...")
 
@@ -94,6 +98,14 @@ class LLMClient:
             logger.error(f"Rate limit exceeded: {e}")
             raise
         except APIError as e:
+            # Some providers (e.g. LM Studio) don't support json_object response_format.
+            # Retry without it — the prompt already requests JSON output.
+            if json_mode and e.status_code == 400:
+                logger.warning("json_object response_format not supported, retrying in text mode")
+                kwargs.pop("response_format", None)
+                response = self.client.chat.completions.create(**kwargs)
+                content = response.choices[0].message.content
+                return re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
             logger.error(f"API error: {e}")
             raise
         except Exception as e:

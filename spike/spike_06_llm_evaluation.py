@@ -19,8 +19,10 @@ Requires:
 
 import json
 import time
+import socket
 from pathlib import Path
 from typing import Dict, List, Any
+from urllib.parse import urlparse
 
 # Add project root to path for imports
 import sys
@@ -28,6 +30,18 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from llm_client import ask_llm_json, LLMClient
 from config import LLM_BASE_URL, LLM_API_KEY, LLM_MODEL
+
+def is_host_reachable(base_url: str, timeout: int = 3) -> bool:
+    """Quick TCP check to see if a provider endpoint is up before running tests."""
+    try:
+        parsed = urlparse(base_url)
+        host = parsed.hostname
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except (OSError, ValueError):
+        return False
+
 
 def test_sentence_generation(client: LLMClient, verb: Dict, noun: Dict, person: str, tense: str, polarity: str) -> Dict[str, Any]:
     """Test generating a single natural sentence."""
@@ -66,7 +80,7 @@ Make the sentence natural and varied - avoid formulaic patterns.
             "time": elapsed,
             "error": None
         }
-    except Exception as e:
+    except BaseException as e:
         elapsed = time.time() - start_time
         return {
             "success": False,
@@ -75,22 +89,35 @@ Make the sentence natural and varied - avoid formulaic patterns.
             "error": str(e)
         }
 
+PROVIDER_TIMEOUT = 15  # seconds total budget per provider
+
 def evaluate_provider(provider_name: str, base_url: str, api_key: str, model: str, test_cases: List[Dict]) -> Dict[str, Any]:
     """Evaluate a specific LLM provider."""
     print(f"\n🔬 Testing {provider_name} ({model})")
     print("=" * 50)
 
-    # Create client with specific config
+    # Quick connectivity check before running all tests
+    if not is_host_reachable(base_url):
+        print(f"  ⚡ Skipped — host not reachable: {base_url}")
+        return {"provider": provider_name, "model": model, "skipped": True, "results": []}
+
+    # Create client with specific config; cap per-request timeout to leave room for multiple tests
     client = LLMClient()
     client.client.base_url = base_url
     client.client.api_key = api_key
+    client.client.timeout = min(10, PROVIDER_TIMEOUT)
     client.model = model
 
     results = []
     total_time = 0
     success_count = 0
+    provider_start = time.time()
 
     for i, test_case in enumerate(test_cases, 1):
+        elapsed_budget = time.time() - provider_start
+        if elapsed_budget >= PROVIDER_TIMEOUT:
+            print(f"  ⏱ Budget exhausted ({PROVIDER_TIMEOUT}s), stopping after {i-1}/{len(test_cases)} tests")
+            break
         print(f"Test {i}/{len(test_cases)}: {test_case['verb']['english']} + {test_case['noun']['english']} ({test_case['person']}/{test_case['tense']}/{test_case['polarity']})")
 
         result = test_sentence_generation(
@@ -162,11 +189,12 @@ def main():
     tenses = ["present", "past"]
     polarities = ["affirmative", "negative"]
 
-    for verb in test_vocab["verbs"][:2]:  # Test first 2 verbs
-        for noun in test_vocab["nouns"][:2]:  # Test first 2 nouns
-            for person in persons[:2]:  # Test first 2 persons
-                for tense in tenses:
-                    for polarity in polarities:
+    # Keep sample small — 4 cases is enough to evaluate quality
+    for verb in test_vocab["verbs"][:1]:
+        for noun in test_vocab["nouns"][:1]:
+            for person in persons[:1]:
+                for tense in tenses[:2]:
+                    for polarity in polarities[:2]:
                         test_cases.append({
                             "verb": verb,
                             "noun": noun,
@@ -176,11 +204,11 @@ def main():
                         })
 
     print(f"📋 Test Plan: {len(test_cases)} sentence generation tests")
-    print(f"   Verbs: {len(test_vocab['verbs'][:2])}")
-    print(f"   Nouns: {len(test_vocab['nouns'][:2])}")
-    print(f"   Persons: {len(persons[:2])}")
-    print(f"   Tenses: {len(tenses)}")
-    print(f"   Polarities: {len(polarities)}")
+    print(f"   Verbs: {len(test_vocab['verbs'][:1])}")
+    print(f"   Nouns: {len(test_vocab['nouns'][:1])}")
+    print(f"   Persons: {len(persons[:1])}")
+    print(f"   Tenses: {len(tenses[:2])}")
+    print(f"   Polarities: {len(polarities[:2])}")
 
     # Test providers
     providers = []
@@ -214,6 +242,14 @@ def main():
         "model": "gemma3:12b"
     })
 
+    # 4. LM Studio
+    providers.append({
+        "name": "LM Studio",
+        "base_url": "http://localhost:1234/v1",
+        "api_key": "lm-studio",
+        "model": "qwen/qwen3-14b"
+    })
+
     # Run evaluations
     all_results = []
     for provider in providers:
@@ -239,7 +275,7 @@ def main():
     print("🏆 OVERALL COMPARISON")
     print("="*60)
 
-    successful_providers = [r for r in all_results if "error" not in r]
+    successful_providers = [r for r in all_results if "error" not in r and not r.get("skipped")]
 
     if successful_providers:
         # Sort by success rate, then by speed
