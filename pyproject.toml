@@ -33,6 +33,9 @@ py-modules = [
     "generate_lesson",
     "lesson_generator",
     "prompt_template",
+    "tts_engine",
+    "video_cards",
+    "video_builder",
 ]
 
 [tool.setuptools.package-data]

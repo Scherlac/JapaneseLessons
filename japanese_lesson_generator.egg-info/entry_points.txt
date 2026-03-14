@@ -1,0 +1,2 @@
+[console_scripts]
+japanese-lesson = generate_lesson:main

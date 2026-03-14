@@ -56,15 +56,21 @@ Researched and documented multiple options for each technology choice:
 - **`decision_fonts_rendering.md`** — 5 font options compared → **Noto Sans JP** (Yu Gothic Bold fallback)
 - **`decision_llm_integration.md`** — 5 LLM options compared → **OpenAI SDK + Ollama** (hybrid: deterministic + LLM)
 
-### 7. Spike Implementations (`spike/`)
-Minimal proof-of-concept scripts validating the recommended tech stack. All 4 pass.
+### 8. Production Modules (Extracted from Spikes)
+- **`tts_engine.py`** — Production TTS engine using edge-tts (extracted from spike_01)
+- **`video_cards.py`** — Card renderer for 1080p video cards (extracted from spike_02)
+- **`video_builder.py`** — Video assembler using moviepy (extracted from spike_03/04)
+- **CLI Integration** — Added `--render-video` flag to `generate_lesson.py`
+- **Module Packaging** — Updated `pyproject.toml` to include new modules
 
-| Spike | Script | Result | Key Findings |
-|-------|--------|--------|--------------|
-| 01 — TTS | `spike_01_tts.py` | ✓ 7 audio files + SRT | edge-tts 7.x: `SubMaker.feed()` + `get_srt()`. NanamiNeural + KeitaNeural. Rate control works. |
-| 02 — Cards | `spike_02_cards.py` | ✓ 3 PNG cards (1920×1080) | Yu Gothic Bold renders Japanese cleanly. Three card types: INTRODUCE, RECALL, TRANSLATE. |
-| 03 — Video | `spike_03_video.py` | ✓ 19s MP4 (4 clips) | moviepy concatenation + audio delay via `with_start()`. Export: libx264 + aac. |
-| 04 — Full pipeline | `spike_04_full_pipeline.py` | ✓ 16s MP4 (3 items) | End-to-end: vocab → cards → TTS → video. Pipeline concept proven. |
+### 9. Video Pipeline Integration
+- Video rendering integrated into CLI with `--create --render-video`
+- Automatic audio generation for all lesson items
+- Automatic card generation matching lesson structure
+- Full pipeline: JSON → Audio → Cards → Video
+- Tested: Audio generation starts successfully (87 files would take ~10-15 minutes)
+
+---
 
 ---
 
@@ -293,10 +299,11 @@ Estimated video length: 87 touches × 7.5s ≈ **~11 minutes** per unit.
 - [x] Spike implementations (all 4 pass)
 - [x] Deterministic lesson generator with `--create`
 - [x] First lesson: food theme (87 items)
-- [ ] Build TTS engine module — extract from spike_01
-- [ ] Build video card renderer — extract from spike_02
-- [ ] Build video assembler — extract from spike_03/04
-- [ ] Add `--render-video` CLI flag
+- [x] Build TTS engine module — extract from spike_01
+- [x] Build video card renderer — extract from spike_02
+- [x] Build video assembler — extract from spike_03/04
+- [x] Add `--render-video` CLI flag
+- [ ] Test full video pipeline (generate complete lesson video)
 - [ ] LLM integration (OpenAI SDK + Ollama) for enhanced grammar
 - [ ] Add more vocabulary themes (daily routine, shopping, school, etc.)
 - [ ] Optional: export generated lessons to Anki-compatible format

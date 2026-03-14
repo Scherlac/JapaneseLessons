@@ -147,8 +147,126 @@ examples:
         action="store_true",
         help="Generate a complete lesson (JSON + Markdown) instead of an LLM prompt.",
     )
+    parser.add_argument(
+        "--render-video",
+        action="store_true",
+        help="Render video from lesson items (requires --create and video dependencies).",
+    )
 
     return parser
+
+
+def _render_video_from_lesson(lesson_data: dict, output_dir: Path) -> None:
+    """Render video from lesson data using the video pipeline."""
+    try:
+        from tts_engine import create_engine
+        from video_cards import CardRenderer
+        from video_builder import VideoBuilder
+    except ImportError as e:
+        print(f"  Error: Video dependencies not available: {e}", file=sys.stderr)
+        print("  Install with: pip install -e .[all] && conda install -c conda-forge ffmpeg", file=sys.stderr)
+        return
+
+    import asyncio
+
+    items = lesson_data["items"]
+    theme = lesson_data["theme"]
+
+    # Create output directories
+    cards_dir = output_dir / "cards"
+    audio_dir = output_dir / "audio"
+    cards_dir.mkdir(exist_ok=True)
+    audio_dir.mkdir(exist_ok=True)
+
+    # Initialize components
+    tts_engine = create_engine("japanese_female", rate="-20%")
+    card_renderer = CardRenderer()
+    video_builder = VideoBuilder()
+
+    async def render_video_async():
+        # Generate audio for all items
+        print("    Generating audio...")
+        audio_paths = []
+        for i, item in enumerate(items):
+            text = item.get("tts_text", item.get("text", ""))
+            voice_key = "japanese_female"  # Default
+            if "tts_voice" in item:
+                if "Nanami" in item["tts_voice"]:
+                    voice_key = "japanese_female"
+                elif "Keita" in item["tts_voice"]:
+                    voice_key = "japanese_male"
+                elif "Aria" in item["tts_voice"]:
+                    voice_key = "english_female"
+
+            # Create voice-specific engine for this item
+            item_engine = create_engine(voice_key, rate="-20%")
+
+            audio_filename = f"audio_{i+1:03d}.mp3"
+            audio_path = audio_dir / audio_filename
+            await item_engine.generate_audio(text, audio_path)
+            audio_paths.append(audio_path)
+
+        # Generate cards for all items
+        print("    Generating cards...")
+        total_items = len(items)
+        for i, item in enumerate(items):
+            progress = (i + 1) / total_items
+
+            # Determine card type based on step
+            step = item["step"]
+            if step == "INTRODUCE":
+                # English → Japanese
+                card = card_renderer.render_introduce_card(
+                    english=item["prompt"],
+                    japanese=item["reveal"],
+                    kana="",  # Could extract from annotation
+                    romaji="",  # Could extract from annotation
+                    step_label=item["counter"],
+                    progress=progress
+                )
+            elif step == "RECALL":
+                # Japanese → English
+                card = card_renderer.render_recall_card(
+                    japanese=item["prompt"],
+                    kana="",  # Could extract from annotation
+                    romaji="",  # Could extract from annotation
+                    english=item["reveal"],
+                    step_label=item["counter"],
+                    progress=progress
+                )
+            else:
+                # TRANSLATE or other grammar steps
+                card = card_renderer.render_translate_card(
+                    english=item["prompt"],
+                    japanese=item["reveal"],
+                    romaji="",  # Could extract from annotation
+                    context=f"{item['phase']} / {step.lower()}",
+                    step_label=item["counter"],
+                    progress=progress
+                )
+
+            # Save card
+            card_path = cards_dir / "03d"
+            card_renderer.save_card(card, card_path)
+
+        # Build video
+        print("    Building video...")
+        video_path = output_dir / f"lesson_{theme}.mp4"
+
+        # Create clips for each item
+        clips = []
+        for i, item in enumerate(items):
+            card_path = cards_dir / "03d"
+            audio_path = audio_dir / "03d"
+            clip = video_builder.create_clip(card_path, audio_path)
+            clips.append(clip)
+
+        # Build final video
+        video_builder.build_video(clips, video_path)
+        print(f"  Video:  {video_path}")
+
+    # Run async video rendering
+    asyncio.run(render_video_async())
 
 
 def main() -> None:
@@ -228,6 +346,12 @@ def main() -> None:
         print(f"  Items:  {len(items)} ({summary})")
         print(f"  JSON:   {json_path}")
         print(f"  Review: {md_path}")
+
+        # Render video if requested
+        if args.render_video:
+            print("  Rendering video...")
+            _render_video_from_lesson(lesson_data, output_dir)
+
         return
 
     # --theme is required for lesson generation
