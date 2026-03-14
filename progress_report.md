@@ -72,10 +72,139 @@ japanese/
 
 ---
 
+### 5. Vocabulary Generation via LLM (`--generate-vocab`)
+- `--generate-vocab <theme>` — produces an LLM prompt that outputs valid vocab JSON
+- `--level beginner|intermediate|advanced` — controls difficulty
+- `--nouns N` / `--verbs N` — override default counts (12/10)
+- LLM output can be saved directly as `vocab/<theme>.json`
+- Tested with `shopping` and `school` themes ✓
+
+---
+
+## Video Generation Pipeline — Plan
+
+### Goal
+
+Turn a generated lesson (text) into a **learning video** with:
+- Visual text cards showing English ↔ Japanese  
+- Audio narration (TTS) for pronunciation  
+- Timed pauses for learner recall  
+
+### End-to-End Pipeline
+
+```
+[1] CLI generates       [2] LLM produces       [3] Parser extracts      [4] TTS generates     [5] Video assembler
+    lesson prompt  --->     lesson text    --->     structured items --->     audio clips   --->   final .mp4
+    (existing)              (manual/API)            (new: parser)            (new: tts)           (new: compose)
+```
+
+### Step Breakdown
+
+| Step | Module | Input | Output | Status |
+|------|--------|-------|--------|--------|
+| 1. Generate prompt | `generate_lesson.py` | vocab JSON | prompt text | ✅ Done |
+| 2. Run LLM | Manual paste or API call | prompt text | lesson markdown | 🔧 Manual for now |
+| 3. Parse lesson | `lesson_parser.py` (new) | lesson markdown | list of `LessonItem` dicts | ❌ To build |
+| 4. Generate audio | `tts_engine.py` (new) | text per item | `.mp3`/`.wav` per item | ❌ To build |
+| 5. Render frames | `video_cards.py` (new) | text per item | image per item (Pillow) | ❌ To build |
+| 6. Compose video | `video_builder.py` (new) | images + audio | `.mp4` | ❌ To build |
+
+### Available Libraries (in py312 env)
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| **moviepy** | 2.1.2 | ✅ Video composition, clip sequencing, audio overlay |
+| **Pillow** | 12.0.0 | ✅ Text card rendering (English/Japanese on image) |
+| **ffmpeg** | — | ❌ **Needs install** — required by moviepy for encoding |
+
+### Libraries to Install
+
+| Library | Purpose | Why this one |
+|---------|---------|-------------|
+| **edge-tts** | Text-to-speech | Free, high-quality, supports Japanese voices (`ja-JP-NanamiNeural`), async, no API key |
+| **ffmpeg** | Video encoding | Required by moviepy; install via `conda install ffmpeg` or system package |
+
+### Proposed Module Design
+
+```
+japanese/
+├── generate_lesson.py       # CLI (existing)
+├── prompt_template.py       # Prompt builder (existing)
+├── lesson_parser.py         # NEW: parse LLM lesson output → structured items
+├── tts_engine.py            # NEW: text → audio files via edge-tts
+├── video_cards.py           # NEW: text → image cards via Pillow
+├── video_builder.py         # NEW: images + audio → mp4 via moviepy
+├── vocab/                   # Vocabulary JSON files
+└── output/                  # Generated audio, images, video (gitignored)
+```
+
+**Principles:**
+- **Low coupling** — each module does one thing, communicates via simple data (dicts/paths)
+- **Composition** — `video_builder` composes outputs from `tts_engine` + `video_cards`
+- **KISS** — no complex orchestration; a single `--render-video` CLI flag runs the pipeline
+- **YAGNI** — no web UI, no real-time preview; just generate an .mp4
+
+### Lesson Item Schema (what the parser produces)
+
+```python
+{
+    "phase": "nouns" | "verbs" | "grammar",
+    "step": "INTRODUCE" | "RECALL" | "REINFORCE" | "SELF-CHECK" | "LOCK-IN" | "TRANSLATE" | "COMPREHEND",
+    "display_text": "water → 水 (みず, mizu)",       # shown on screen
+    "tts_english": "water",                           # spoken in English
+    "tts_japanese": "mizu",                           # spoken in Japanese
+    "pause_seconds": 2.0,                             # think time before reveal
+}
+```
+
+### Video Card Layout (per frame)
+
+```
+┌─────────────────────────────────┐
+│         [INTRODUCE] 1/30        │  ← step label + counter
+│                                 │
+│           water                 │  ← English (large)
+│                                 │
+│        ─── pause ───            │  ← blank/thinking gap
+│                                 │
+│      水 (みず, mizu)            │  ← Japanese reveal
+│                                 │
+│   ━━━━━━━━━━━━━━━━━━━━━━━━━━   │  ← progress bar
+└─────────────────────────────────┘
+```
+
+### Timing Model
+
+| Event | Duration |
+|-------|----------|
+| Show English text | 1.5s |
+| English TTS plays | ~1s (auto) |
+| Pause (learner thinks) | 2.0s |
+| Reveal Japanese + TTS | ~1.5s (auto) |
+| Hold both visible | 1.5s |
+| **Total per touch** | **~7.5s** |
+
+Estimated video length: 87 touches × 7.5s ≈ **~11 minutes** per unit.
+
+### Implementation Order
+
+1. Install `edge-tts` + `ffmpeg`
+2. Build `lesson_parser.py` — parse lesson markdown into item list
+3. Build `tts_engine.py` — generate audio clips
+4. Build `video_cards.py` — render text cards as images
+5. Build `video_builder.py` — assemble final video
+6. Add `--render-video` flag to CLI
+7. Test end-to-end with food theme
+
+---
+
 ## Next Steps
 
+- [ ] Install ffmpeg + edge-tts
+- [ ] Build lesson parser (step 3 of pipeline)
+- [ ] Build TTS engine (step 4)
+- [ ] Build video card renderer (step 5)
+- [ ] Build video assembler (step 6)
 - [ ] Add more vocabulary themes (daily routine, shopping, school, etc.)
 - [ ] Optional: pipe output directly to an LLM API (OpenAI / Ollama)
-- [ ] Optional: add an `--interactive` mode that feeds the prompt and streams back the lesson
 - [ ] Optional: export generated lessons to Anki-compatible format
-- [ ] Consider adding dimension selection flags (e.g. `--tense past` to limit scope)

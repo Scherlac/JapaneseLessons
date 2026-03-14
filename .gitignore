@@ -1,6 +1,9 @@
 # Generated lesson outputs
 lesson_*.md
 
+# Generated video/audio output
+output/
+
 # Python
 __pycache__/
 *.pyc
