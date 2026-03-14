@@ -107,6 +107,58 @@ japanese/
 
 ---
 
+## Development Cycle
+
+This project follows an **iterative, research-driven development cycle** designed for solo development with high documentation standards:
+
+### Cycle Phases
+
+1. **Research & Design** 📋
+   - Define problem and requirements
+   - Research technology options
+   - Document decisions in `docs/` 
+   - Design architecture and data structures
+
+2. **Spike Implementation** 🔬
+   - Create minimal proof-of-concept scripts (`spike/`)
+   - Validate technology choices
+   - Reduce risk before full implementation
+   - Document findings and key learnings
+
+3. **Core Development** 🛠️
+   - Implement production-ready features
+   - Follow YAGNI/KISS/DRY principles
+   - Keep dependencies minimal (stdlib-first)
+   - Write pure functions with clear interfaces
+
+4. **Testing & Validation** ✅
+   - Manual testing of all CLI commands
+   - Verify output formats and functionality
+   - Test edge cases and error conditions
+   - Document test results
+
+5. **Documentation & Planning** 📝
+   - Update progress report with completed work
+   - Document architecture and design decisions
+   - Plan next iteration's scope
+   - Maintain comprehensive README
+
+### Cycle Characteristics
+
+- **Documentation-first**: Every decision and implementation is documented before/after
+- **Spike-before-scale**: Prove concepts with minimal code before building full features
+- **Incremental delivery**: Working features over big releases
+- **Validation-driven**: Test and verify at each step
+- **Research-heavy**: Technology decisions are well-researched and documented
+
+### Current Cycle Status
+
+- ✅ **Completed**: Research, design, spikes, core CLI, lesson generation
+- 🔄 **Active**: Extracting production modules from spikes (TTS, video rendering)
+- 📋 **Planned**: LLM integration, video pipeline completion, additional themes
+
+---
+
 ## Dependencies
 
 ### Core (stdlib only — no pip install needed)
