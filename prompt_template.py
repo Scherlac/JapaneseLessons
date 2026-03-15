@@ -233,3 +233,289 @@ Schema example:
 Now generate the complete JSON for theme "{theme}" with {num_nouns} nouns and {num_verbs} verbs.
 """
     return prompt
+
+
+# ---------------------------------------------------------------------------
+# Focused practice prompts (JSON-output, use with ask_llm_json_free)
+# ---------------------------------------------------------------------------
+# These prompts are designed for the curriculum pipeline.
+# Each returns a JSON object — feed to ask_llm_json_free(), not ask_llm_json().
+
+def build_noun_practice_prompt(nouns: list[dict], lesson_number: int = 1) -> str:
+    """Build a prompt for an LLM to generate focused noun introduction content.
+
+    Returns JSON: {"noun_items": [{"english", "japanese", "kanji", "romaji",
+    "example_sentence_jp", "example_sentence_en", "memory_tip"}, ...]}
+
+    Use with ask_llm_json_free().
+    """
+    noun_block = _format_noun_list(nouns)
+
+    return f"""\
+You are a Japanese language teacher writing a noun introduction for lesson {lesson_number}.
+
+NOUNS TO INTRODUCE:
+{noun_block}
+
+For each noun, produce a JSON entry with:
+- english, japanese (kana), kanji, romaji  (copy from the list above exactly)
+- example_sentence_jp  — a short, natural Japanese sentence using the noun
+- example_sentence_en  — the English translation of that sentence
+- memory_tip           — a mnemonic or visual association to help remember the word
+
+Return ONLY a raw JSON object — no markdown fences, no commentary:
+{{
+  "noun_items": [
+    {{
+      "english": "...",
+      "japanese": "...",
+      "kanji": "...",
+      "romaji": "...",
+      "example_sentence_jp": "...",
+      "example_sentence_en": "...",
+      "memory_tip": "..."
+    }}
+  ]
+}}
+""".strip()
+
+
+def build_verb_practice_prompt(verbs: list[dict], lesson_number: int = 1) -> str:
+    """Build a prompt for an LLM to generate focused verb introduction content.
+
+    Returns JSON: {"verb_items": [{"english", "japanese", "kanji", "romaji",
+    "masu_form", "polite_forms", "example_sentence_jp", "example_sentence_en",
+    "memory_tip"}, ...]}
+    "polite_forms" contains all four ます-forms.
+
+    Use with ask_llm_json_free().
+    """
+    verb_block = _format_verb_list(verbs)
+
+    return f"""\
+You are a Japanese language teacher writing a verb introduction for lesson {lesson_number}.
+
+VERBS TO INTRODUCE:
+{verb_block}
+
+For each verb, produce a JSON entry with:
+- english, japanese (kana), kanji, romaji, masu_form  (copy exactly from the list)
+- polite_forms — object with four keys: present_aff, present_neg, past_aff, past_neg
+- example_sentence_jp  — a short, natural Japanese sentence using the verb
+- example_sentence_en  — the English translation
+- memory_tip           — a mnemonic or association
+
+Return ONLY a raw JSON object — no markdown fences, no commentary:
+{{
+  "verb_items": [
+    {{
+      "english": "...",
+      "japanese": "...",
+      "kanji": "...",
+      "romaji": "...",
+      "masu_form": "...",
+      "polite_forms": {{
+        "present_aff": "...",
+        "present_neg": "...",
+        "past_aff": "...",
+        "past_neg": "..."
+      }},
+      "example_sentence_jp": "...",
+      "example_sentence_en": "...",
+      "memory_tip": "..."
+    }}
+  ]
+}}
+""".strip()
+
+
+def build_grammar_select_prompt(
+    unlocked_grammar: list[dict],
+    available_nouns: list[dict],
+    available_verbs: list[dict],
+    lesson_number: int,
+    covered_grammar_ids: list[str],
+) -> str:
+    """Level-1 grammar prompt: ask the LLM which grammar point to teach next.
+
+    Given the unlocked (available but not yet covered) grammar steps and the
+    current vocabulary pool, the LLM selects the most suitable 1-2 grammar
+    IDs for this lesson and explains its reasoning.
+
+    Returns JSON: {"selected_ids": [...], "rationale": "..."}
+
+    Use with ask_llm_json_free().
+    """
+    grammar_lines = "\n".join(
+        f"  - id: {g['id']}\n"
+        f"    structure: {g['structure']}\n"
+        f"    description: {g['description']}\n"
+        f"    example: {g['example_en']} → {g['example_jp']}\n"
+        f"    level: {g['level']}"
+        for g in unlocked_grammar
+    )
+
+    noun_names = ", ".join(n["english"] for n in available_nouns)
+    verb_names = ", ".join(v["english"] for v in available_verbs)
+    covered_str = ", ".join(covered_grammar_ids) if covered_grammar_ids else "(none)"
+
+    return f"""\
+You are a Japanese curriculum designer planning lesson {lesson_number}.
+
+ALREADY COVERED GRAMMAR:
+  {covered_str}
+
+AVAILABLE VOCABULARY FOR THIS LESSON:
+  Nouns: {noun_names}
+  Verbs: {verb_names}
+
+UNLOCKED GRAMMAR STEPS (prerequisites met, not yet taught):
+{grammar_lines}
+
+TASK:
+Select 1 OR 2 grammar IDs from the unlocked list that are:
+1. Appropriate difficulty for lesson {lesson_number} (prefer lower level first)
+2. Compatible with the available vocabulary (can form natural practice sentences)
+3. If this is an early lesson, prefer level-1 steps before level-2
+
+Return ONLY a raw JSON object — no markdown fences, no commentary:
+{{
+  "selected_ids": ["<id1>"],
+  "rationale": "One sentence explaining why these grammar points were chosen."
+}}
+""".strip()
+
+
+def build_grammar_generate_prompt(
+    grammar_specs: list[dict],
+    nouns: list[dict],
+    verbs: list[dict],
+    persons: list[tuple[str, str, str]] | None = None,
+    sentences_per_grammar: int = 3,
+) -> str:
+    """Level-2 grammar prompt: generate example sentences for selected grammar.
+
+    Given one or more grammar specs and the lesson vocabulary, the LLM produces
+    natural example sentences covering different persons.
+
+    Returns JSON: {"sentences": [{"grammar_id", "english", "japanese", "romaji",
+    "person", "notes"}, ...]}
+
+    Use with ask_llm_json_free().
+    """
+    _default_persons = [("I", "私", "watashi"), ("You", "あなた", "anata"), ("He/She", "彼", "kare")]
+    persons = persons or _default_persons
+
+    grammar_block = "\n".join(
+        f"  [{g['id']}] {g['structure']} — {g['description']}\n"
+        f"  Example: {g['example_en']} → {g['example_jp']}"
+        for g in grammar_specs
+    )
+
+    noun_block = _format_noun_list(nouns)
+    verb_block = _format_verb_list(verbs)
+
+    person_lines = "\n".join(
+        f"  - {en} ({jp}, {rm})" for en, jp, rm in persons
+    )
+
+    total = len(grammar_specs) * sentences_per_grammar
+
+    return f"""\
+You are a Japanese language teacher generating practice sentences.
+
+GRAMMAR POINTS TO PRACTICE:
+{grammar_block}
+
+VOCABULARY TO USE (use only these words):
+Nouns:
+{noun_block}
+
+Verbs:
+{verb_block}
+
+PERSONS:
+{person_lines}
+
+TASK:
+For each grammar point, generate {sentences_per_grammar} natural sentences using the
+vocabulary above. Cover different persons across the sentences.
+Use polite (ます/です) form throughout. Total: {total} sentences.
+
+Each sentence must include:
+- grammar_id  — which grammar point this sentence demonstrates
+- english     — natural English
+- japanese    — correct Japanese in polite form (kanji + kana)
+- romaji      — romanised transcription
+- person      — which person (I / You / He/She / etc.)
+- notes       — brief grammar note (e.g. which particle, which conjugation)
+
+Return ONLY a raw JSON object — no markdown fences, no commentary:
+{{
+  "sentences": [
+    {{
+      "grammar_id": "...",
+      "english": "...",
+      "japanese": "...",
+      "romaji": "...",
+      "person": "...",
+      "notes": "..."
+    }}
+  ]
+}}
+""".strip()
+
+
+def build_content_validate_prompt(sentences: list[dict]) -> str:
+    """Cross-check prompt: ask the LLM to validate and correct Japanese sentences.
+
+    Accepts a list of sentence dicts with at minimum: english, japanese, romaji.
+    Returns a validation report with per-sentence corrections and an overall score.
+
+    Returns JSON: {"score": 0-10, "corrections": [...], "summary": "..."}
+    Each correction: {"index", "original_japanese", "corrected_japanese",
+                       "original_romaji", "corrected_romaji", "explanation", "severity"}
+
+    Use with ask_llm_json_free().
+    """
+    sentence_lines = "\n".join(
+        f"  [{i}] EN: {s.get('english', '')}\n"
+        f"       JP: {s.get('japanese', '')}\n"
+        f"       RM: {s.get('romaji', '')}"
+        for i, s in enumerate(sentences)
+    )
+
+    return f"""\
+You are a native Japanese language expert reviewing learning material.
+
+SENTENCES TO VALIDATE:
+{sentence_lines}
+
+TASK:
+Review each sentence for accuracy. Check:
+1. Correct Japanese particles (は, を, が, に, へ, etc.)
+2. Correct polite conjugation (ます/ません/ました/ませんでした)
+3. Natural word order (SOV)
+4. Correct romaji transcription
+5. Faithful English translation
+
+For each error found, provide a correction entry with your fix and explanation.
+If a sentence is correct, do NOT include it in the corrections list.
+
+Return ONLY a raw JSON object — no markdown fences, no commentary:
+{{
+  "score": <0-10 overall accuracy>,
+  "corrections": [
+    {{
+      "index": <sentence index>,
+      "original_japanese": "...",
+      "corrected_japanese": "...",
+      "original_romaji": "...",
+      "corrected_romaji": "...",
+      "explanation": "...",
+      "severity": "minor|major"
+    }}
+  ],
+  "summary": "One-sentence overall assessment."
+}}
+""".strip()

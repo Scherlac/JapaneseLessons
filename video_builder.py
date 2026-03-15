@@ -84,6 +84,10 @@ class VideoBuilder:
         Returns:
             MoviePy ColorClip
         """
+        # moviepy 2.x ColorClip requires an RGB tuple, not a hex string.
+        if isinstance(color, str):
+            h = color.lstrip("#")
+            color = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
         return ColorClip(size=(1920, 1080), color=color, duration=duration)
 
     def build_video(

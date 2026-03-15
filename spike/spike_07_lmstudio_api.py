@@ -39,6 +39,67 @@ def strip_think(text: str) -> str:
 # Add this as a system message to disable thinking mode on Qwen3 and similar models
 NO_THINK_SYSTEM = "/no_think"
 
+# JSON schema for structured output — LM Studio supports json_schema (grammar-sampled
+# by llama.cpp), NOT json_object.  Using json_schema forces valid JSON even from
+# reasoning/verbose models.
+_TRANSLATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "english":  {"type": "string"},
+        "japanese": {"type": "string"},
+        "romaji":   {"type": "string"},
+    },
+    "required": ["english", "japanese", "romaji"],
+}
+
+# Mistral-7B-Instruct v0.x GGUFs use the old [INST] chat template which has *no*
+# system-role token.  Sending a system message causes a 400 Bad Request.
+_NO_SYSTEM_ROLE_PATTERNS = ("mistral-7b-instruct",)
+
+
+def build_messages(model_id: str, system: str, user: str) -> list[dict]:
+    """Return the correct message list for the given model.
+
+    Models whose GGUF chat template has no system-role slot get the system
+    content prepended to the user turn instead.
+    """
+    mid = model_id.lower()
+    if any(p in mid for p in _NO_SYSTEM_ROLE_PATTERNS):
+        return [{"role": "user", "content": f"{system}\n\n{user}"}]
+    return [
+        {"role": "system", "content": system},
+        {"role": "user",   "content": user},
+    ]
+
+
+def extract_json(text: str) -> dict | None:
+    """Try to extract a valid JSON object from text.
+
+    Useful when reasoning/verbose models output an answer buried inside prose.
+    Scans from the end of the text (reasoning models place the answer last).
+    Returns the parsed dict, or None if nothing parseable is found.
+    """
+    # Try the whole text first (ideal case)
+    try:
+        return json.loads(text.strip())
+    except (json.JSONDecodeError, ValueError):
+        pass
+    # Scan all top-level {...} blobs, last one is usually the final answer
+    for m in reversed(list(re.finditer(r'\{[^{}]+\}', text, re.DOTALL))):
+        try:
+            return json.loads(m.group())
+        except (json.JSONDecodeError, ValueError):
+            continue
+    # Code-fence extraction  ``` or ```json
+    fence = re.search(r'```(?:json)?[ \t]*\n?(.*?)```', text, re.DOTALL)
+    if fence:
+        try:
+            return json.loads(fence.group(1).strip())
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return None
+
+
 BASE_URL = "http://localhost:1234"
 API_BASE = f"{BASE_URL}/v1"
 HEADERS = {"Content-Type": "application/json", "Authorization": "Bearer lm-studio"}
@@ -127,10 +188,10 @@ def test_plain_text(model_id: str, timeout: int = 120) -> bool:
     section(f"Plain text generation — {model_id}")
     body = {
         "model": model_id,
-        "messages": [
-            {"role": "system", "content": NO_THINK_SYSTEM},
-            {"role": "user", "content": "Say hello in Japanese. One sentence only."},
-        ],
+        "messages": build_messages(
+            model_id, NO_THINK_SYSTEM,
+            "Say hello in Japanese. One sentence only.",
+        ),
         "temperature": 0.5,
         "max_tokens": 256,
     }
@@ -147,32 +208,44 @@ def test_plain_text(model_id: str, timeout: int = 120) -> bool:
         return False
 
 
-def test_json_object_mode(model_id: str, timeout: int = 120) -> bool:
-    section(f"JSON object mode — {model_id}")
+def test_json_schema_mode(model_id: str, timeout: int = 120) -> bool:
+    """Use LM Studio's json_schema structured output.
+
+    LM Studio uses llama.cpp grammar-based sampling for GGUF models, which
+    constrains token generation to valid JSON matching the schema — this works
+    even for verbose reasoning models that would otherwise output prose.
+    Note: LM Studio does NOT support the older 'json_object' type.
+    """
+    section(f"JSON schema mode — {model_id}")
     body = {
         "model": model_id,
-        "messages": [
-            {"role": "system", "content": NO_THINK_SYSTEM},
-            {"role": "user", "content": (
-                'Return a JSON object with keys "english", "japanese", "romaji". '
-                'English sentence: "I eat fish."'
-            )},
-        ],
+        "messages": build_messages(
+            model_id, NO_THINK_SYSTEM,
+            'Translate the English sentence into Japanese. English sentence: "I eat fish."',
+        ),
         "temperature": 0.3,
         "max_tokens": 256,
-        "response_format": {"type": "json_object"},
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "translation",
+                "strict": True,
+                "schema": _TRANSLATION_SCHEMA,
+            },
+        },
     }
+    content = ""
     try:
         t0 = time.time()
         r = post("/chat/completions", body, timeout=timeout)
         elapsed = time.time() - t0
         if r.status_code == 400:
-            print(f"  ⚠️  json_object not supported (HTTP 400): {r.json()}")
+            print(f"  ⚠️  json_schema not supported (HTTP 400): {r.json()}")
             return False
         r.raise_for_status()
         content = r.json()["choices"][0]["message"]["content"]
         parsed = json.loads(content)
-        print(f"  ✅ JSON mode works ({elapsed:.2f}s)")
+        print(f"  ✅ JSON schema mode works ({elapsed:.2f}s)")
         print(f"     english:  {parsed.get('english')}")
         print(f"     japanese: {parsed.get('japanese')}")
         print(f"     romaji:   {parsed.get('romaji')}")
@@ -186,41 +259,46 @@ def test_json_object_mode(model_id: str, timeout: int = 120) -> bool:
 
 
 def test_json_via_prompt(model_id: str, timeout: int = 120) -> bool:
-    """Fallback: ask for JSON in plain text mode (no response_format)."""
+    """Fallback: ask for JSON in plain text mode (no response_format).
+
+    Uses extract_json() to fish the answer out of verbose/reasoning-model output.
+    Also validates that japanese and romaji fields are non-empty.
+    """
     section(f"JSON via prompt fallback — {model_id}")
     body = {
         "model": model_id,
-        "messages": [
-            {"role": "system", "content": NO_THINK_SYSTEM},
-            {"role": "user", "content": (
-                'Return ONLY a raw JSON object — no markdown, no explanation.\n'
-                'Keys: "english", "japanese", "romaji".\n'
-                'English sentence: "I drink water."'
-            )},
-        ],
+        "messages": build_messages(
+            model_id, NO_THINK_SYSTEM,
+            'Output ONLY a raw JSON object with no markdown, no explanation, no extra text.\n'
+            'Required keys: "english" (string), "japanese" (string), "romaji" (string).\n'
+            'Translate: "I drink water."\n'
+            'Example format: {"english":"I drink water.","japanese":"水を飲みます。","romaji":"Mizu o nomimasu."}',
+        ),
         "temperature": 0.3,
-        "max_tokens": 256,
+        "max_tokens": 512,
     }
+    content = ""
     try:
         t0 = time.time()
         r = post("/chat/completions", body, timeout=timeout)
         elapsed = time.time() - t0
         r.raise_for_status()
-        content = strip_think(r.json()["choices"][0]["message"]["content"])
-        # Strip markdown fences if present
-        if content.startswith("```"):
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-        parsed = json.loads(content)
+        raw = r.json()["choices"][0]["message"]["content"]
+        content = strip_think(raw)
+        parsed = extract_json(content)
+        if parsed is None:
+            print(f"  ⚠️  Could not extract JSON (first 300 chars): {content[:300]}")
+            return False
+        jp = (parsed.get("japanese") or "").strip()
+        ro = (parsed.get("romaji")   or "").strip()
+        if not jp or not ro:
+            print(f"  ⚠️  JSON parsed but japanese/romaji empty: {parsed}")
+            return False
         print(f"  ✅ Prompt-based JSON works ({elapsed:.2f}s)")
         print(f"     english:  {parsed.get('english')}")
-        print(f"     japanese: {parsed.get('japanese')}")
-        print(f"     romaji:   {parsed.get('romaji')}")
+        print(f"     japanese: {jp}")
+        print(f"     romaji:   {ro}")
         return True
-    except json.JSONDecodeError:
-        print(f"  ⚠️  Could not parse JSON from response: {content}")
-        return False
     except Exception as e:
         print(f"  ❌ Failed: {e}")
         return False
@@ -233,32 +311,32 @@ def evaluate_model(model_id: str) -> dict:
     print(f"{'#'*55}")
     # First request to a new model may trigger LM Studio to swap it in — allow extra time
     plain_ok = test_plain_text(model_id, timeout=180)
-    json_mode_ok = test_json_object_mode(model_id, timeout=120)
+    json_schema_ok = test_json_schema_mode(model_id, timeout=120)
     json_prompt_ok: bool | None
-    if not json_mode_ok:
+    if not json_schema_ok:
         json_prompt_ok = test_json_via_prompt(model_id, timeout=120)
     else:
         json_prompt_ok = None  # not needed
 
-    json_capable = json_mode_ok or bool(json_prompt_ok)
+    json_capable = json_schema_ok or bool(json_prompt_ok)
 
     print(f"\n  {'─'*45}")
-    print(f"  Plain text:       {'✅' if plain_ok else '❌'}")
-    print(f"  JSON object mode: {'✅' if json_mode_ok else '⚠️  not supported'}")
+    print(f"  Plain text:         {'✅' if plain_ok else '❌'}")
+    print(f"  JSON schema mode:   {'✅' if json_schema_ok else '⚠️  not supported'}")
     if json_prompt_ok is not None:
-        print(f"  JSON via prompt:  {'✅' if json_prompt_ok else '❌'}")
+        print(f"  JSON via prompt:    {'✅' if json_prompt_ok else '❌'}")
     if not json_capable:
         verdict = "❌ Cannot reliably produce JSON — not suitable"
-    elif not json_mode_ok and json_prompt_ok:
-        verdict = "ℹ️  Use prompt-based JSON (llm_client.py fallback path)"
+    elif not json_schema_ok and json_prompt_ok:
+        verdict = "ℹ️  JSON via prompt only (no grammar enforcement)"
     else:
-        verdict = "✅ Ready — JSON object mode supported"
-    print(f"  Verdict:          {verdict}", flush=True)
+        verdict = "✅ Ready — json_schema structured output supported"
+    print(f"  Verdict:            {verdict}", flush=True)
 
     return {
         "model_id": model_id,
         "plain_text_ok": plain_ok,
-        "json_mode_ok": json_mode_ok,
+        "json_schema_ok": json_schema_ok,
         "json_prompt_ok": json_prompt_ok,
         "json_capable": json_capable,
     }
@@ -289,14 +367,14 @@ def main():
 
     # Summary table
     section("Final Summary")
-    print(f"  {'Model':<45} {'Plain':^7} {'JSON mode':^10} {'JSON prompt':^12} {'Usable':^7}")
-    print(f"  {'─'*45} {'─'*7} {'─'*10} {'─'*12} {'─'*7}")
+    print(f"  {'Model':<45} {'Plain':^7} {'JSON schema':^12} {'JSON prompt':^12} {'Usable':^7}")
+    print(f"  {'─'*45} {'─'*7} {'─'*12} {'─'*12} {'─'*7}")
     for r in all_results:
-        plain  = "✅" if r["plain_text_ok"] else "❌"
-        jmode  = "✅" if r["json_mode_ok"] else "—"
+        plain   = "✅" if r["plain_text_ok"]  else "❌"
+        jschema = "✅" if r["json_schema_ok"] else "—"
         jprompt = ("✅" if r["json_prompt_ok"] else "❌") if r["json_prompt_ok"] is not None else "—"
-        usable = "✅" if r["json_capable"] else "❌"
-        print(f"  {r['model_id']:<45} {plain:^7} {jmode:^10} {jprompt:^12} {usable:^7}", flush=True)
+        usable  = "✅" if r["json_capable"]    else "❌"
+        print(f"  {r['model_id']:<45} {plain:^7} {jschema:^12} {jprompt:^12} {usable:^7}", flush=True)
 
     # Save results
     output_dir = pathlib.Path(__file__).parent / "output"

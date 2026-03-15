@@ -18,6 +18,12 @@ import random
 import sys
 from pathlib import Path
 
+from curriculum import (
+    load_curriculum,
+    save_curriculum,
+    suggest_new_vocab,
+    summary as curriculum_summary,
+)
 from lesson_generator import generate_lesson_items, render_lesson_markdown
 from prompt_template import (
     DIMENSIONS_BEGINNER,
@@ -144,6 +150,23 @@ examples:
         type=str, default=None,
         metavar="THEME",
         help="Generate an LLM prompt to create vocabulary for a new theme.",
+    )
+    parser.add_argument(
+        "--create-vocab",
+        type=str, default=None,
+        metavar="THEME",
+        help="Generate vocabulary for a theme using the LLM and save to vocab/<theme>.json.",
+    )
+    parser.add_argument(
+        "--show-curriculum",
+        action="store_true",
+        help="Display the current curriculum progress and exit.",
+    )
+    parser.add_argument(
+        "--curriculum-path",
+        type=str, default=None,
+        metavar="FILE",
+        help="Path to curriculum JSON file (default: curriculum/curriculum.json).",
     )
     parser.add_argument(
         "--level",
@@ -306,9 +329,33 @@ def _render_video_from_lesson(lesson_data: dict, output_dir: Path, video_method:
     asyncio.run(render_video_async())
 
 
+DEFAULT_CURRICULUM_PATH = Path(__file__).parent / "curriculum" / "curriculum.json"
+
+
+def _get_curriculum_path(args) -> Path:
+    return Path(args.curriculum_path) if args.curriculum_path else DEFAULT_CURRICULUM_PATH
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+
+    # --show-curriculum
+    if args.show_curriculum:
+        cur = load_curriculum(_get_curriculum_path(args))
+        print(curriculum_summary(cur))
+        return
+
+    # --create-vocab
+    if args.create_vocab:
+        from vocab_generator import generate_vocab
+        generate_vocab(
+            theme=args.create_vocab,
+            num_nouns=args.nouns if args.nouns != 6 else 12,
+            num_verbs=args.verbs if args.verbs != 6 else 10,
+            level=args.level,
+        )
+        return
 
     # --list-themes
     if args.list_themes:

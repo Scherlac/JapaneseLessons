@@ -40,3 +40,12 @@ py-modules = [
 
 [tool.setuptools.package-data]
 "*" = ["vocab/*.json"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "integration: tests that require a running LM Studio server (http://localhost:1234)",
+    "internet: tests that call external services (Microsoft Edge TTS)",
+    "video: tests that render a full .mp4 — slow, requires ffmpeg",
+]

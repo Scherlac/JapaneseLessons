@@ -40,6 +40,50 @@ def _strip_think(text: str) -> str:
     return text.strip()
 
 
+def _extract_json(text: str) -> Optional[Dict[str, Any]]:
+    """Try to extract a valid JSON object from text.
+
+    Useful when reasoning/verbose models embed the answer inside prose.
+    Scans from the end of the text since reasoning models place the answer last.
+    """
+    try:
+        return json.loads(text.strip())
+    except (json.JSONDecodeError, ValueError):
+        pass
+    # Scan all top-level {...} blobs, last one is usually the final answer
+    for m in reversed(list(re.finditer(r'\{[^{}]+\}', text, re.DOTALL))):
+        try:
+            return json.loads(m.group())
+        except (json.JSONDecodeError, ValueError):
+            continue
+    # Code-fence extraction  ``` or ```json
+    fence = re.search(r'```(?:json)?[ \t]*\n?(.*?)```', text, re.DOTALL)
+    if fence:
+        try:
+            return json.loads(fence.group(1).strip())
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return None
+
+
+# LM Studio uses llama.cpp grammar-based sampling and requires json_schema (not
+# json_object).  This schema covers the translation response used by lesson_generator.py.
+_TRANSLATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "english":  {"type": "string"},
+        "japanese": {"type": "string"},
+        "romaji":   {"type": "string"},
+        "context":  {"type": "string"},
+    },
+    "required": ["english", "japanese", "romaji"],
+}
+
+# Mistral-7B-Instruct v0.x GGUFs use the old [INST] chat template which has no
+# system-role token.  Sending a system message causes HTTP 400.
+_NO_SYSTEM_ROLE_PATTERNS = ("mistral-7b-instruct",)
+
+
 class LLMClient:
     """Universal LLM client using OpenAI-compatible interface."""
 
@@ -54,12 +98,21 @@ class LLMClient:
         self.no_think = LLM_NO_THINK
 
     def _build_messages(self, prompt: str) -> list[dict]:
-        """Build message list, prepending /no_think system message when enabled."""
-        messages = []
+        """Build message list with correct role structure for the configured model.
+
+        Models whose GGUF chat template has no system-role slot (Mistral v0.x) get
+        the /no_think prefix folded into the user turn instead.
+        """
         if self.no_think:
-            messages.append({"role": "system", "content": "/no_think"})
-        messages.append({"role": "user", "content": prompt})
-        return messages
+            system = "/no_think"
+            if any(p in self.model.lower() for p in _NO_SYSTEM_ROLE_PATTERNS):
+                # Old Mistral [INST] template has no system slot — prepend to user turn
+                return [{"role": "user", "content": f"{system}\n\n{prompt}"}]
+            return [
+                {"role": "system", "content": system},
+                {"role": "user",   "content": prompt},
+            ]
+        return [{"role": "user", "content": prompt}]
 
     def generate_text(
         self,
@@ -98,7 +151,16 @@ class LLMClient:
         }
 
         if json_mode:
-            kwargs["response_format"] = {"type": "json_object"}
+            # LM Studio requires json_schema (grammar-sampled by llama.cpp).
+            # json_object is not supported and returns HTTP 400.
+            kwargs["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "translation",
+                    "strict": True,
+                    "schema": _TRANSLATION_SCHEMA,
+                },
+            }
 
         try:
             if LLM_DEBUG:
@@ -119,10 +181,9 @@ class LLMClient:
             logger.error(f"Rate limit exceeded: {e}")
             raise
         except APIError as e:
-            # Some providers (e.g. LM Studio) don't support json_object response_format.
-            # Retry without it — the prompt already requests JSON output.
+            # Fall back to plain text mode if the provider doesn't support json_schema.
             if json_mode and e.status_code == 400:
-                logger.warning("json_object response_format not supported, retrying in text mode")
+                logger.warning("json_schema response_format not supported, retrying in text mode")
                 kwargs.pop("response_format", None)
                 response = self.client.chat.completions.create(**kwargs)
                 content = response.choices[0].message.content
@@ -169,19 +230,14 @@ class LLMClient:
             max_tokens=max_tokens,
         )
 
-        # Strip markdown fences that some models add even when asked not to
-        text = response_text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-            text = text.rstrip("`").strip()
+        # With json_schema grammar sampling (LM Studio) the response is already valid JSON.
+        # For other providers, _extract_json scans for embedded JSON in verbose output.
+        parsed = _extract_json(response_text)
+        if parsed is not None:
+            return parsed
 
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON response: {response_text}")
-            raise ValueError(f"LLM returned invalid JSON: {e}") from e
+        logger.error(f"Failed to parse JSON response: {response_text}")
+        raise ValueError(f"LLM returned invalid JSON: {response_text[:200]}")
 
 # Global client instance
 _client = None
@@ -241,3 +297,40 @@ def ask_llm_json(
         temperature=temperature,
         max_tokens=max_tokens,
     )
+
+
+def ask_llm_json_free(
+    prompt: str,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Ask the LLM for a JSON response without schema enforcement.
+
+    Use this for complex responses (vocab dicts, sentence arrays, validation
+    reports) where the structure doesn't fit the fixed _TRANSLATION_SCHEMA.
+    Falls back to _extract_json for parsing, which handles reasoning-model
+    verbosity and code-fence wrapping.
+
+    Args:
+        prompt: The input prompt (should instruct JSON output)
+        temperature: Sampling temperature
+        max_tokens: Maximum tokens to generate
+
+    Returns:
+        Parsed JSON dictionary
+
+    Raises:
+        ValueError: If the response cannot be parsed as JSON
+    """
+    client = get_llm_client()
+    # Use text mode — no schema enforcement so the LLM can return any shape
+    response_text = client.generate_text(
+        prompt=prompt,
+        json_mode=False,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    parsed = _extract_json(response_text)
+    if parsed is not None:
+        return parsed
+    raise ValueError(f"LLM returned invalid JSON: {response_text[:200]}")
