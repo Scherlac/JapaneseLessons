@@ -38,45 +38,59 @@ Core principles: Cohesion / Coupling / Composition / YAGNI / KISS / DRY, spike-b
 
 ## Architecture
 
+> **Migration pending** — current code is flat at project root. Planned package structure
+> documented in [`docs/decision_project_structure.md`](docs/decision_project_structure.md).
+> The tree below shows the target state after migration.
+
 ```
-japanese/
-├── generate_lesson.py    # CLI entry point  ← needs pipeline wire-up
-├── prompt_template.py    # LLM prompt builder (7 pure functions)
-├── curriculum.py         # Grammar progression table + lesson dictionary CRUD
-├── vocab_generator.py    # LLM-driven vocab generation + schema validation
-├── config.py             # LLM configuration (env-driven)
-├── llm_client.py         # Universal LLM client (OpenAI SDK)
-├── tts_engine.py         # edge-tts wrapper
-├── video_cards.py        # Pillow 1920×1080 card renderer
-├── video_builder.py      # moviepy / FFmpeg video assembler
-├── vocab/
-│   ├── food.json         # 12 nouns + 10 verbs
-│   └── travel.json       # 12 nouns + 10 verbs
-├── curriculum/
-│   └── curriculum.json   # Lesson-by-lesson progress state
-├── docs/
-│   ├── development_history.md      # Spike logs, model evals, bug history
-│   ├── decision_tts_engine.md
-│   ├── decision_video_pipeline.md
-│   ├── decision_fonts_rendering.md
-│   └── decision_llm_integration.md
-├── tests/                # 204 tests (184 unit, 20 integration/internet/video)
-└── spike/                # Proof-of-concept scripts (spike_01 through spike_09)
+jlesson/                        ← all production Python source
+├── __init__.py
+├── cli.py                      ← click subcommands (was generate_lesson.py)
+├── config.py                   ← LLM connection parameters
+├── models.py                   ← NEW: pydantic schemas for all data shapes
+├── curriculum.py               ← grammar progression + lesson dictionary CRUD
+├── prompt_template.py          ← LLM prompt builder (7 pure functions)
+├── vocab_generator.py          ← LLM vocab generation + schema validation
+├── llm_client.py               ← OpenAI-compatible HTTP client
+├── llm_cache.py                ← NEW: sha256 file cache for dev
+├── lesson_pipeline.py          ← NEW: LessonContext + stage functions
+├── lesson_store.py             ← NEW: output/<id>/content.json I/O
+├── video/
+│   ├── __init__.py
+│   ├── tts_engine.py           ← edge-tts async wrapper
+│   ├── cards.py                ← Pillow 1920×1080 card renderer (was video_cards.py)
+│   └── builder.py             ← moviepy/FFmpeg assembler (was video_builder.py)
+└── exporters/                  ← NEW: format adapters
+    ├── __init__.py
+    ├── video_exporter.py
+    ├── anki_exporter.py
+    └── text_exporter.py
+
+vocab/                          ← vocabulary source data (stays at root)
+curriculum/                     ← lesson-progress state (stays at root)
+tests/                          ← unit test suite (imports update to jlesson.X)
+spike/                          ← proof-of-concept scripts (spike_01–spike_09)
+docs/                           ← decision documents + development history
+output/                         ← generated artifacts (gitignored)
 ```
 
 ### Module Responsibilities
 
 | Module | Responsibility | Coupling |
 |--------|---------------|---------|
-| `curriculum.py` | Grammar progression table; lesson dictionary CRUD; vocab selection | Data only — no LLM, no I/O |
-| `prompt_template.py` | Build LLM prompt strings from vocab + grammar specs | Pure functions — no imports from project |
-| `vocab_generator.py` | LLM vocab generation + schema validation + file save | Calls `llm_client`, `prompt_template` |
-| `llm_client.py` | OpenAI-compatible HTTP client; JSON extraction; think-stripping | Calls `config` |
-| `config.py` | LLM connection parameters (env-overridable) | stdlib only |
-| `tts_engine.py` | edge-tts async audio generation | Third-party only |
-| `video_cards.py` | Pillow card rendering (1920×1080 PNG) | Third-party only |
-| `video_builder.py` | moviepy/FFmpeg clip assembly → MP4 | Third-party only |
-| `generate_lesson.py` | CLI arg parsing + command dispatch | Imports curriculum, prompt_template, vocab_generator |
+| `jlesson/curriculum.py` | Grammar progression table; lesson dictionary CRUD; vocab selection | Data only — no LLM, no I/O |
+| `jlesson/prompt_template.py` | Build LLM prompt strings from vocab + grammar specs | Pure functions — no project imports |
+| `jlesson/models.py` | Pydantic schemas: `Noun`, `Verb`, `VocabFile`, `LessonContent`, `Person` | `pydantic` only |
+| `jlesson/vocab_generator.py` | LLM vocab generation + schema validation + file save | Calls `llm_client`, `prompt_template` |
+| `jlesson/llm_client.py` | OpenAI-compatible HTTP client; JSON extraction; think-stripping | Calls `config` |
+| `jlesson/llm_cache.py` | File-based LLM response cache (dev mode) | stdlib only |
+| `jlesson/config.py` | LLM connection parameters (env-overridable) | stdlib only |
+| `jlesson/lesson_pipeline.py` | `LessonContext` dataclass + stage functions + `run_pipeline()` | Application layer — composes all others |
+| `jlesson/lesson_store.py` | `save_lesson_content()` / `load_lesson_content()` | stdlib only |
+| `jlesson/video/tts_engine.py` | edge-tts async audio generation | Third-party only |
+| `jlesson/video/cards.py` | Pillow card rendering (1920×1080 PNG) | Third-party only |
+| `jlesson/video/builder.py` | moviepy/FFmpeg clip assembly → MP4 | Third-party only |
+| `jlesson/cli.py` | click subcommand groups + command dispatch | Imports pipeline, curriculum, vocab_generator |
 
 ---
 
@@ -309,6 +323,32 @@ Seven areas researched. Key finding: `click`, `pydantic`, `python-dotenv`, and `
 | `lesson_pipeline.py` | Pipeline orchestrator with `LessonContext` dataclass + stage functions | `rich` |
 | `lesson_store.py` | `save_lesson_content()` / `load_lesson_content()` | stdlib |
 | `llm_cache.py` | `ask_llm_cached()` — file-based dev cache for LLM calls | stdlib |
+
+---
+
+## Project Structure Decision (2026-03-15)
+
+Full analysis in [`docs/decision_project_structure.md`](docs/decision_project_structure.md).
+
+**Decision:** Move all production Python source into a `jlesson/` package with `video/` and
+`exporters/` sub-packages. Replace `py-modules` in `pyproject.toml` with `packages.find`.
+Rename CLI entry point from `japanese-lesson` → `jlesson`.
+
+**Migration status:** PLANNED — no files moved yet.
+
+| Change | Detail |
+|--------|--------|
+| Package directory | `jlesson/` at project root (flat layout, no `src/`) |
+| Sub-packages | `jlesson/video/` (3 modules), `jlesson/exporters/` (3 new modules) |
+| Renamed files | `generate_lesson.py` → `cli.py`; `video_cards.py` → `cards.py`; `video_builder.py` → `builder.py` |
+| `pyproject.toml` | `py-modules` → `packages.find`; entry point `jlesson = "jlesson.cli:main"` |
+| All 7 test files | Flat imports → `from jlesson.X import ...` / `from jlesson.video.X import ...` |
+| Files deleted | `requirements.txt` (redundant), `progress_report_prev.md` (archived) |
+| Files moved | `structure.md` → `docs/structure.md` |
+| Path fix | `VOCAB_DIR` in `cli.py`: `parent` → `parent.parent` (one level up from `jlesson/`) |
+
+**Migration prerequisite:** complete before implementing TD-01 (`lesson_pipeline.py`) and TD-02
+(`lesson_store.py`) — new modules belong in `jlesson/`, not at the root.
 
 ---
 
