@@ -207,6 +207,48 @@ class TestCreateClip:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# create_multi_audio_clip
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestCreateMultiAudioClip:
+
+    def _make_card(self, tmp_path):
+        from jlesson.video.cards import CardRenderer
+        renderer = CardRenderer()
+        img = renderer.render_en_card("hello")
+        card_path = tmp_path / "card.png"
+        renderer.save_card(img, card_path)
+        return card_path
+
+    def test_no_audio_returns_3s_clip(self, tmp_path):
+        card = self._make_card(tmp_path)
+        vb = VideoBuilder()
+        clip = vb.create_multi_audio_clip(card, [])
+        assert clip.duration == pytest.approx(3.0, abs=0.1)
+
+    def test_nonexistent_audio_returns_3s_clip(self, tmp_path):
+        card = self._make_card(tmp_path)
+        vb = VideoBuilder()
+        clip = vb.create_multi_audio_clip(card, [tmp_path / "missing.mp3"])
+        assert clip.duration == pytest.approx(3.0, abs=0.1)
+
+    def test_single_audio_delegates_to_create_clip(self, tmp_path):
+        card = self._make_card(tmp_path)
+        vb = VideoBuilder()
+        audio_path = tmp_path / "audio.mp3"
+        audio_path.write_bytes(b"fake")
+        with patch.object(vb, "create_clip", return_value=MagicMock(duration=5.0)) as mock_cc:
+            clip = vb.create_multi_audio_clip(card, [audio_path])
+        mock_cc.assert_called_once_with(card, audio_path, pause_before=1.5, pause_after=1.0)
+
+    def test_none_audio_paths_are_filtered(self, tmp_path):
+        card = self._make_card(tmp_path)
+        vb = VideoBuilder()
+        clip = vb.create_multi_audio_clip(card, [None, None])
+        assert clip.duration == pytest.approx(3.0, abs=0.1)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Integration — full render (slow, requires ffmpeg + Pillow)
 # ─────────────────────────────────────────────────────────────────────────────
 

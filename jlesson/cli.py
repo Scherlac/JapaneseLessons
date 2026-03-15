@@ -184,6 +184,13 @@ def lesson() -> None:
 @click.option("--no-video", is_flag=True, default=False, help="Skip video rendering.")
 @click.option("--no-cache", is_flag=True, default=False, help="Disable LLM response cache (always call LLM).")
 @click.option("--dry-run", is_flag=True, default=False, help="Skip TTS/card/video — generate content and report only.")
+@click.option(
+    "--profile",
+    default="passive_video",
+    show_default=True,
+    type=click.Choice(["passive_video", "active_flash_cards"]),
+    help="Touch profile for asset compilation and video rendering.",
+)
 def lesson_next(
     theme: str,
     nouns: int,
@@ -195,6 +202,7 @@ def lesson_next(
     no_video: bool,
     no_cache: bool,
     dry_run: bool,
+    profile: str,
 ) -> None:
     """Run the full pipeline for the next lesson.
 
@@ -214,6 +222,7 @@ def lesson_next(
         use_cache=not no_cache,
         render_video=not no_video,
         dry_run=dry_run,
+        profile=profile,
     )
     try:
         run_pipeline(config)

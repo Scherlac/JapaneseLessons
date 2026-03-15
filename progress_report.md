@@ -47,6 +47,11 @@ Core principles: Cohesion / Coupling / Composition / YAGNI / KISS / DRY, spike-b
 | **Touch compiler (`touch_compiler.py`)** | ✅ Done — Stage 3: round-robin interleaved touch sequence from compiled items + profile |
 | **Touch-system card renderers** | ✅ Done — `render_en_card`, `render_jp_card`, `render_bilingual_card` in `cards.py` |
 | Unit test suite (366 unit / 392 total) | ✅ Done — +87 tests for compilation pipeline |
+| **Compilation pipeline wired into lesson_pipeline.py** | ✅ Done — `CompileAssetsStep` (stage 8) + `CompileTouchesStep` (stage 9); `RenderVideoStep` reads from touch sequence; 11-step pipeline |
+| **`--profile` CLI option** | ✅ Done — `passive_video` (default) / `active_flash_cards`; flows through `LessonConfig.profile` |
+| **Multi-audio video clips (`builder.py`)** | ✅ Done — `create_multi_audio_clip()` supports sequential audio tracks per card |
+| **Profile-aware lesson report** | ✅ Done — `SaveReportStep._summary()` uses `count_touches()` with actual profile |
+| Unit test suite (388 unit / 414 total) | ✅ Done — +22 tests for pipeline integration |
 
 ---
 
@@ -63,7 +68,7 @@ jlesson/                        ← all production Python source
 ├── vocab_generator.py          ← LLM vocab generation + schema validation
 ├── llm_client.py               ← OpenAI-compatible HTTP client
 ├── llm_cache.py                ← NEW: sha256 file cache for dev
-├── lesson_pipeline.py          ← NEW: LessonContext + 9 stage functions
+├── lesson_pipeline.py          ← LessonContext + 11-step pipeline (compile + render)
 ├── lesson_store.py             ← NEW: output/<id>/content.json I/O
 ├── lesson_report.py            ← NEW: Markdown lesson report generator
 ├── profiles.py                 ← NEW: touch profile definitions (passive_video, active_flash_cards)
@@ -99,7 +104,7 @@ output/                         ← generated artifacts (gitignored)
 | `jlesson/llm_client.py` | OpenAI-compatible HTTP client; JSON extraction; think-stripping | Calls `config` |
 | `jlesson/llm_cache.py` | File-based LLM response cache (dev mode) | stdlib only |
 | `jlesson/config.py` | LLM connection parameters (env-overridable) | stdlib + dotenv |
-| `jlesson/lesson_pipeline.py` | `LessonContext` dataclass + stage functions + `run_pipeline()` | Application layer — composes all others |
+| `jlesson/lesson_pipeline.py` | `LessonContext` dataclass + 11 pipeline steps + `run_pipeline()` | Application layer — composes all others |
 | `jlesson/lesson_report.py` | Markdown report generator — mirrors video lesson structure | `models` only |
 | `jlesson/profiles.py` | Touch profile definitions; touch-type → asset mappings; repetition cycles | `models` only |
 | `jlesson/asset_compiler.py` | Stage 2: render card images + TTS audio per item based on profile | `models`, `profiles`, `video.cards`, `video.tts_engine` |
@@ -214,7 +219,7 @@ This project follows an **iterative, research-driven development cycle** designe
 
 ```
 pytest tests/ -m "not integration and not internet and not video"
-→ 379 passed, 13 deselected in 15.32s
+→ 401 passed, 13 deselected in 59.86s
 ```
 
 | Test file | Unit tests | Slow markers |
@@ -224,11 +229,12 @@ pytest tests/ -m "not integration and not internet and not video"
 | `test_llm_client.py` | 20 | 14 `integration` |
 | `test_video_cards.py` | 43 | — |
 | `test_tts_engine.py` | 22 | 4 `internet` |
-| `test_video_builder.py` | 13 | 2 `video` |
+| `test_video_builder.py` | 17 | 2 `video` |
 | `test_vocab_generator.py` | 18 | — |
 | `test_lesson_store.py` | 20 | — |
-| `test_lesson_pipeline.py` | 28 | — |
+| `test_lesson_pipeline.py` | 46 | — |
 | `test_llm_cache.py` | 20 | — |
+| `test_lesson_report.py` | 25 | — |
 | `test_profiles.py` | 29 | — |
 | `test_touch_compiler.py` | 22 | — |
 | `test_asset_compiler.py` | 23 | — |
@@ -409,14 +415,17 @@ Fast and repeatable — re-running with a different format does not re-render.
 Steps 1–7:  content generation + persistence     (unchanged, produces item_sequence)
 Step 8:     compile_assets    — Stage 2: item_sequence → compiled_items
 Step 9:     compile_touches   — Stage 3: compiled_items + profile → touch_sequence
-Step 10+:   render_video      — Stage 4: touch_sequence → MP4
-            render_report     — Stage 4: touch_sequence → Markdown
-            render_export     — Stage 4: touch_sequence → Anki / other
+Step 10:    render_video      — Stage 4: touch_sequence → MP4
+Step 11:    save_report       — Stage 4: touch_sequence → Markdown
 ```
 
 `compile_assets` is item-aware (renders cards and TTS).  
 `compile_touches` is profile-aware (reads the rulebook).  
 Stage 4 steps are format-aware but profile-agnostic.
+
+**Integration status:** ✅ WIRED — `CompileAssetsStep` (step 8), `CompileTouchesStep`
+(step 9), `RenderVideoStep` (step 10, reads from touch sequence), `SaveReportStep`
+(step 11, profile-aware summary). `--profile` option on CLI. 22 new tests.
 
 ---
 
@@ -428,9 +437,10 @@ Stage 4 steps are format-aware but profile-agnostic.
    `profiles.py` (2 profiles, touch-type mappings), `asset_compiler.py` (Stage 2),
    `touch_compiler.py` (Stage 3), 3 new card renderers in `cards.py`. 87 new tests.
 
-2. **Wire compilation pipeline into lesson_pipeline.py** — Replace `_build_video_items` /
-   `_render_async` with `compile_assets` → `compile_touches` → render from touch sequence.
-   Add `--profile` option to CLI. This is the integration step.
+2. ~~**Wire compilation pipeline into lesson_pipeline.py**~~ ✅ DONE — `CompileAssetsStep`
+   + `CompileTouchesStep` added as steps 8–9; `RenderVideoStep` reads from touch sequence;
+   `SaveReportStep` uses profile-aware `count_touches()`; `--profile` CLI option;
+   `create_multi_audio_clip()` in VideoBuilder. 22 new tests.
 
 3. **Passive video profile** — Listen-first touch types (`listen:en,jp-m,jp-f`,
    `listen:jp-f,jp-m`, `listen:en,jp-f`). The profile is defined; requires wiring the

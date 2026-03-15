@@ -1,12 +1,14 @@
 """Unit tests for jlesson.lesson_pipeline — pipeline steps and runner."""
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from jlesson.curriculum import create_curriculum, get_grammar_by_id
 from jlesson.lesson_pipeline import (
+    CompileAssetsStep,
+    CompileTouchesStep,
     GenerateSentencesStep,
     GrammarSelectStep,
     LessonConfig,
@@ -14,12 +16,16 @@ from jlesson.lesson_pipeline import (
     NounPracticeStep,
     PersistContentStep,
     RegisterLessonStep,
+    RenderVideoStep,
+    SaveReportStep,
     SelectVocabStep,
     StepInfo,
     VerbPracticeStep,
+    _build_items_by_phase,
     _build_video_items,
     run_pipeline,
 )
+from jlesson.models import CompiledItem, ItemAssets, NounItem, Phase, Touch, TouchIntent, TouchType, VerbItem, Sentence
 
 
 # ---------------------------------------------------------------------------
@@ -710,3 +716,309 @@ def test_run_pipeline_report_contains_all_sections(config):
     assert "## Phase 3" in md
     assert "## Summary" in md
     assert "## Pipeline Timetable" in md
+
+
+# ---------------------------------------------------------------------------
+# _build_items_by_phase
+# ---------------------------------------------------------------------------
+
+
+def test_build_items_by_phase_groups_correctly(ctx):
+    ctx.noun_items = [
+        {"english": "water", "japanese": "みず", "kanji": "水", "romaji": "mizu"},
+    ]
+    ctx.verb_items = [
+        {
+            "english": "to eat",
+            "japanese": "たべる",
+            "kanji": "食べる",
+            "romaji": "taberu",
+            "masu_form": "食べます",
+        },
+    ]
+    ctx.sentences = [
+        {
+            "grammar_id": "action_present_affirmative",
+            "english": "I eat bread.",
+            "japanese": "パンを食べます。",
+            "romaji": "pan wo tabemasu",
+            "person": "I",
+        },
+    ]
+    result = _build_items_by_phase(ctx)
+    assert len(result[Phase.NOUNS]) == 1
+    assert len(result[Phase.VERBS]) == 1
+    assert len(result[Phase.GRAMMAR]) == 1
+    assert isinstance(result[Phase.NOUNS][0], NounItem)
+    assert isinstance(result[Phase.VERBS][0], VerbItem)
+    assert isinstance(result[Phase.GRAMMAR][0], Sentence)
+
+
+def test_build_items_by_phase_empty(ctx):
+    ctx.noun_items = []
+    ctx.verb_items = []
+    ctx.sentences = []
+    result = _build_items_by_phase(ctx)
+    assert result[Phase.NOUNS] == []
+    assert result[Phase.VERBS] == []
+    assert result[Phase.GRAMMAR] == []
+
+
+# ---------------------------------------------------------------------------
+# CompileAssetsStep
+# ---------------------------------------------------------------------------
+
+
+def _make_compiled_items(count: int, phase: Phase) -> list[CompiledItem]:
+    """Create mock compiled items for testing."""
+    items = []
+    for i in range(count):
+        item = NounItem(english=f"item_{i}", japanese=f"jp_{i}", romaji=f"r_{i}")
+        if phase == Phase.VERBS:
+            item = VerbItem(english=f"item_{i}", japanese=f"jp_{i}", romaji=f"r_{i}", masu_form=f"m_{i}")
+        elif phase == Phase.GRAMMAR:
+            item = Sentence(english=f"item_{i}", japanese=f"jp_{i}", romaji=f"r_{i}")
+        items.append(CompiledItem(item=item, phase=phase, assets=ItemAssets()))
+    return items
+
+
+def test_compile_assets_step_dry_run(ctx, tmp_path):
+    ctx.config.dry_run = True
+    ctx.lesson_id = 1
+    ctx.noun_items = [
+        {"english": "water", "japanese": "みず", "kanji": "水", "romaji": "mizu"},
+    ]
+    ctx.verb_items = []
+    ctx.sentences = []
+    mock_compiled = _make_compiled_items(1, Phase.NOUNS)
+    with patch(
+        "jlesson.asset_compiler.compile_assets_sync",
+        return_value=mock_compiled,
+    ) as mock_sync:
+        ctx = CompileAssetsStep().execute(ctx)
+    mock_sync.assert_called_once()
+    assert len(ctx.compiled_items) == 1
+
+
+def test_compile_assets_step_full(ctx, tmp_path):
+    ctx.config.dry_run = False
+    ctx.lesson_id = 1
+    ctx.noun_items = [
+        {"english": "water", "japanese": "みず", "kanji": "水", "romaji": "mizu"},
+    ]
+    ctx.verb_items = []
+    ctx.sentences = []
+    mock_compiled = _make_compiled_items(1, Phase.NOUNS)
+    with patch(
+        "jlesson.asset_compiler.compile_assets",
+        return_value=mock_compiled,
+    ):
+        with patch("jlesson.lesson_pipeline.asyncio.run", return_value=mock_compiled):
+            ctx = CompileAssetsStep().execute(ctx)
+    assert len(ctx.compiled_items) == 1
+
+
+def test_compile_assets_step_counts_all_phases(ctx, tmp_path):
+    ctx.config.dry_run = True
+    ctx.lesson_id = 1
+    ctx.noun_items = [
+        {"english": "water", "japanese": "みず", "kanji": "水", "romaji": "mizu"},
+    ]
+    ctx.verb_items = [
+        {"english": "to eat", "japanese": "たべる", "kanji": "食べる", "romaji": "taberu", "masu_form": "食べます"},
+    ]
+    ctx.sentences = [
+        {"grammar_id": "g1", "english": "I eat.", "japanese": "食べます。", "romaji": "tabemasu", "person": "I"},
+    ]
+    mock_compiled = (
+        _make_compiled_items(1, Phase.NOUNS)
+        + _make_compiled_items(1, Phase.VERBS)
+        + _make_compiled_items(1, Phase.GRAMMAR)
+    )
+    with patch("jlesson.asset_compiler.compile_assets_sync", return_value=mock_compiled):
+        ctx = CompileAssetsStep().execute(ctx)
+    assert len(ctx.compiled_items) == 3
+
+
+# ---------------------------------------------------------------------------
+# CompileTouchesStep
+# ---------------------------------------------------------------------------
+
+
+def test_compile_touches_step_produces_touches(ctx):
+    ctx.compiled_items = _make_compiled_items(2, Phase.NOUNS)
+    mock_touches = [
+        Touch(
+            compiled_item_index=0,
+            touch_index=1,
+            touch_type=TouchType.EN_JP,
+            intent=TouchIntent.INTRODUCE,
+        ),
+        Touch(
+            compiled_item_index=1,
+            touch_index=1,
+            touch_type=TouchType.EN_JP,
+            intent=TouchIntent.INTRODUCE,
+        ),
+    ]
+    with patch("jlesson.touch_compiler.compile_touches", return_value=mock_touches):
+        ctx = CompileTouchesStep().execute(ctx)
+    assert len(ctx.touches) == 2
+    assert ctx.touches[0].touch_type == TouchType.EN_JP
+
+
+def test_compile_touches_step_uses_config_profile(ctx):
+    ctx.config.profile = "active_flash_cards"
+    ctx.compiled_items = _make_compiled_items(1, Phase.NOUNS)
+    with patch("jlesson.touch_compiler.compile_touches", return_value=[]) as mock_ct:
+        ctx = CompileTouchesStep().execute(ctx)
+    # Verify the profile passed is active_flash_cards
+    call_args = mock_ct.call_args
+    assert call_args[0][1].name == "active_flash_cards"
+
+
+def test_compile_touches_step_empty_compiled_items(ctx):
+    ctx.compiled_items = []
+    with patch("jlesson.touch_compiler.compile_touches", return_value=[]):
+        ctx = CompileTouchesStep().execute(ctx)
+    assert ctx.touches == []
+
+
+# ---------------------------------------------------------------------------
+# RenderVideoStep (updated — touch-based)
+# ---------------------------------------------------------------------------
+
+
+def test_render_video_step_skips_on_dry_run(ctx):
+    ctx.config.dry_run = True
+    ctx.touches = []
+    ctx = RenderVideoStep().execute(ctx)
+    assert ctx.video_path is None
+
+
+def test_render_video_step_skips_when_no_video(ctx):
+    ctx.config.render_video = False
+    ctx.touches = []
+    ctx = RenderVideoStep().execute(ctx)
+    assert ctx.video_path is None
+
+
+def test_render_video_step_uses_touches(ctx, tmp_path):
+    ctx.config.render_video = True
+    ctx.config.dry_run = False
+    ctx.lesson_id = 1
+    # Create a dummy card file on disk
+    card_path = tmp_path / "card.png"
+    card_path.write_bytes(b"fakepng")
+    ctx.touches = [
+        Touch(
+            compiled_item_index=0,
+            touch_index=1,
+            touch_type=TouchType.EN_JP,
+            intent=TouchIntent.INTRODUCE,
+            card_path=card_path,
+            audio_paths=[],
+        ),
+    ]
+    mock_builder = MagicMock()
+    mock_builder.create_multi_audio_clip.return_value = MagicMock(duration=3.0)
+
+    def _fake_build_video(clips, output_path, **kwargs):
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"fakevideo")
+
+    mock_builder.build_video = _fake_build_video
+    with patch("jlesson.video.builder.VideoBuilder", return_value=mock_builder):
+        ctx = RenderVideoStep().execute(ctx)
+    mock_builder.create_multi_audio_clip.assert_called_once_with(card_path, [])
+    assert ctx.video_path is not None
+    assert ctx.video_path.exists()
+
+
+def test_render_video_step_skips_missing_card(ctx, tmp_path):
+    ctx.config.render_video = True
+    ctx.config.dry_run = False
+    ctx.lesson_id = 1
+    ctx.touches = [
+        Touch(
+            compiled_item_index=0,
+            touch_index=1,
+            touch_type=TouchType.EN_JP,
+            intent=TouchIntent.INTRODUCE,
+            card_path=tmp_path / "nonexistent.png",
+            audio_paths=[],
+        ),
+    ]
+    mock_builder = MagicMock()
+    with patch("jlesson.video.builder.VideoBuilder", return_value=mock_builder):
+        ctx = RenderVideoStep().execute(ctx)
+    # No clips → no video built
+    mock_builder.build_video.assert_not_called()
+    assert ctx.video_path is None
+
+
+# ---------------------------------------------------------------------------
+# SaveReportStep (profile-aware summary)
+# ---------------------------------------------------------------------------
+
+
+def test_save_report_summary_uses_profile(ctx, tmp_path):
+    ctx.config.profile = "passive_video"
+    ctx.lesson_id = 1
+    ctx.noun_items = [dict(n) for n in _NOUNS[:2]]
+    ctx.verb_items = [dict(v) for v in _VERBS[:2]]
+    ctx.sentences = [
+        {"grammar_id": "g1", "english": "I eat.", "japanese": "食べます。", "romaji": "tabemasu", "person": "I"},
+    ]
+    ctx = SaveReportStep().execute(ctx)
+    md = ctx.report_path.read_text(encoding="utf-8")
+    assert "passive_video" in md
+    # passive_video: 3 noun touches per item, 3 verb, 2 grammar
+    assert "| Nouns | 2 | 3 | 6 |" in md
+    assert "| Verbs | 2 | 3 | 6 |" in md
+    assert "| Grammar | 1 | 2 | 2 |" in md
+
+
+def test_save_report_summary_active_flash_cards(ctx, tmp_path):
+    ctx.config.profile = "active_flash_cards"
+    ctx.lesson_id = 1
+    ctx.noun_items = [dict(n) for n in _NOUNS[:2]]
+    ctx.verb_items = [dict(v) for v in _VERBS[:2]]
+    ctx.sentences = [
+        {"grammar_id": "g1", "english": "I eat.", "japanese": "食べます。", "romaji": "tabemasu", "person": "I"},
+    ]
+    ctx = SaveReportStep().execute(ctx)
+    md = ctx.report_path.read_text(encoding="utf-8")
+    assert "active_flash_cards" in md
+    # active_flash_cards: 5 noun/verb touches per item, 3 grammar
+    assert "| Nouns | 2 | 5 | 10 |" in md
+    assert "| Verbs | 2 | 5 | 10 |" in md
+    assert "| Grammar | 1 | 3 | 3 |" in md
+
+
+# ---------------------------------------------------------------------------
+# LessonConfig — profile field
+# ---------------------------------------------------------------------------
+
+
+def test_config_default_profile():
+    config = LessonConfig(theme="food", curriculum_path=Path("c.json"))
+    assert config.profile == "passive_video"
+
+
+def test_config_custom_profile():
+    config = LessonConfig(theme="food", curriculum_path=Path("c.json"), profile="active_flash_cards")
+    assert config.profile == "active_flash_cards"
+
+
+# ---------------------------------------------------------------------------
+# LessonContext — new fields
+# ---------------------------------------------------------------------------
+
+
+def test_context_has_compiled_items_field(ctx):
+    assert ctx.compiled_items == []
+
+
+def test_context_has_touches_field(ctx):
+    assert ctx.touches == []

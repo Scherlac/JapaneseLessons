@@ -73,6 +73,44 @@ class VideoBuilder:
                 duration = 3.0  # Default duration for image-only clips
             return img_clip.with_duration(duration)
 
+    def create_multi_audio_clip(
+        self,
+        card_path: Path,
+        audio_paths: List[Path],
+        pause_before: float = 1.5,
+        pause_between: float = 0.5,
+        pause_after: float = 1.0,
+    ):
+        """Create a clip from a card image with multiple sequential audio tracks.
+
+        For a single audio path this behaves identically to create_clip.
+        For multiple paths the audio clips are positioned sequentially with
+        *pause_between* gaps, wrapped by *pause_before* and *pause_after*.
+        """
+        img_clip = ImageClip(str(card_path))
+        valid = [p for p in audio_paths if p and p.exists()]
+
+        if not valid:
+            return img_clip.with_duration(3.0)
+
+        if len(valid) == 1:
+            return self.create_clip(card_path, valid[0], pause_before=pause_before, pause_after=pause_after)
+
+        from moviepy import CompositeAudioClip
+
+        positioned = []
+        t = pause_before
+        for ap in valid:
+            ac = AudioFileClip(str(ap))
+            positioned.append(ac.with_start(t))
+            t += ac.duration + pause_between
+        # Replace the last pause_between with pause_after
+        total_duration = t - pause_between + pause_after
+
+        combined = CompositeAudioClip(positioned)
+        img_clip = img_clip.with_duration(total_duration)
+        return img_clip.with_audio(combined)
+
     def create_pause_clip(self, duration: float, color: str = "#000000") -> ColorClip:
         """
         Create a pause/black clip.

@@ -1,17 +1,19 @@
 """
 Lesson generation pipeline.
 
-Orchestrates the full lesson workflow through nine sequential steps:
+Orchestrates the full lesson workflow through eleven sequential steps:
 
-  step 1  select_vocab       — pick fresh nouns/verbs from the vocab file
-  step 2  grammar_select     — LLM: pick 1-2 grammar points for this lesson
-  step 3  generate_sentences — LLM: produce practice sentences
-  step 4  noun_practice      — LLM: enrich nouns with examples + memory tips
-  step 5  verb_practice      — LLM: enrich verbs with conjugations + memory tips
-  step 6  register_lesson    — add+complete the lesson in curriculum.json
-  step 7  persist_content    — save LessonContent to output/<id>/content.json
-  step 8  render_video       — TTS audio + card images + assembled MP4
-  step 9  save_report        — finalize and save Markdown lesson report
+  step 1   select_vocab       — pick fresh nouns/verbs from the vocab file
+  step 2   grammar_select     — LLM: pick 1-2 grammar points for this lesson
+  step 3   generate_sentences — LLM: produce practice sentences
+  step 4   noun_practice      — LLM: enrich nouns with examples + memory tips
+  step 5   verb_practice      — LLM: enrich verbs with conjugations + memory tips
+  step 6   register_lesson    — add+complete the lesson in curriculum.json
+  step 7   persist_content    — save LessonContent to output/<id>/content.json
+  step 8   compile_assets     — render card images + TTS audio per item (Stage 2)
+  step 9   compile_touches    — profile-driven touch sequencing (Stage 3)
+  step 10  render_video       — assemble MP4 from touch sequence
+  step 11  save_report        — finalize and save Markdown lesson report
 
 Each step is a PipelineStep subclass with an execute(ctx) method,
 making them individually testable and easy to extend.
@@ -49,7 +51,16 @@ from .curriculum import (
 from .lesson_report import ReportBuilder, save_report
 from .lesson_store import save_lesson_content
 from .llm_client import ask_llm_json_free
-from .models import LessonContent, NounItem, Sentence, VerbItem
+from .models import (
+    CompiledItem,
+    LessonContent,
+    NounItem,
+    Phase,
+    Sentence,
+    Touch,
+    VerbItem,
+)
+from .profiles import get_profile
 from .prompt_template import (
     build_grammar_generate_prompt,
     build_grammar_select_prompt,
@@ -77,6 +88,7 @@ class LessonConfig:
     render_video: bool = True
     dry_run: bool = False
     verbose: bool = True
+    profile: str = "passive_video"
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +130,8 @@ class LessonContext:
     sentences: list[dict] = field(default_factory=list)
     noun_items: list[dict] = field(default_factory=list)
     verb_items: list[dict] = field(default_factory=list)
+    compiled_items: list[CompiledItem] = field(default_factory=list)
+    touches: list[Touch] = field(default_factory=list)
     lesson_id: int = 0
     created_at: str = ""
     content_path: Path | None = None
@@ -240,6 +254,18 @@ def _build_content(ctx: LessonContext) -> LessonContent:
             .replace("+00:00", "Z")
         ),
     )
+
+
+def _build_items_by_phase(ctx: LessonContext) -> dict[Phase, list]:
+    """Convert pipeline context dicts into typed items grouped by phase."""
+    nouns = [NounItem.model_validate(n) for n in ctx.noun_items]
+    verbs = [VerbItem.model_validate(v) for v in ctx.verb_items]
+    sentences = [Sentence.model_validate(s) for s in ctx.sentences]
+    return {
+        Phase.NOUNS: nouns,
+        Phase.VERBS: verbs,
+        Phase.GRAMMAR: sentences,
+    }
 
 
 async def _render_async(
@@ -619,11 +645,61 @@ class PersistContentStep(PipelineStep):
         return ctx
 
 
+class CompileAssetsStep(PipelineStep):
+    """Step 8 — Render card images + TTS audio per item (Stage 2)."""
+
+    name = "compile_assets"
+    description = "Render card images + TTS audio per item"
+
+    def execute(self, ctx: LessonContext) -> LessonContext:
+        from .asset_compiler import compile_assets, compile_assets_sync
+
+        items_by_phase = _build_items_by_phase(ctx)
+        profile = get_profile(ctx.config.profile)
+        output_dir = _resolve_output_dir(ctx.config)
+        lesson_dir = output_dir / f"lesson_{ctx.lesson_id:03d}"
+
+        total_items = sum(len(v) for v in items_by_phase.values())
+
+        if ctx.config.dry_run:
+            self._log(ctx, f"       (dry-run) {total_items} items — cards only")
+            ctx.compiled_items = compile_assets_sync(
+                items_by_phase, profile, lesson_dir,
+            )
+        else:
+            self._log(ctx, f"       {total_items} items → cards + TTS")
+            ctx.compiled_items = asyncio.run(
+                compile_assets(items_by_phase, profile, lesson_dir)
+            )
+
+        self._log(ctx, f"       {len(ctx.compiled_items)} compiled items")
+        return ctx
+
+
+class CompileTouchesStep(PipelineStep):
+    """Step 9 — Profile-driven touch sequencing (Stage 3)."""
+
+    name = "compile_touches"
+    description = "Profile-driven touch sequencing"
+
+    def execute(self, ctx: LessonContext) -> LessonContext:
+        from .touch_compiler import compile_touches
+
+        profile = get_profile(ctx.config.profile)
+        ctx.touches = compile_touches(ctx.compiled_items, profile)
+        self._log(
+            ctx,
+            f"       {len(ctx.touches)} touches "
+            f"(profile: {ctx.config.profile})",
+        )
+        return ctx
+
+
 class RenderVideoStep(PipelineStep):
-    """Step 8 — Render TTS audio + visual card PNGs + assembled MP4."""
+    """Step 10 — Assemble MP4 from touch sequence."""
 
     name = "render_video"
-    description = "TTS audio + card images + assembled MP4"
+    description = "Assemble MP4 from touch sequence"
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         if not ctx.config.render_video or ctx.config.dry_run:
@@ -631,28 +707,34 @@ class RenderVideoStep(PipelineStep):
             self._log(ctx, f"       ({reason})")
             return ctx
 
+        from .video.builder import VideoBuilder
+
         output_dir = _resolve_output_dir(ctx.config)
-        lesson_dir = output_dir / f"lesson_{ctx.lesson_id:03d}"
         video_path = (
             output_dir / f"lesson_{ctx.lesson_id:03d}_{ctx.config.theme}.mp4"
         )
-        items = _build_video_items(ctx.noun_items, ctx.sentences)
-        self._log(ctx, f"       {len(items)} cards \u2192 {video_path.name}")
 
-        asyncio.run(
-            _render_async(
-                items,
-                video_path,
-                lesson_dir / "cards",
-                lesson_dir / "audio",
-                report=ctx.report,
+        video_builder = VideoBuilder()
+        clips = []
+        for touch in ctx.touches:
+            card_path = touch.card_path
+            if card_path is None or not card_path.exists():
+                continue
+            clip = video_builder.create_multi_audio_clip(
+                card_path, touch.audio_paths,
             )
-        )
-        ctx.video_path = video_path
-        size_kb = video_path.stat().st_size // 1024
-        self._log(ctx, f"       OK  ({size_kb} KB)")
+            clips.append(clip)
 
-        ctx.report.add_artifact("Video", video_path)
+        self._log(ctx, f"       {len(clips)} clips → {video_path.name}")
+
+        if clips:
+            video_builder.build_video(clips, video_path, method="ffmpeg")
+            ctx.video_path = video_path
+            size_kb = video_path.stat().st_size // 1024
+            self._log(ctx, f"       OK  ({size_kb} KB)")
+            ctx.report.add_artifact("Video", video_path)
+
+        lesson_dir = output_dir / f"lesson_{ctx.lesson_id:03d}"
         cards_dir = lesson_dir / "cards"
         audio_dir = lesson_dir / "audio"
         if cards_dir.exists():
@@ -663,7 +745,7 @@ class RenderVideoStep(PipelineStep):
 
 
 class SaveReportStep(PipelineStep):
-    """Step 9 — Finalize and save Markdown lesson report."""
+    """Step 11 — Finalize and save Markdown lesson report."""
 
     name = "save_report"
     description = "Finalize and save Markdown lesson report"
@@ -679,20 +761,28 @@ class SaveReportStep(PipelineStep):
 
     @staticmethod
     def _summary(ctx: LessonContext) -> str:
+        from .touch_compiler import count_touches
+
         n_nouns = len(ctx.noun_items)
         n_verbs = len(ctx.verb_items)
         n_sentences = len(ctx.sentences)
         total = n_nouns + n_verbs + n_sentences
-        total_touches = n_nouns * 5 + n_verbs * 5 + n_sentences * 3
+        profile = get_profile(ctx.config.profile)
+        counts = count_touches(n_nouns, n_verbs, n_sentences, profile)
+        noun_reps = len(profile.cycle_for(Phase.NOUNS))
+        verb_reps = len(profile.cycle_for(Phase.VERBS))
+        grammar_reps = len(profile.cycle_for(Phase.GRAMMAR))
         lines = [
             "## Summary",
             "",
+            f"> Profile: **{ctx.config.profile}**",
+            "",
             "| Phase | Items | Repetitions | Touches |",
             "|-------|-------|-------------|---------|",
-            f"| Nouns | {n_nouns} | 5 | {n_nouns * 5} |",
-            f"| Verbs | {n_verbs} | 5 | {n_verbs * 5} |",
-            f"| Grammar | {n_sentences} | 3 | {n_sentences * 3} |",
-            f"| **Total** | **{total}** | | **{total_touches}** |",
+            f"| Nouns | {n_nouns} | {noun_reps} | {counts['nouns']} |",
+            f"| Verbs | {n_verbs} | {verb_reps} | {counts['verbs']} |",
+            f"| Grammar | {n_sentences} | {grammar_reps} | {counts['grammar']} |",
+            f"| **Total** | **{total}** | | **{counts['total']}** |",
             "",
         ]
         return "\n".join(lines)
@@ -710,6 +800,8 @@ PIPELINE: list[PipelineStep] = [
     VerbPracticeStep(),
     RegisterLessonStep(),
     PersistContentStep(),
+    CompileAssetsStep(),
+    CompileTouchesStep(),
     RenderVideoStep(),
     SaveReportStep(),
 ]
@@ -718,7 +810,7 @@ PIPELINE: list[PipelineStep] = [
 def run_pipeline(config: LessonConfig) -> LessonContext:
     """Run the full lesson generation pipeline.
 
-    Loads the curriculum from config.curriculum_path, executes all nine
+    Loads the curriculum from config.curriculum_path, executes all eleven
     steps in sequence, and returns the completed LessonContext.
     """
     ctx = LessonContext(config=config)
