@@ -28,8 +28,8 @@ from urllib.parse import urlparse
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from llm_client import ask_llm_json, LLMClient
-from config import LLM_BASE_URL, LLM_API_KEY, LLM_MODEL
+from jlesson.llm_client import ask_llm_json, LLMClient
+from jlesson.config import LLM_BASE_URL, LLM_API_KEY, LLM_MODEL
 
 def is_host_reachable(base_url: str, timeout: int = 3) -> bool:
     """Quick TCP check to see if a provider endpoint is up before running tests."""
@@ -237,7 +237,7 @@ def main():
     # 3. Alternative Ollama model
     providers.append({
         "name": "Ollama (Gemma)",
-        "base_url": "http://localhost:11434/v1",
+        "base_url": LLM_BASE_URL,
         "api_key": "ollama",
         "model": "gemma3:12b"
     })
@@ -245,7 +245,7 @@ def main():
     # 4. LM Studio
     providers.append({
         "name": "LM Studio",
-        "base_url": "http://localhost:1234/v1",
+        "base_url": LLM_BASE_URL,
         "api_key": "lm-studio",
         "model": "qwen/qwen3-14b"
     })

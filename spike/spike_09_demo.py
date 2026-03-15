@@ -135,9 +135,9 @@ async def _render_video_async(
     cards_dir: Path,
     audio_dir: Path,
 ) -> None:
-    from tts_engine import create_engine
-    from video_cards import CardRenderer
-    from video_builder import VideoBuilder
+    from jlesson.video.tts_engine import create_engine
+    from jlesson.video.cards import CardRenderer
+    from jlesson.video.builder import VideoBuilder
 
     cards_dir.mkdir(parents=True, exist_ok=True)
     audio_dir.mkdir(parents=True, exist_ok=True)

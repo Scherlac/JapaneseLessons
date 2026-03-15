@@ -16,6 +16,7 @@ Usage:
     python spike/spike_07_lmstudio_api.py
 """
 
+import os
 import json
 import re
 import sys
@@ -23,6 +24,11 @@ import time
 import pathlib
 
 import requests
+from dotenv import load_dotenv
+
+load_dotenv(pathlib.Path(__file__).resolve().parent.parent / ".env")
+
+
 
 
 def strip_think(text: str) -> str:
@@ -100,8 +106,8 @@ def extract_json(text: str) -> dict | None:
     return None
 
 
-BASE_URL = "http://localhost:1234"
-API_BASE = f"{BASE_URL}/v1"
+BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:1234")
+API_BASE = f"{BASE_URL}"
 HEADERS = {"Content-Type": "application/json", "Authorization": "Bearer lm-studio"}
 
 # ---------------------------------------------------------------------------

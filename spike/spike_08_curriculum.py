@@ -13,7 +13,7 @@ Tests the full end-to-end curriculum workflow:
 Run with LM Studio running at http://localhost:1234:
     conda run -n base python spike/spike_08_curriculum.py
 """
-
+import os
 import json
 import sys
 import time
@@ -42,6 +42,9 @@ from jlesson.prompt_template import (
     build_verb_practice_prompt,
 )
 
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
 VOCAB_DIR = Path(__file__).parent.parent / "vocab"
@@ -54,11 +57,12 @@ def _hr(label: str) -> None:
     print(f"  {label}")
     print('═' * 60)
 
+API_URL = os.getenv("LLM_BASE_URL", "http://localhost:1234")
 
 def _check_lm_studio() -> bool:
     try:
         import requests
-        r = requests.get("http://localhost:1234/v1/models", timeout=4)
+        r = requests.get(f"{API_URL}/v1/models", timeout=4)
         return r.status_code == 200
     except Exception:
         return False
@@ -260,7 +264,7 @@ def main() -> None:
     print("Spike 08 — Curriculum-Driven LLM Lesson Planning")
     print(f"LM Studio: ", end="")
     if not _check_lm_studio():
-        print("❌ not reachable at http://localhost:1234 — aborting")
+        print(f"❌ not reachable at {API_URL} — aborting")
         sys.exit(1)
     print("✅ connected")
 
