@@ -39,6 +39,8 @@ Core principles: Cohesion / Coupling / Composition / YAGNI / KISS / DRY, spike-b
 | **Seeded vocab shuffle (TD-04)** | ✅ Done — `suggest_new_vocab(seed=)` uses local RNG; CLI `--seed` wired through |
 | **LLM response cache (`llm_cache.py`)** | ✅ Done — `ask_llm_cached()`, `--no-cache` flag; sha256 file cache; stdlib only |
 | Unit test suite (254 unit / 274 total) | ✅ Done — +22 tests for cache + shuffle |
+| **Markdown lesson report (`lesson_report.py`)** | ✅ Done — `generate_report()`, mirrors video structure; `--dry-run` flag |
+| Unit test suite (279 unit / 299 total) | ✅ Done — +25 tests for report |
 
 ---
 
@@ -55,8 +57,9 @@ jlesson/                        ← all production Python source
 ├── vocab_generator.py          ← LLM vocab generation + schema validation
 ├── llm_client.py               ← OpenAI-compatible HTTP client
 ├── llm_cache.py                ← NEW: sha256 file cache for dev
-├── lesson_pipeline.py          ← NEW: LessonContext + stage functions
+├── lesson_pipeline.py          ← NEW: LessonContext + 9 stage functions
 ├── lesson_store.py             ← NEW: output/<id>/content.json I/O
+├── lesson_report.py            ← NEW: Markdown lesson report generator
 ├── video/
 │   ├── __init__.py
 │   ├── tts_engine.py           ← edge-tts async wrapper
@@ -88,6 +91,7 @@ output/                         ← generated artifacts (gitignored)
 | `jlesson/llm_cache.py` | File-based LLM response cache (dev mode) | stdlib only |
 | `jlesson/config.py` | LLM connection parameters (env-overridable) | stdlib + dotenv |
 | `jlesson/lesson_pipeline.py` | `LessonContext` dataclass + stage functions + `run_pipeline()` | Application layer — composes all others |
+| `jlesson/lesson_report.py` | Markdown report generator — mirrors video lesson structure | `models` only |
 | `jlesson/lesson_store.py` | `save_lesson_content()` / `load_lesson_content()` | stdlib only |
 | `jlesson/video/tts_engine.py` | edge-tts async audio generation | Third-party only |
 | `jlesson/video/cards.py` | Pillow card rendering (1920×1080 PNG) | Third-party only |

@@ -157,6 +157,7 @@ def lesson() -> None:
 )
 @click.option("--no-video", is_flag=True, default=False, help="Skip video rendering.")
 @click.option("--no-cache", is_flag=True, default=False, help="Disable LLM response cache (always call LLM).")
+@click.option("--dry-run", is_flag=True, default=False, help="Skip TTS/card/video — generate content and report only.")
 def lesson_next(
     theme: str,
     nouns: int,
@@ -167,6 +168,7 @@ def lesson_next(
     output_dir: str | None,
     no_video: bool,
     no_cache: bool,
+    dry_run: bool,
 ) -> None:
     """Run the full pipeline for the next lesson.
 
@@ -185,6 +187,7 @@ def lesson_next(
         seed=seed,
         use_cache=not no_cache,
         render_video=not no_video,
+        dry_run=dry_run,
     )
     run_pipeline(config)
 
