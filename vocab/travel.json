@@ -1,29 +1,109 @@
 {
   "theme": "travel",
   "nouns": [
-    {"english": "station", "japanese": "えき", "kanji": "駅", "romaji": "eki"},
-    {"english": "airport", "japanese": "くうこう", "kanji": "空港", "romaji": "kuukou"},
-    {"english": "hotel", "japanese": "ホテル", "kanji": "ホテル", "romaji": "hoteru"},
-    {"english": "map", "japanese": "ちず", "kanji": "地図", "romaji": "chizu"},
-    {"english": "ticket", "japanese": "きっぷ", "kanji": "切符", "romaji": "kippu"},
-    {"english": "bus", "japanese": "バス", "kanji": "バス", "romaji": "basu"},
-    {"english": "train", "japanese": "でんしゃ", "kanji": "電車", "romaji": "densha"},
-    {"english": "passport", "japanese": "パスポート", "kanji": "パスポート", "romaji": "pasupooto"},
-    {"english": "suitcase", "japanese": "スーツケース", "kanji": "スーツケース", "romaji": "suutsukeesu"},
-    {"english": "taxi", "japanese": "タクシー", "kanji": "タクシー", "romaji": "takushii"},
-    {"english": "road", "japanese": "みち", "kanji": "道", "romaji": "michi"},
-    {"english": "country", "japanese": "くに", "kanji": "国", "romaji": "kuni"}
+    {
+      "english": "ticket",
+      "japanese": "きっぷ",
+      "kanji": "切符",
+      "romaji": "kippu"
+    },
+    {
+      "english": "bag",
+      "japanese": "かばん",
+      "kanji": "鞄",
+      "romaji": "kaban"
+    },
+    {
+      "english": "map",
+      "japanese": "まっぷ",
+      "kanji": "地図",
+      "romaji": "mappu"
+    },
+    {
+      "english": "hotel",
+      "japanese": "ホテル",
+      "kanji": "ホテル",
+      "romaji": "hoteru"
+    },
+    {
+      "english": "plane",
+      "japanese": "ひこうき",
+      "kanji": "飛行機",
+      "romaji": "hikouki"
+    },
+    {
+      "english": "train",
+      "japanese": "とおりょう",
+      "kanji": "列車",
+      "romaji": "toriyous"
+    },
+    {
+      "english": "station",
+      "japanese": "えき",
+      "kanji": "駅",
+      "romaji": "eki"
+    },
+    {
+      "english": "passport",
+      "japanese": "ぱそぽーと",
+      "kanji": "パスポート",
+      "romaji": "pasupooto"
+    },
+    {
+      "english": "luggage",
+      "japanese": "もやい",
+      "kanji": "荷物",
+      "romaji": "moyai"
+    }
   ],
   "verbs": [
-    {"english": "to go", "japanese": "いく", "kanji": "行く", "romaji": "iku", "type": "う-verb", "masu_form": "行きます"},
-    {"english": "to come", "japanese": "くる", "kanji": "来る", "romaji": "kuru", "type": "irregular", "masu_form": "来ます"},
-    {"english": "to return", "japanese": "かえる", "kanji": "帰る", "romaji": "kaeru", "type": "う-verb", "masu_form": "帰ります"},
-    {"english": "to ride", "japanese": "のる", "kanji": "乗る", "romaji": "noru", "type": "う-verb", "masu_form": "乗ります"},
-    {"english": "to walk", "japanese": "あるく", "kanji": "歩く", "romaji": "aruku", "type": "う-verb", "masu_form": "歩きます"},
-    {"english": "to wait", "japanese": "まつ", "kanji": "待つ", "romaji": "matsu", "type": "う-verb", "masu_form": "待ちます"},
-    {"english": "to arrive", "japanese": "つく", "kanji": "着く", "romaji": "tsuku", "type": "う-verb", "masu_form": "着きます"},
-    {"english": "to stay", "japanese": "とまる", "kanji": "泊まる", "romaji": "tomaru", "type": "う-verb", "masu_form": "泊まります"},
-    {"english": "to look for", "japanese": "さがす", "kanji": "探す", "romaji": "sagasu", "type": "う-verb", "masu_form": "探します"},
-    {"english": "to see", "japanese": "みる", "kanji": "見る", "romaji": "miru", "type": "る-verb", "masu_form": "見ます"}
+    {
+      "english": "to go",
+      "japanese": "いく",
+      "kanji": "行く",
+      "romaji": "iku",
+      "type": "う-verb",
+      "masu_form": "行きます"
+    },
+    {
+      "english": "to take (a train)",
+      "japanese": "とる",
+      "kanji": "取る",
+      "romaji": "toru",
+      "type": "う-verb",
+      "masu_form": "取ります"
+    },
+    {
+      "english": "to buy",
+      "japanese": "かう",
+      "kanji": "買う",
+      "romaji": "kau",
+      "type": "う-verb",
+      "masu_form": "買います"
+    },
+    {
+      "english": "to see",
+      "japanese": "みる",
+      "kanji": "見る",
+      "romaji": "miru",
+      "type": "る-verb",
+      "masu_form": "見ます"
+    },
+    {
+      "english": "to speak",
+      "japanese": "はなす",
+      "kanji": "話す",
+      "romaji": "hanasu",
+      "type": "る-verb",
+      "masu_form": "話します"
+    },
+    {
+      "english": "to arrive",
+      "japanese": "とうりょうする",
+      "kanji": "到着する",
+      "romaji": "touryou suru",
+      "type": "irregular",
+      "masu_form": "到着します"
+    }
   ]
 }

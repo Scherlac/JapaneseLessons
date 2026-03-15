@@ -124,6 +124,14 @@ def generate_vocab(
     if "theme" not in raw:
         raw["theme"] = theme
 
+    # Strip leading/trailing whitespace from all string values (LLMs sometimes pad them)
+    for group in ("nouns", "verbs"):
+        for item in raw.get(group, []):
+            if isinstance(item, dict):
+                for k, v in item.items():
+                    if isinstance(v, str):
+                        item[k] = v.strip()
+
     errors = validate_vocab_schema(raw)
     if errors:
         raise ValueError(

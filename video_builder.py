@@ -65,8 +65,8 @@ class VideoBuilder:
             img_clip = img_clip.with_duration(total_duration)
             audio_clip = audio_clip.with_start(pause_before)
 
-            # Combine
-            return CompositeVideoClip([img_clip, audio_clip.with_start(pause_before)])
+            # Attach audio directly — CompositeVideoClip only accepts video clips in moviepy 2.x
+            return img_clip.with_audio(audio_clip)
         else:
             # Image only clip
             if duration is None:

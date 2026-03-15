@@ -40,6 +40,37 @@ def _strip_think(text: str) -> str:
     return text.strip()
 
 
+def _find_json_objects(text: str) -> list[str]:
+    """Return all top-level {...} substrings, handling arbitrary nesting depth."""
+    results: list[str] = []
+    depth = 0
+    start: Optional[int] = None
+    in_string = False
+    escape_next = False
+    for i, ch in enumerate(text):
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == '\\' and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0 and start is not None:
+                results.append(text[start:i + 1])
+                start = None
+    return results
+
+
 def _extract_json(text: str) -> Optional[Dict[str, Any]]:
     """Try to extract a valid JSON object from text.
 
@@ -50,19 +81,20 @@ def _extract_json(text: str) -> Optional[Dict[str, Any]]:
         return json.loads(text.strip())
     except (json.JSONDecodeError, ValueError):
         pass
-    # Scan all top-level {...} blobs, last one is usually the final answer
-    for m in reversed(list(re.finditer(r'\{[^{}]+\}', text, re.DOTALL))):
-        try:
-            return json.loads(m.group())
-        except (json.JSONDecodeError, ValueError):
-            continue
-    # Code-fence extraction  ``` or ```json
+    # Code-fence extraction  ``` or ```json  (try before brace scan so fences win)
     fence = re.search(r'```(?:json)?[ \t]*\n?(.*?)```', text, re.DOTALL)
     if fence:
         try:
             return json.loads(fence.group(1).strip())
         except (json.JSONDecodeError, ValueError):
             pass
+    # Brace-depth scan — finds all top-level {...} blobs including nested ones;
+    # try the last one first because reasoning models place the final answer at the end.
+    for blob in reversed(_find_json_objects(text)):
+        try:
+            return json.loads(blob)
+        except (json.JSONDecodeError, ValueError):
+            continue
     return None
 
 
