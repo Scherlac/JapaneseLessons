@@ -134,7 +134,7 @@ class TestGenerateAudioMocked:
         engine = TTSEngine()
         mock_comm = _make_communicate_mock()
 
-        with patch("tts_engine.edge_tts.Communicate", return_value=mock_comm):
+        with patch("jlesson.video.tts_engine.edge_tts.Communicate", return_value=mock_comm):
             asyncio.run(engine.generate_audio("こんにちは", out))
 
         mock_comm.save.assert_awaited_once_with(str(out))
@@ -143,7 +143,7 @@ class TestGenerateAudioMocked:
         out = tmp_path / "hello.mp3"
         engine = TTSEngine()
 
-        with patch("tts_engine.edge_tts.Communicate") as mock_cls:
+        with patch("jlesson.video.tts_engine.edge_tts.Communicate") as mock_cls:
             mock_cls.return_value = _make_communicate_mock()
             asyncio.run(engine.generate_audio("こんにちは", out))
 
@@ -157,7 +157,7 @@ class TestGenerateAudioMocked:
         out = tmp_path / "test.mp3"
         engine = TTSEngine(voice="ja-JP-KeitaNeural", rate="-10%")
 
-        with patch("tts_engine.edge_tts.Communicate") as mock_cls:
+        with patch("jlesson.video.tts_engine.edge_tts.Communicate") as mock_cls:
             mock_cls.return_value = _make_communicate_mock()
             asyncio.run(engine.generate_audio("テスト", out))
 
@@ -169,7 +169,7 @@ class TestGenerateAudioMocked:
         engine = TTSEngine()
         assert not out_dir.exists()
 
-        with patch("tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()):
+        with patch("jlesson.video.tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()):
             asyncio.run(engine.generate_batch(["hello"], out_dir))
 
         assert out_dir.exists()
@@ -183,8 +183,8 @@ class TestGenerateAudioMocked:
         fake_submaker = MagicMock()
         fake_submaker.get_srt.return_value = "1\n00:00:00,000 --> 00:00:01,000\nhello\n"
 
-        with patch("tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()), \
-             patch("tts_engine.edge_tts.SubMaker", return_value=fake_submaker):
+        with patch("jlesson.video.tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()), \
+             patch("jlesson.video.tts_engine.edge_tts.SubMaker", return_value=fake_submaker):
             asyncio.run(engine.generate_audio("hello", out_audio, subtitle_path=out_srt))
 
         assert out_audio.exists()
@@ -201,7 +201,7 @@ class TestGenerateBatchMocked:
         engine = TTSEngine()
         texts = ["one", "two", "three"]
 
-        with patch("tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()):
+        with patch("jlesson.video.tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()):
             paths = asyncio.run(engine.generate_batch(texts, tmp_path))
 
         assert len(paths) == 3
@@ -210,7 +210,7 @@ class TestGenerateBatchMocked:
         engine = TTSEngine()
         texts = ["apple", "orange"]
 
-        with patch("tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()):
+        with patch("jlesson.video.tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()):
             paths = asyncio.run(engine.generate_batch(texts, tmp_path, base_filename="clip"))
 
         assert paths[0].name == "clip_01.mp3"
@@ -219,7 +219,7 @@ class TestGenerateBatchMocked:
     def test_default_base_filename(self, tmp_path):
         engine = TTSEngine()
 
-        with patch("tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()):
+        with patch("jlesson.video.tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()):
             paths = asyncio.run(engine.generate_batch(["hi"], tmp_path))
 
         assert paths[0].name == "audio_01.mp3"
@@ -229,7 +229,7 @@ class TestGenerateBatchMocked:
         engine = TTSEngine()
         assert not out_dir.exists()
 
-        with patch("tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()):
+        with patch("jlesson.video.tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()):
             asyncio.run(engine.generate_batch(["hi"], out_dir))
 
         assert out_dir.exists()
@@ -237,7 +237,7 @@ class TestGenerateBatchMocked:
     def test_empty_list_returns_empty(self, tmp_path):
         engine = TTSEngine()
 
-        with patch("tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()):
+        with patch("jlesson.video.tts_engine.edge_tts.Communicate", return_value=_make_communicate_mock()):
             paths = asyncio.run(engine.generate_batch([], tmp_path))
 
         assert paths == []
@@ -246,7 +246,7 @@ class TestGenerateBatchMocked:
         engine = TTSEngine()
         texts = ["a", "b", "c"]
 
-        with patch("tts_engine.edge_tts.Communicate") as mock_cls:
+        with patch("jlesson.video.tts_engine.edge_tts.Communicate") as mock_cls:
             mock_cls.return_value = _make_communicate_mock()
             asyncio.run(engine.generate_batch(texts, tmp_path))
 

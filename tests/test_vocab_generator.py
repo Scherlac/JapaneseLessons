@@ -109,27 +109,27 @@ class TestGenerateVocab:
     """Mocks ask_llm_json_free so no LLM server is required."""
 
     def test_returns_valid_vocab_dict(self, tmp_path):
-        with patch("vocab_generator.ask_llm_json_free", return_value=_vocab()) as _:
+        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()) as _:
             result = generate_vocab("test", save=False)
         assert result["theme"] == "test"
         assert len(result["nouns"]) == 2
         assert len(result["verbs"]) == 1
 
     def test_saves_file_when_save_true(self, tmp_path):
-        with patch("vocab_generator.ask_llm_json_free", return_value=_vocab()):
+        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()):
             generate_vocab("testtheme", save=True, output_dir=tmp_path)
         assert (tmp_path / "testtheme.json").exists()
 
     def test_saved_file_content_matches_returned_dict(self, tmp_path):
         import json
-        with patch("vocab_generator.ask_llm_json_free", return_value=_vocab()):
+        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()):
             result = generate_vocab("testtheme", save=True, output_dir=tmp_path)
         saved = json.loads((tmp_path / "testtheme.json").read_text(encoding="utf-8"))
         assert saved["theme"] == result["theme"]
         assert len(saved["nouns"]) == len(result["nouns"])
 
     def test_no_file_written_when_save_false(self, tmp_path):
-        with patch("vocab_generator.ask_llm_json_free", return_value=_vocab()):
+        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()):
             generate_vocab("testtheme", save=False, output_dir=tmp_path)
         assert not (tmp_path / "testtheme.json").exists()
 
@@ -137,25 +137,25 @@ class TestGenerateVocab:
         """LLM sometimes omits the 'theme' key — generate_vocab should inject it."""
         vocab_without_theme = _vocab()
         del vocab_without_theme["theme"]
-        with patch("vocab_generator.ask_llm_json_free", return_value=vocab_without_theme):
+        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=vocab_without_theme):
             result = generate_vocab("animals", save=False)
         assert result["theme"] == "animals"
 
     def test_raises_value_error_on_schema_validation_failure(self):
         bad_response = {"theme": "bad", "nouns": "not-a-list", "verbs": []}
-        with patch("vocab_generator.ask_llm_json_free", return_value=bad_response):
+        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=bad_response):
             with pytest.raises(ValueError, match="schema validation"):
                 generate_vocab("bad", save=False)
 
     def test_llm_uses_correct_theme_in_prompt(self):
         """Ask_llm_json_free should be called with a prompt mentioning the theme."""
-        with patch("vocab_generator.ask_llm_json_free", return_value=_vocab()) as mock_llm:
+        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()) as mock_llm:
             generate_vocab("animals", save=False)
         call_args = mock_llm.call_args[0][0]
         assert "animals" in call_args
 
     def test_llm_uses_correct_num_nouns_and_verbs_in_prompt(self):
-        with patch("vocab_generator.ask_llm_json_free", return_value=_vocab()) as mock_llm:
+        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()) as mock_llm:
             generate_vocab("animals", num_nouns=8, num_verbs=5, save=False)
         call_args = mock_llm.call_args[0][0]
         assert "8" in call_args
@@ -163,6 +163,6 @@ class TestGenerateVocab:
 
     def test_creates_output_directory_if_missing(self, tmp_path):
         nested = tmp_path / "deep" / "nested"
-        with patch("vocab_generator.ask_llm_json_free", return_value=_vocab()):
+        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()):
             generate_vocab("testtheme", save=True, output_dir=nested)
         assert (nested / "testtheme.json").exists()

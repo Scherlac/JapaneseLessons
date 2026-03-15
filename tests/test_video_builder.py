@@ -167,7 +167,7 @@ class TestBuildVideoFfmpegFallback:
 class TestCreateClip:
     def test_image_only_clip_uses_default_duration(self, tmp_path):
         """When no audio exists the clip uses the 3s default."""
-        from video_cards import CardRenderer
+        from jlesson.video.cards import CardRenderer
 
         renderer = CardRenderer()
         img = renderer.render_introduce_card("fish", "魚", "さかな", "sakana", "1/1")
@@ -179,7 +179,7 @@ class TestCreateClip:
         assert clip.duration == pytest.approx(3.0, abs=0.1)
 
     def test_image_only_clip_with_explicit_duration(self, tmp_path):
-        from video_cards import CardRenderer
+        from jlesson.video.cards import CardRenderer
 
         renderer = CardRenderer()
         img = renderer.render_introduce_card("cat", "猫", "ねこ", "neko", "1/1")
@@ -192,7 +192,7 @@ class TestCreateClip:
 
     def test_missing_audio_falls_back_to_image_only(self, tmp_path):
         """If audio_path doesn't exist, clip is created without audio."""
-        from video_cards import CardRenderer
+        from jlesson.video.cards import CardRenderer
 
         renderer = CardRenderer()
         img = renderer.render_introduce_card("dog", "犬", "いぬ", "inu", "1/1")
@@ -216,7 +216,7 @@ class TestVideoRenderIntegration:
     """Render a real single-card .mp4.  Slow (~30s), requires ffmpeg."""
 
     def test_render_single_card_to_mp4(self, tmp_path):
-        from video_cards import CardRenderer
+        from jlesson.video.cards import CardRenderer
 
         renderer = CardRenderer()
         img = renderer.render_introduce_card("water", "水", "みず", "mizu", "1/1", progress=0.5)
@@ -233,7 +233,7 @@ class TestVideoRenderIntegration:
         assert out.stat().st_size > 10_000, "Rendered video is unexpectedly small"
 
     def test_render_three_cards_concatenated(self, tmp_path):
-        from video_cards import CardRenderer
+        from jlesson.video.cards import CardRenderer
 
         renderer = CardRenderer()
         clips = []
