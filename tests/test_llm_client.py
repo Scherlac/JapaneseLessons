@@ -25,7 +25,7 @@ import time
 
 import pytest
 
-from llm_client import (
+from jlesson.llm_client import (
     LLMClient,
     _NO_SYSTEM_ROLE_PATTERNS,
     _TRANSLATION_SCHEMA,

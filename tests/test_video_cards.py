@@ -11,7 +11,7 @@ import pytest
 from pathlib import Path
 from PIL import Image
 
-from video_cards import CardRenderer, create_renderer
+from jlesson.video.cards import CardRenderer, create_renderer
 
 
 # ─────────────────────────────────────────────────────────────────────────────

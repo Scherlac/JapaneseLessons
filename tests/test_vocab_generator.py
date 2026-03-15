@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from vocab_generator import generate_vocab, validate_vocab_schema
+from jlesson.vocab_generator import generate_vocab, validate_vocab_schema
 
 # ── Minimal valid vocab fixture ───────────────────────────────────────────────
 

@@ -33,7 +33,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
-from curriculum import (
+from jlesson.curriculum import (
     add_lesson,
     complete_lesson,
     create_curriculum,
@@ -42,13 +42,13 @@ from curriculum import (
     save_curriculum,
     suggest_new_vocab,
 )
-from llm_client import ask_llm_json_free
-from prompt_template import (
+from jlesson.llm_client import ask_llm_json_free
+from jlesson.prompt_template import (
     build_grammar_generate_prompt,
     build_grammar_select_prompt,
     build_noun_practice_prompt,
 )
-from vocab_generator import generate_vocab
+from jlesson.vocab_generator import generate_vocab
 
 # ---------------------------------------------------------------------------
 # Config

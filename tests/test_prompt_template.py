@@ -17,8 +17,8 @@ Each test asserts that the generated prompt string:
 
 import pytest
 
-from curriculum import GRAMMAR_PROGRESSION
-from prompt_template import (
+from jlesson.curriculum import GRAMMAR_PROGRESSION
+from jlesson.prompt_template import (
     build_content_validate_prompt,
     build_grammar_generate_prompt,
     build_grammar_select_prompt,

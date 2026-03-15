@@ -23,7 +23,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from video_builder import VideoBuilder, create_video_builder
+from jlesson.video.builder import VideoBuilder, create_video_builder
 
 
 # ─────────────────────────────────────────────────────────────────────────────

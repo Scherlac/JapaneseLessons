@@ -26,23 +26,11 @@ all = [
 ]
 
 [project.scripts]
-japanese-lesson = "generate_lesson:main"
+jlesson = "jlesson.cli:main"
 
-[tool.setuptools]
-py-modules = [
-    "generate_lesson",
-    "curriculum",
-    "vocab_generator",
-    "prompt_template",
-    "llm_client",
-    "config",
-    "tts_engine",
-    "video_cards",
-    "video_builder",
-]
-
-[tool.setuptools.package-data]
-"*" = ["vocab/*.json"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["jlesson*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

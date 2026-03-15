@@ -24,7 +24,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tts_engine import VOICES, TTSEngine, create_engine
+from jlesson.video.tts_engine import VOICES, TTSEngine, create_engine
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -23,10 +23,10 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from llm_client import ask_llm_json_free
-from prompt_template import build_vocab_prompt
+from .llm_client import ask_llm_json_free
+from .prompt_template import build_vocab_prompt
 
-VOCAB_DIR = Path(__file__).parent / "vocab"
+VOCAB_DIR = Path(__file__).parent.parent / "vocab"
 
 _REQUIRED_NOUN_FIELDS = {"english", "japanese", "kanji", "romaji"}
 _REQUIRED_VERB_FIELDS = {"english", "japanese", "kanji", "romaji", "type", "masu_form"}

@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional
 from openai import OpenAI
 from openai._exceptions import APIError, RateLimitError
 
-from config import (
+from .config import (
     LLM_API_KEY,
     LLM_BASE_URL,
     LLM_DEBUG,

@@ -22,7 +22,7 @@ from pathlib import Path
 # Ensure project root is on the path when run from spike/
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from curriculum import (
+from jlesson.curriculum import (
     GRAMMAR_PROGRESSION,
     add_lesson,
     complete_lesson,
@@ -33,8 +33,8 @@ from curriculum import (
     suggest_new_vocab,
     summary,
 )
-from llm_client import ask_llm_json_free
-from prompt_template import (
+from jlesson.llm_client import ask_llm_json_free
+from jlesson.prompt_template import (
     build_content_validate_prompt,
     build_grammar_generate_prompt,
     build_grammar_select_prompt,

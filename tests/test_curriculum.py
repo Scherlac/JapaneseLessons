@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from curriculum import (
+from jlesson.curriculum import (
     GRAMMAR_PROGRESSION,
     add_lesson,
     complete_lesson,

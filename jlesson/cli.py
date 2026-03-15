@@ -20,11 +20,11 @@ import random
 import sys
 from pathlib import Path
 
-from curriculum import (
+from .curriculum import (
     load_curriculum,
     summary as curriculum_summary,
 )
-from prompt_template import (
+from .prompt_template import (
     DIMENSIONS_BEGINNER,
     GRAMMAR_PATTERNS_BEGINNER,
     PERSONS_BEGINNER,
@@ -32,7 +32,7 @@ from prompt_template import (
     build_vocab_prompt,
 )
 
-VOCAB_DIR = Path(__file__).parent / "vocab"
+VOCAB_DIR = Path(__file__).parent.parent / "vocab"
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ examples:
     return parser
 
 
-DEFAULT_CURRICULUM_PATH = Path(__file__).parent / "curriculum" / "curriculum.json"
+DEFAULT_CURRICULUM_PATH = Path(__file__).parent.parent / "curriculum" / "curriculum.json"
 
 
 def _get_curriculum_path(args) -> Path:
@@ -170,7 +170,7 @@ def main() -> None:
 
     # --create-vocab
     if args.create_vocab:
-        from vocab_generator import generate_vocab
+        from .vocab_generator import generate_vocab
         generate_vocab(
             theme=args.create_vocab,
             num_nouns=args.nouns if args.nouns != 6 else 12,
