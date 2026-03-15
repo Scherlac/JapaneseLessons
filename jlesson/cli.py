@@ -32,6 +32,29 @@ VOCAB_DIR = Path(__file__).parent.parent / "vocab"
 DEFAULT_CURRICULUM_PATH = Path(__file__).parent.parent / "curriculum" / "curriculum.json"
 
 
+def _friendly_error(exc: Exception) -> str:
+    """Convert LLM / network exceptions into a one-line user message."""
+    name = type(exc).__name__
+    msg = str(exc)
+    # openai SDK exceptions
+    if "TimeoutError" in name or "timeout" in msg.lower():
+        return (
+            "LLM request timed out. The model may need more time for large "
+            "prompts.\nTry: set LLM_REQUEST_TIMEOUT to a higher value in .env "
+            "(current default: 120s)."
+        )
+    if "ConnectionError" in name or "Connection" in name:
+        from .config import LLM_BASE_URL
+        return f"Cannot connect to LLM server at {LLM_BASE_URL}. Is it running?"
+    if "RateLimitError" in name:
+        return "LLM rate limit exceeded. Wait a moment and retry."
+    if "APIError" in name:
+        return f"LLM API error: {msg}"
+    if isinstance(exc, ValueError):
+        return str(exc)
+    return f"{name}: {msg}"
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -102,7 +125,10 @@ def vocab_list() -> None:
 def vocab_create(theme: str, nouns: int, verbs: int, level: str) -> None:
     """Generate vocabulary for THEME via LLM and save to vocab/<THEME>.json."""
     from .vocab_generator import generate_vocab
-    generate_vocab(theme=theme, num_nouns=nouns, num_verbs=verbs, level=level)
+    try:
+        generate_vocab(theme=theme, num_nouns=nouns, num_verbs=verbs, level=level)
+    except Exception as exc:
+        raise click.ClickException(_friendly_error(exc)) from exc
 
 
 @vocab.command("generate-prompt")
@@ -189,7 +215,10 @@ def lesson_next(
         render_video=not no_video,
         dry_run=dry_run,
     )
-    run_pipeline(config)
+    try:
+        run_pipeline(config)
+    except Exception as exc:
+        raise click.ClickException(_friendly_error(exc)) from exc
 
 
 @lesson.command("prompt")

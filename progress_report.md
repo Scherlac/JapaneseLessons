@@ -268,28 +268,176 @@ completed stages on re-run. See `decision_pipeline_orchestration.md` for the str
 functions now have consistent type signatures; `person_block` formatting renders
 `"  - I: 私 (watashi)"` correctly.
 
+### TD-09 — Vocab generation overwrites and lacks difficulty metadata  `MEDIUM`
+`generate_vocab()` writes to `vocab/<theme>.json` unconditionally — re-running for an
+existing theme silently overwrites the file, losing any previous words. Additionally:
+- **No difficulty level** — words have no beginner/intermediate/advanced tag, so the
+  generator cannot filter by learner level.
+- **No deduplication across themes** — the LLM has no awareness of words already
+  generated in other theme files, risking duplicates (e.g. "water" in both food and travel).
+- **Curriculum tracks covered words** via `covered_nouns` / `covered_verbs` in
+  `curriculum.json`, so lesson-level deduplication works — but the vocab *source files*
+  themselves have no such guard.
+
+**Fix options:**
+1. Merge-on-save: load existing file, union new words, write back.
+2. Add a `level` field (beginner/intermediate/advanced) per word in the vocab schema.
+3. Pass existing word lists to the LLM prompt so it avoids repeats.
+4. Warn (or abort) when the target file already exists unless `--force` is passed.
+
+### TD-10 — Sentence generation produces nonsensical combinations  `HIGH`
+The pipeline selects nouns (step 1), verbs (step 1), and grammar points (step 2)
+independently, then asks the LLM to generate sentences combining all three (step 3).
+Because each selection is made without considering the others, the LLM is sometimes
+forced to combine words and grammar patterns that don't fit naturally — producing
+awkward or nonsensical sentences (e.g. forcing an existence pattern with action verbs,
+or pairing unrelated nouns with transitive verbs).
+
+**Root cause:** no feedback loop — the pipeline is strictly forward (select → generate),
+with no validation or revision pass on the generated output.
+
+**Fix options (not mutually exclusive):**
+1. **Review/lector step** — add an LLM review step after sentence generation that scores
+   each sentence for naturalness and flags or regenerates poor fits. Could use a separate
+   prompt: "Rate these sentences 1–5 for naturalness; rewrite any scoring below 3."
+2. **Grammar-aware vocab selection** — after selecting grammar points, filter the vocab
+   pool to items that pair naturally with those patterns before finalising the noun/verb
+   selection. Requires reordering steps 1 and 2.
+3. **Joint generation** — instead of selecting vocab first and grammar second, give the
+   LLM the full pool and let it pick a coherent subset of nouns + verbs + grammar in one
+   call. Reduces control but improves naturalness.
+4. **Sentence-level retry** — if a generated sentence fails a quality heuristic (e.g.
+   short length, repeated words, missing expected particles), retry that sentence with
+   a more constrained prompt.
+
+---
+
+## Compilation Pipeline Design
+
+The rendering side of the pipeline follows a **three-stage transformation**,
+each producing an explicit, inspectable data structure. This replaces the
+current approach where `_build_video_items` constructs ad-hoc dicts and
+`_render_async` reads/writes folders directly.
+
+```
+item_sequence  ──→  compiled_items  ──→  touch_sequence  ──→  output
+   (raw data)       (items + assets)     (ordered touches)    (video / report / anki)
+```
+
+Touch system domain concepts (profiles, touch types, repetition cycles) are
+defined in [`docs/structure.md`](docs/structure.md).
+
+### Stage 1 — Item Sequence (steps 1–7, already implemented)
+
+Raw lesson items (nouns, verbs, sentences) with LLM-enriched data.
+Persisted as `output/<id>/content.json` by `PersistContentStep`.
+
+```
+ItemSequence = list[NounItem | VerbItem | Sentence]
+```
+
+### Stage 2 — Compiled Items (asset rendering)
+
+For each item, render the unique assets required by the profile's touch types.
+Assets are rendered once per item and de-duplicated across touches.
+
+```
+CompiledItem
+  ├── item          NounItem | VerbItem | Sentence
+  ├── phase         "nouns" | "verbs" | "grammar"
+  └── assets
+        ├── card_en       Path | None
+        ├── card_jp       Path | None
+        ├── card_en_jp    Path | None
+        ├── audio_en      Path | None
+        ├── audio_jp_f    Path | None
+        └── audio_jp_m    Path | None
+```
+
+This is the **quality-control checkpoint** — every card image and audio clip
+exists on disk and can be inspected before proceeding.
+
+### Stage 3 — Touch Sequence (profile-driven ordering)
+
+The compiler reads the repetition cycles and produces a flat, ordered list of
+touches — interleaved by round — ready for output rendering.
+
+```
+Touch
+  ├── compiled_item   ref → CompiledItem
+  ├── touch_index     1-based within the item's cycle
+  ├── touch_type      "en→jp" | "listen:en,jp-m,jp-f" | …
+  ├── intent          "introduce" | "recall" | "reinforce" | …
+  ├── card_path       Path   (resolved from compiled_item.assets)
+  └── audio_paths     list[Path]  (resolved, ordered for playback)
+```
+
+Separating Stage 2 from Stage 3 means:
+- Changing repetition cycles or interleaving does **not** re-render assets.
+- Multiple profiles can share the **same compiled items**.
+
+### Stage 4 — Output Rendering (format-specific)
+
+| Output format | Deliverable | Reads from each touch |
+|--------------|-------------|------------------------|
+| Video (MP4) | Clips assembled in sequence order | card PNG + audio MP3s |
+| Lesson report (Markdown) | Structured `.md` file | item metadata + touch intent |
+| Anki export (TSV / `.apkg`) | Flashcard deck | card images + audio + text fields |
+
+Fast and repeatable — re-running with a different format does not re-render.
+
+### Pipeline Step Mapping
+
+```
+Steps 1–7:  content generation + persistence     (unchanged, produces item_sequence)
+Step 8:     compile_assets    — Stage 2: item_sequence → compiled_items
+Step 9:     compile_touches   — Stage 3: compiled_items + profile → touch_sequence
+Step 10+:   render_video      — Stage 4: touch_sequence → MP4
+            render_report     — Stage 4: touch_sequence → Markdown
+            render_export     — Stage 4: touch_sequence → Anki / other
+```
+
+`compile_assets` is item-aware (renders cards and TTS).  
+`compile_touches` is profile-aware (reads the rulebook).  
+Stage 4 steps are format-aware but profile-agnostic.
+
 ---
 
 ## Anticipated Next Features (Ranked by Value)
 
 ### Priority 1 — High value, natural next steps
-1. **More vocab themes** — animals, school, weather, work, time, numbers  
-   Expands learning surface; each theme is one `--create-vocab <theme>` call away.
 
-2. **Anki export** — `.apkg` or Anki-compatible CSV  
-   High retention value; requires content persistence (already done) first.
+1. **Touch system + compilation pipeline** — Implement the three-stage transformation
+   (item sequence → compiled items → touch sequence → output). Replaces ad-hoc
+   `_build_video_items` / `_render_async`. Requires: `CompiledItem` and `Touch` data
+   models, profile/rulebook configuration, asset compiler, touch sequencer.
+   Design: see Compilation Pipeline Design above + [`docs/structure.md`](docs/structure.md).
+
+2. **Passive video profile** — Listen-first touch types (`listen:en,jp-m,jp-f`,
+   `listen:jp-f,jp-m`, `listen:en,jp-f`). Requires: EN TTS voice, JP male TTS voice,
+   EN+JP bilingual card renderer. Design: see profile definition in `docs/structure.md`.
+
+3. **More vocab themes** — animals, school, weather, work, time, numbers  
+   Expands learning surface; each theme is one `--create-vocab <theme>` call away.
+   Blocked by TD-09 (overwrite risk, no difficulty level, no cross-theme dedup).
+
+4. **Anki export** — `.apkg` or Anki-compatible CSV  
+   High retention value; consumes compiled items from Stage 2. Requires `genanki`.
+   Design: see [`docs/decision_anki_export.md`](docs/decision_anki_export.md).
 
 ### Priority 2 — Quality improvements
-3. **Interactive text review mode** — CLI-based: show English, learner types romaji/Japanese  
-   Alternative to video for quick review. Requires content persistence.
 
-4. **Progress tracking + scoring** — correct/incorrect per item, due-date scheduling  
+5. **Interactive text review mode** — CLI-based: show English, learner types romaji/Japanese  
+   Alternative to video for quick review. Consumes touch sequence.
+
+6. **Progress tracking + scoring** — correct/incorrect per item, due-date scheduling  
    Moves toward spaced-repetition. Needs lesson runner first.
 
-5. **Cross-platform font support** (TD-05)  
+7. **Cross-platform font support** (TD-05)  
    Low complexity; unblocks non-Windows use.
 
 ### Priority 3 — Infrastructure
+
 8. **Pipeline checkpointing** (TD-07) — crash resilience for long LLM runs
 9. **Multi-model flag** — `--model <id>` override per invocation
 

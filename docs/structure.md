@@ -84,6 +84,225 @@ Each sentence reuses nouns and verbs from Phases 1 & 2, giving additional repeti
 
 ---
 
+## Touch System
+
+The sections above describe *what* is learned and *how many* repetitions occur.
+This section formalises *what each touch actually contains* — what the learner
+sees, hears, and does — and how a **rulebook** compiles raw lesson items into a
+complete, renderable touch sequence.
+
+### Terminology
+
+| Term | Definition |
+|------|------------|
+| **Item** | A single learning unit: a noun, a verb, or a grammar sentence. |
+| **Touch** | One learner interaction with an item. Each touch presents the item in a specific way. |
+| **Touch type** | Mechanical specification of a touch: what is shown, what audio plays, in what order. |
+| **Repetition cycle** | An ordered list of touch types applied to every item in a phase. |
+| **Profile** | A named rulebook variant that targets a specific use case (e.g. passive video, active flash cards). Different profiles reuse the same items but define different touch types and repetition cycles. |
+| **Rulebook** | The complete mapping for one profile: phase → repetition cycle → required assets per touch. Given a lesson's items, the rulebook produces the full touch sequence and asset manifest. |
+
+### Touch Anatomy
+
+A touch is a timed sequence of **stages** within one video clip.
+Different touch types have different numbers of stages:
+
+| Stage | Purpose | Typical content |
+|-------|---------|-----------------|
+| **Prompt** | Challenge or introduction | Text card, audio, or both |
+| **Pause** | Thinking time (optional) | Same card, silence |
+| **Reveal** | Answer or confirmation | New card, audio, or both |
+
+Not every touch needs all three stages. A passive-listening touch may have
+no pause and no distinct reveal — just sequential audio over a card.
+
+### Touch Type Catalogue
+
+All available touch types across all profiles. Each profile selects a subset.
+
+#### Card-based (visual prompt → visual reveal)
+
+| ID | Prompt | Reveal | Prompt audio | Reveal audio | Pause | Learner action |
+|----|--------|--------|:------------:|:------------:|:-----:|----------------|
+| `en→jp` | English text | JP text + reading | — | 🔊 JP female | ✓ | Produce Japanese from English |
+| `jp→en` | JP text | English text | 🔊 JP female | — | ✓ | Recognise meaning from Japanese |
+| `jp→jp` | JP text | JP text (same) | — | 🔊 JP female | ✓ | Self-confirm pronunciation |
+
+#### Listen-first (audio-led, passive-friendly)
+
+| ID | Card shown | Audio sequence | Pause | Learner action |
+|----|------------|----------------|:-----:|----------------|
+| `listen:en,jp-m,jp-f` | EN + JP text | 🔊 EN → 🔊 JP male → 🔊 JP female | — | Listen & absorb |
+| `listen:jp-f,jp-m` | JP text | 🔊 JP female → 🔊 JP male | — | Hear two speakers |
+| `listen:en,jp-f` | EN + JP text | 🔊 EN → 🔊 JP female | — | Map English to Japanese |
+
+### Assets per Touch Type
+
+| Touch type | Cards needed | EN voice | JP female | JP male |
+|------------|-------------|:--------:|:---------:|:-------:|
+| `en→jp` | EN card, JP card | — | ✓ | — |
+| `jp→en` | JP card, EN card | — | ✓ | — |
+| `jp→jp` | JP card | — | ✓ | — |
+| `listen:en,jp-m,jp-f` | EN+JP card | ✓ | ✓ | ✓ |
+| `listen:jp-f,jp-m` | JP card | — | ✓ | ✓ |
+| `listen:en,jp-f` | EN+JP card | ✓ | ✓ | — |
+
+**Unique assets per item** (de-duplicated — assets are rendered once and reused):
+
+| Asset | Description |
+|-------|-------------|
+| Card: EN | English word or sentence |
+| Card: JP | Japanese text + reading |
+| Card: EN+JP | Bilingual card (both languages) |
+| Audio: EN | English TTS |
+| Audio: JP female | Japanese TTS (female voice) |
+| Audio: JP male | Japanese TTS (male voice) |
+
+→ Up to **6 unique assets per item**. The asset manifest depends on which
+  touch types appear in the profile's repetition cycles.
+
+---
+
+### Profile: Passive Video
+
+**Use case:** The learner watches a video. No interaction, no pauses.
+English-speaking learner acquiring Japanese through repeated audio exposure.
+
+**Touch pattern per item:** hear the English word/sentence, then hear it
+in Japanese twice — male and female — while seeing both languages on screen.
+
+#### Repetition Cycle — Nouns & Verbs (3 touches)
+
+| # | Touch type | Intent | What the learner experiences |
+|---|-----------|--------|------------------------------|
+| 1 | `listen:en,jp-m,jp-f` | introduce | Hear English, then Japanese (male), then Japanese (female). See bilingual card. |
+| 2 | `listen:jp-f,jp-m` | reinforce | Hear Japanese only — female then male. See JP card. |
+| 3 | `listen:en,jp-m,jp-f` | lock-in | Full cycle again: English → JP male → JP female. |
+
+#### Repetition Cycle — Grammar Sentences (2 touches)
+
+| # | Touch type | Intent | What the learner experiences |
+|---|-----------|--------|------------------------------|
+| 1 | `listen:en,jp-m,jp-f` | translate | Hear the English sentence, then both JP voices. |
+| 2 | `listen:en,jp-f` | reinforce | Hear English → JP female only (faster pacing). |
+
+#### Compilation Example (Passive Video)
+
+2 nouns + 2 grammar sentences:
+
+```
+Phase 1 — Nouns
+  noun₁  touch 1  listen:en,jp-m,jp-f  introduce
+  noun₂  touch 1  listen:en,jp-m,jp-f  introduce
+  noun₁  touch 2  listen:jp-f,jp-m     reinforce
+  noun₂  touch 2  listen:jp-f,jp-m     reinforce
+  noun₁  touch 3  listen:en,jp-m,jp-f  lock-in
+  noun₂  touch 3  listen:en,jp-m,jp-f  lock-in
+Phase 3 — Grammar
+  sent₁  touch 1  listen:en,jp-m,jp-f  translate
+  sent₂  touch 1  listen:en,jp-m,jp-f  translate
+  sent₁  touch 2  listen:en,jp-f       reinforce
+  sent₂  touch 2  listen:en,jp-f       reinforce
+```
+
+**10 touches**, **4 items**.
+
+| Asset | Count |
+|-------|-------|
+| EN+JP bilingual cards | 4 |
+| JP-only cards | 2 (nouns only, touch 2) |
+| EN TTS audio | 4 |
+| JP female TTS audio | 4 |
+| JP male TTS audio | 4 |
+| **Total unique assets** | **18** |
+| **Total rendered clips** | **10** |
+
+---
+
+### Profile: Active Flash Cards
+
+**Use case:** The learner actively engages — sees a prompt, pauses to think,
+then the reveal appears. Current default for the video pipeline.
+
+#### Repetition Cycle — Nouns & Verbs (5 touches)
+
+| # | Touch type | Intent | What happens |
+|---|-----------|--------|--------------|
+| 1 | `en→jp` | introduce | First exposure: see English, learn Japanese |
+| 2 | `jp→en` | recall | See Japanese, remember the English meaning |
+| 3 | `en→jp` | reinforce | Produce Japanese again from English |
+| 4 | `jp→jp` | confirm | See Japanese, hear Japanese, self-check pronunciation |
+| 5 | `en→jp` | lock-in | Final production from English |
+
+#### Repetition Cycle — Grammar Sentences (3 touches)
+
+| # | Touch type | Intent | What happens |
+|---|-----------|--------|--------------|
+| 1 | `en→jp` | translate | Produce the full Japanese sentence |
+| 2 | `jp→en` | comprehend | Understand the Japanese sentence |
+| 3 | `en→jp` | reinforce | Produce Japanese one more time |
+
+#### Compilation Example (Active Flash Cards)
+
+2 nouns + 2 grammar sentences:
+
+```
+Phase 1 — Nouns
+  noun₁  touch 1  en→jp  introduce
+  noun₂  touch 1  en→jp  introduce
+  noun₁  touch 2  jp→en  recall
+  noun₂  touch 2  jp→en  recall
+  noun₁  touch 3  en→jp  reinforce
+  noun₂  touch 3  en→jp  reinforce
+  noun₁  touch 4  jp→jp  confirm
+  noun₂  touch 4  jp→jp  confirm
+  noun₁  touch 5  en→jp  lock-in
+  noun₂  touch 5  en→jp  lock-in
+Phase 3 — Grammar
+  sent₁  touch 1  en→jp  translate
+  sent₂  touch 1  en→jp  translate
+  sent₁  touch 2  jp→en  comprehend
+  sent₂  touch 2  jp→en  comprehend
+  sent₁  touch 3  en→jp  reinforce
+  sent₂  touch 3  en→jp  reinforce
+```
+
+**16 touches**, **4 items**.
+
+| Asset | Count |
+|-------|-------|
+| EN cards | 4 |
+| JP cards | 4 |
+| JP female TTS audio | 4 |
+| **Total unique assets** | **12** |
+| **Total rendered clips** | **16** |
+
+---
+
+### Summary per Unit by Profile
+
+| Profile | Noun touches | Verb touches | Grammar touches | Total (6n + 6v + 9g) |
+|---------|:-----------:|:-----------:|:---------------:|:---------------------:|
+| **Passive Video** | 3 | 3 | 2 | 18 + 18 + 18 = **54** |
+| **Active Flash Cards** | 5 | 5 | 3 | 30 + 30 + 27 = **87** |
+
+### Extensibility
+
+New profiles and touch types can be added independently:
+
+**Adding a touch type:**
+1. Define it in the Touch Type Catalogue (columns: what's shown, what's heard).
+2. Add a card renderer for any new card layout.
+3. Add TTS generation for any new voice/language.
+
+**Adding a profile:**
+1. Name the use case and target learner.
+2. Pick touch types from the catalogue (or define new ones).
+3. Define a repetition cycle per phase.
+4. The compilation logic and asset pipeline remain unchanged.
+
+---
+
 ## Common Japanese Grammar Structures — Overview
 
 Japanese grammar follows a **Subject–Object–Verb (SOV)** word order and relies heavily on **particles** (small words after nouns) to mark grammatical roles. Verbs come at the end and conjugate for tense, politeness, and negation.

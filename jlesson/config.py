@@ -19,10 +19,10 @@ LLM_MODEL = os.getenv("LLM_MODEL", "qwen/qwen3-14b")
 
 # Model-specific settings
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))
-LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "4096"))
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "8192"))
 
 # Timeout settings (seconds)
-LLM_REQUEST_TIMEOUT = int(os.getenv("LLM_REQUEST_TIMEOUT", "60"))
+LLM_REQUEST_TIMEOUT = int(os.getenv("LLM_REQUEST_TIMEOUT", "120"))
 
 # Disable thinking/reasoning mode for models that support it (Qwen3, phi-4-reasoning, etc.).
 # Sends "/no_think" as a system message, which skips the <think> block and makes
