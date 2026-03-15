@@ -31,8 +31,11 @@ japanese-lesson = "generate_lesson:main"
 [tool.setuptools]
 py-modules = [
     "generate_lesson",
-    "lesson_generator",
+    "curriculum",
+    "vocab_generator",
     "prompt_template",
+    "llm_client",
+    "config",
     "tts_engine",
     "video_cards",
     "video_builder",

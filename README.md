@@ -1,116 +1,136 @@
 # Japanese Lesson Generator
 
-CLI tool that generates structured Japanese learning lessons with high repetition, combining vocabulary and grammar in a single unit.
+CLI tool that generates structured Japanese lessons driven by an LLM, with a curriculum grammar progression system and rendered video output.
 
 ## Problem
 
 Most Japanese learning materials:
 1. **Focus on one area only** — just vocab, just grammar, just kanji — never combined
 2. **Low repetition** — you see a word once or twice, then move on
+3. **No progression** — grammar points introduced randomly, not built on prior knowledge
 
-This tool produces lessons where every word gets **5 touches** (introduce → recall → reinforce → self-check → lock-in) and grammar sentences get **3 touches** (translate → comprehend → reinforce), totalling **87 items per unit**.
+This tool produces lessons where vocabulary and grammar are always taught together, grammar unlocks progressively lesson-by-lesson, and every lesson is rendered as a video with TTS audio.
 
 ## Quick Start
 
 ```bash
-# Install dependencies (optional, for video/LLM features)
+# Activate your conda environment first (do NOT use conda run — it hides live output)
+conda activate base
+
+# Install dependencies
 pip install -e .[all]
 conda install -c conda-forge ffmpeg
 
-# No dependencies needed for core CLI (stdlib only)
-python generate_lesson.py --create --theme food
+# Run the two-lesson demo (requires LM Studio running on localhost:1234)
+python spike/spike_09_demo.py
 
 # Output:
-#   output/lesson_food.json   ← structured items (for video pipeline)
-#   output/lesson_food.md     ← human-readable lesson
+#   output/demo/lesson_01_food.mp4    ← rendered video
+#   output/demo/lesson_02_travel.mp4
+#   output/demo/curriculum_demo.json  ← lesson dictionary
 ```
 
-## Usage
+## CLI Usage
 
 ```bash
-# List available themes
+# List available vocab themes
 python generate_lesson.py --list-themes
 
-# Generate a complete lesson (deterministic, no LLM needed)
-python generate_lesson.py --create --theme food
-python generate_lesson.py --create --theme food --nouns 4 --verbs 4
-python generate_lesson.py --create --theme food --seed 42
+# Show current curriculum progress
+python generate_lesson.py --show-curriculum
 
-# Generate video from lesson (fast FFmpeg method by default)
-python generate_lesson.py --create --theme food --render-video
-python generate_lesson.py --create --theme food --render-video --video-method moviepy
-
-# Generate an LLM prompt instead (for pasting into ChatGPT etc.)
+# Print an LLM-ready lesson prompt to stdout (or file)
+python generate_lesson.py --theme food
+python generate_lesson.py --theme travel --nouns 4 --verbs 4 --seed 7
 python generate_lesson.py --theme food -o prompt.md
 
-# Generate vocab for a new theme (via LLM)
+# Generate a vocab file for a new theme via LLM (saves to vocab/<theme>.json)
+python generate_lesson.py --create-vocab animals
+python generate_lesson.py --create-vocab school --nouns 15 --verbs 12 --level intermediate
+
+# Print a vocab-generation prompt without calling the LLM
 python generate_lesson.py --generate-vocab shopping
-python generate_lesson.py --generate-vocab school --level intermediate
 ```
 
-## Lesson Structure
+## How a Lesson Works
 
-Each lesson has 3 phases:
+Each lesson is driven by the LLM in three steps:
 
-| Phase | Items | Touches/Item | Total |
-|-------|-------|-------------|-------|
-| **Nouns** | 6 | 5 (INTRODUCE → RECALL → REINFORCE → SELF-CHECK → LOCK-IN) | 30 |
-| **Verbs** | 6 | 5 (same cycle) | 30 |
-| **Grammar** | 9 sentences | 3 (TRANSLATE → COMPREHEND → REINFORCE) | 27 |
-| **Total** | | | **87** |
+| Step | What happens |
+|------|-------------|
+| **Grammar select** | LLM picks 2 unlocked grammar points appropriate for this lesson number |
+| **Sentence generate** | LLM writes practice sentences for each grammar point using lesson vocabulary |
+| **Noun practice** | LLM produces example sentences and memory tips for each noun |
 
-Grammar covers 3 persons (I, You, He/She) × 3 verb-noun pairs with polite-form conjugation.
+The results are assembled into a video: one card per item (nouns + sentences), TTS audio, exported as MP4.
+
+## Curriculum & Grammar Progression
+
+`curriculum.py` tracks which grammar points have been covered and unlocks new ones as lessons complete:
+
+| Level | Grammar points |
+|-------|---------------|
+| 1 | `action_present_affirmative`, `identity_present_affirmative` |
+| 2 | `action_present_negative`, `action_past_affirmative`, `question_ka`, `direction_ni_ikimasu`, `existence_arimasu`, `adjective_na` |
+| 3 | `action_past_negative`, `desire_tai`, `desire_hoshii`, `reason_kara` |
+| 4 | `te_form_request`, `te_form_progressive`, `potential_dekimasu` |
+
+Level 2 grammar unlocks only after level 1 is covered, and so on up the chain.
 
 ## Vocabulary Themes
 
-Themes are JSON files in `vocab/`:
+Themes are JSON files in `vocab/`. Missing theme files are auto-generated by the LLM when first needed.
 
-| Theme | Nouns | Verbs | Grammar Pairs |
-|-------|-------|-------|---------------|
-| `food` | 12 (water, rice, fish, …) | 10 (eat, drink, cook, …) | eat+fish, drink+water, cook+meat |
-| `travel` | 12 (station, airport, …) | 10 (go, come, return, …) | — |
+| Theme | Nouns | Verbs |
+|-------|-------|-------|
+| `food` | 9 (rice, bread, meat, …) | 6 (eat, drink, cook, …) |
+| `travel` | 9 (ticket, bag, map, …) | 6 (go, take a train, …) |
 
-Add new themes by saving LLM output from `--generate-vocab` as `vocab/<theme>.json`.
+Add a new theme explicitly:
+```bash
+python generate_lesson.py --create-vocab <theme>
+```
+
+Or pass a new theme name to the demo — it will generate the vocab automatically.
 
 ## Project Structure
 
 ```
 japanese/
 ├── generate_lesson.py    # CLI entry point
-├── lesson_generator.py   # Deterministic lesson builder
-├── prompt_template.py    # LLM prompt templates
+├── curriculum.py         # Grammar progression table + lesson dictionary CRUD
+├── vocab_generator.py    # LLM-driven vocab generation + schema validation
+├── prompt_template.py    # LLM prompt builders (7 functions)
+├── llm_client.py         # Universal LLM client (OpenAI SDK)
+├── tts_engine.py         # TTS audio generation (edge-tts)
+├── video_cards.py        # 1080p lesson card renderer (Pillow)
+├── video_builder.py      # Video assembler (moviepy + ffmpeg)
+├── config.py             # LLM provider settings
 ├── vocab/                # Vocabulary JSON files
-├── docs/                 # Decision documents
+├── curriculum/           # Lesson dictionary (curriculum.json)
+├── docs/                 # Technology decision documents
+├── tests/                # Unit test suite (204 tests)
 ├── spike/                # Proof-of-concept scripts
-└── output/               # Generated lessons (gitignored)
+│   └── spike_09_demo.py  # End-to-end two-lesson demo with video output
+└── output/               # Generated lessons and videos (gitignored)
 ```
 
 ## Installation
 
-### Core CLI (No Dependencies)
-The core CLI works with Python 3.10+ stdlib only:
 ```bash
-python generate_lesson.py --create --theme food
-```
+# Activate conda environment first
+conda activate base
 
-### Full Installation (Video + LLM Features)
-Install all dependencies using the project's pyproject.toml:
-```bash
-# Install Python dependencies
+# Full install (video + LLM)
 pip install -e .[all]
-
-# Install ffmpeg (required for video encoding)
 conda install -c conda-forge ffmpeg
 ```
 
 Or install components separately:
 ```bash
-# Video features only
-pip install -e .[video]
+pip install -e .[video]   # edge-tts, moviepy, Pillow
+pip install -e .[llm]     # openai
 conda install -c conda-forge ffmpeg
-
-# LLM features only  
-pip install -e .[llm]
 ```
 
 Or use the automated script:
@@ -118,29 +138,37 @@ Or use the automated script:
 .\install.ps1
 ```
 
-This installs:
-- **Video pipeline**: `edge-tts`, `moviepy`, `Pillow`
-- **LLM integration**: `openai`
-- **System dependency**: `ffmpeg`
+**⚠️ Notes:**
+- Video generation requires internet access for TTS (Microsoft Edge TTS service)
+- LLM features require [LM Studio](https://lmstudio.ai) (or any OpenAI-compatible server) running on `localhost:1234`
+- Recommended model: `qwen/qwen3-14b` (best Japanese quality in testing)
 
-**⚠️ Note**: Video generation requires internet access for TTS (Microsoft Edge TTS service).
+## LLM Setup
+
+Configure the provider in `config.py`:
+
+```python
+LLM_BASE_URL = "http://localhost:1234/v1"   # LM Studio default
+LLM_MODEL    = "qwen/qwen3-14b"
+LLM_NO_THINK = True                          # suppress <think> blocks
+```
+
+The client uses the OpenAI SDK and works with LM Studio, Ollama, or OpenAI. LM Studio requires `json_schema` response format (not `json_object`) — this is handled automatically.
 
 ## Design Principles
 
 - **YAGNI** — no frameworks, no databases, stdlib-only core
 - **KISS** — flat JSON vocab, argparse CLI, pure functions
-- **DRY** — shared repetition cycle logic
-- **Low coupling** — modules communicate via dicts and paths
-- **Deterministic first** — works fully offline with no LLM; LLM enhances quality when available
+- **DRY** — shared prompt builders, single LLM client
+- **Low coupling** — modules communicate via plain dicts and file paths
+- **LLM-driven** — natural sentences and grammar selection via LLM; video pipeline handles rendering
 
 ## Requirements
 
 - Python 3.10+
-- No pip dependencies for core CLI
-- Video pipeline: `edge-tts`, `moviepy`, `Pillow`, `ffmpeg`
-- LLM integration (planned): `openai` + Ollama server
-
-Install all dependencies with: `pip install -e .[all]` and `conda install -c conda-forge ffmpeg`
+- LM Studio (or compatible OpenAI server) for lesson generation
+- `edge-tts`, `moviepy`, `Pillow`, `ffmpeg` for video output
+- `openai` for LLM client
 
 ## License
 

@@ -41,21 +41,16 @@ Build a CLI tool that generates structured Japanese lessons combining vocabulary
 - `--output FILE` — write to file instead of stdout
 - `--generate-vocab <theme>` — produce LLM prompt for new vocab JSON
 - `--level beginner|intermediate|advanced` — difficulty level
-- `--create` — generate a complete lesson deterministically (JSON + Markdown)
 - `--create-vocab THEME` — generate vocab JSON for a new theme via LLM; saves to `vocab/<theme>.json`
 - `--show-curriculum` — display current grammar progression and lesson summary from curriculum file
 - `--curriculum-path FILE` — override default curriculum path (`curriculum/curriculum.json`)
 - Tested with `food` and `travel` themes ✓
+- **Cleaned (2026-03-15)**: removed all `lesson_generator` imports; removed `--create`, `--llm`, `--render-video`, `--video-method` flags and their handlers (module deleted from repo)
 
-### 5. Deterministic Lesson Generator (`lesson_generator.py`)
-- Produces structured lesson items directly from vocab (no LLM required)
-- Japanese polite-form conjugation: ます/ません/ました/ませんでした + な-adj (です)
-- Romaji conjugation for all verb types (る/う/irregular/な-adj)
-- English conjugation with irregular past tense support (40+ irregular verbs)
-- 3 phases: nouns (5 touches each), verbs (5 touches each), grammar (3 touches each)
-- Explicit grammar pairs from vocab JSON for natural sentences
-- Markdown renderer for human review
-- First lesson: 87 items (30 nouns + 30 verbs + 27 grammar)
+### 5. Deterministic Lesson Generator (`lesson_generator.py`) — **REMOVED**
+- This module was deleted from the repo (last seen in commit `8837a15`)
+- All references removed from `generate_lesson.py` and demo spikes
+- Functionality superseded by the LLM-driven curriculum pipeline in `spike_09_demo.py`
 
 ### 6. Decision Documents (`docs/`)
 Researched and documented multiple options for each technology choice:
@@ -89,6 +84,20 @@ Researched and documented multiple options for each technology choice:
   - **Run 2**: Switched to `json_schema` + extended all models; added `qwen/qwen3.5-9b` (new model); `mistral-7b-instruct-v0.3` still failing (400 on system message)
   - **Run 3** (latest): Added `build_messages()` helper to fold system content into user turn for old Mistral GGUF template; added `extract_json()` helper to fish JSON out of verbose reasoning output; upgraded `test_json_via_prompt` with stricter empty-field validation
   - **Final result**: All 8 generation models pass `json_schema` structured output — 8/8 ✅
+
+### 14. End-to-End Demo (`spike/spike_09_demo.py`) — **NEW (2026-03-15)**
+- Two-lesson curriculum demo with fully rendered MP4 videos; no `lesson_generator` dependency
+- Auto-generates missing vocab via LLM (`_load_vocab` calls `generate_vocab` if `vocab/<theme>.json` absent)
+- LLM pipeline per lesson: grammar select → sentence generate → noun practice → add/complete lesson → render video
+- Fixed 4 bugs during first successful run:
+  1. **`_extract_json()` nested JSON** — replaced flat-object regex `r'\{[^{}]+\}'` with a brace-depth scanner (`_find_json_objects`) that correctly extracts nested dicts (vocab has `{"nouns":[...]}` which the old regex couldn't match)
+  2. **Vocab string whitespace** — LLM returned `' irregular'` (leading space) causing schema validation failure; added strip pass over all string values in `vocab_generator.generate_vocab()`
+  3. **`PERSONS` format** — constant was `["I", "you", "she"]` (plain strings) but `build_grammar_generate_prompt` expects `list[tuple[str,str,str]]`; fixed to `[("I","私","watashi"), ...]`
+  4. **moviepy 2.x audio API** — `CompositeVideoClip([img, audio])` raises `AttributeError: 'AudioFileClip' has no attribute 'layer_index'`; fixed to `img_clip.with_audio(audio_clip)`
+- **Demo result** (2026-03-15, `qwen/qwen3-14b`, 192s total):
+  - Lesson 1 (food): 6 sentences, 3 noun items → `output/demo/lesson_01_food.mp4` (482 KB)
+  - Lesson 2 (travel): 6 sentences, 3 noun items → `output/demo/lesson_02_travel.mp4` (571 KB)
+  - Curriculum saved → `output/demo/curriculum_demo.json`
 
 ### 13. Curriculum & Lesson Dictionary System
 - **`curriculum.py`** — grammar progression tracker and lesson dictionary
@@ -140,7 +149,6 @@ All 8 models evaluated with `json_schema` structured output (grammar-sampled by 
 ```
 japanese/
 ├── generate_lesson.py    # CLI entry point
-├── lesson_generator.py   # Deterministic lesson generator (no LLM)
 ├── prompt_template.py    # LLM prompt builder (pure functions, 7 functions)
 ├── curriculum.py         # Grammar progression table + lesson dictionary CRUD
 ├── vocab_generator.py    # LLM-driven vocab generation + schema validation
@@ -178,6 +186,7 @@ japanese/
 │   ├── spike_06_llm_evaluation.py  # LLM provider benchmark (multi-provider, budgeted)
 │   ├── spike_07_lmstudio_api.py    # LM Studio deep API evaluation
 │   ├── spike_08_curriculum.py      # Curriculum workflow end-to-end (LLM required)
+│   ├── spike_09_demo.py            # Two-lesson demo with rendered MP4 videos  ← NEW
 │   └── output/           # Spike outputs (gitignored)
 └── output/               # Generated lessons (gitignored)
 ```
@@ -241,7 +250,8 @@ This project follows an **iterative, research-driven development cycle** designe
 
 - ✅ **Completed**: Research, design, spikes, core CLI, lesson generation, video pipeline
 - ✅ **Completed**: LLM integration validated — all 8 LM Studio models pass `json_schema` structured output; `mistral-7b` system-role fix applied; `qwen3.5-9b` new model evaluated
-- 📋 **Planned**: Switch `llm_client.py` from `json_object` → `json_schema`, wire `/no_think` into config, validate `--llm` flag end-to-end, expand vocab themes, Anki export
+- ✅ **Completed**: End-to-end curriculum demo — two lessons, LLM-driven, auto vocab generation, rendered MP4 videos
+- 📋 **Planned**: Expand vocab themes, Anki export, interactive lesson runner, more grammar levels
 
 ---
 
@@ -272,6 +282,10 @@ This project follows an **iterative, research-driven development cycle** designe
 
 ## Test Results (2026-03-14)
 
+> **Note**: All commands are run in an already-activated conda environment (`conda activate base`).
+> Do **not** use `conda run` — it buffers all output until the process exits, hiding intermediate
+> progress that shows whether a long-running LLM or video task is on track.
+
 | Command | Result |
 |---------|--------|
 | `python generate_lesson.py --list-themes` | ✓ Lists food, travel |
@@ -282,11 +296,12 @@ This project follows an **iterative, research-driven development cycle** designe
 | `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --render-video --video-method ffmpeg` | ✓ Video generated (69.9 KB, fast method) |
 | `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --render-video --video-method moviepy` | ✓ Video generated (slower method, compatible) |
 | `python generate_lesson.py --create --theme food --nouns 1 --verbs 0 --no-shuffle --llm` | ⚠️ Ran but fell back to deterministic (no LLM server running at the time) |
-| `conda run -n base python spike/spike_07_lmstudio_api.py` (run 1) | ✅ LM Studio confirmed: plain text 2.4s, JSON via prompt 7.3s, `qwen3-14b` with `/no_think` |
-| `conda run -n base python spike/spike_06_llm_evaluation.py` | ✅ Ran: Ollama not running (skipped), LM Studio hit 15s budget (model slow to load) |
-| `conda run -n base python spike/spike_07_lmstudio_api.py` (run 2, all models) | ✅ Added `qwen/qwen3.5-9b`; switched to `json_schema`; 6/8 pass, `mistral-7b` still 400 |
-| `conda run -n base python spike/spike_07_lmstudio_api.py` (run 3, fixed) | ✅ All 8/8 models pass `json_schema` — `mistral-7b` fixed via `build_messages()` helper |
-| `conda run -n base python spike/spike_08_curriculum.py` | ✅ Full curriculum workflow — grammar select 12.1s, generate 21.4s, validate **10/10** 2.6s, noun practice 11.5s |
+| `python spike/spike_07_lmstudio_api.py` (run 1) | ✅ LM Studio confirmed: plain text 2.4s, JSON via prompt 7.3s, `qwen3-14b` with `/no_think` |
+| `python spike/spike_06_llm_evaluation.py` | ✅ Ran: Ollama not running (skipped), LM Studio hit 15s budget (model slow to load) |
+| `python spike/spike_07_lmstudio_api.py` (run 2, all models) | ✅ Added `qwen/qwen3.5-9b`; switched to `json_schema`; 6/8 pass, `mistral-7b` still 400 |
+| `python spike/spike_07_lmstudio_api.py` (run 3, fixed) | ✅ All 8/8 models pass `json_schema` — `mistral-7b` fixed via `build_messages()` helper |
+| `python spike/spike_08_curriculum.py` | ✅ Full curriculum workflow — grammar select 12.1s, generate 21.4s, validate **10/10** 2.6s, noun practice 11.5s |
+| `python spike/spike_09_demo.py` (2026-03-15) | ✅ Two lessons rendered — food 482 KB + travel 571 KB MP4; 192s total; all LLM stages passed |
 
 ## Unit Test Suite (2026-05-30)
 
