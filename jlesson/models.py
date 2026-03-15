@@ -3,9 +3,16 @@ Pydantic data models for Japanese lesson content.
 
 These schemas define the shapes of LLM-generated data used across the pipeline
 and serialised to output/<lesson_id>/content.json by lesson_store.py.
+
+Compilation pipeline models (CompiledItem, Touch) define the data shapes for
+the three-stage transformation: item_sequence → compiled_items → touch_sequence.
 """
 
 from __future__ import annotations
+
+from enum import Enum
+from pathlib import Path
+from typing import Union
 
 from pydantic import BaseModel, Field
 
@@ -57,3 +64,91 @@ class LessonContent(BaseModel):
     verb_items: list[VerbItem] = Field(default_factory=list)
     sentences: list[Sentence] = Field(default_factory=list)
     created_at: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Compilation pipeline models (Stages 2–3)
+# ---------------------------------------------------------------------------
+
+
+class Phase(str, Enum):
+    """Lesson phase — determines which repetition cycle applies."""
+
+    NOUNS = "nouns"
+    VERBS = "verbs"
+    GRAMMAR = "grammar"
+
+
+class TouchType(str, Enum):
+    """Mechanical specification of a single touch interaction."""
+
+    # Card-based (visual prompt → visual reveal)
+    EN_JP = "en→jp"
+    JP_EN = "jp→en"
+    JP_JP = "jp→jp"
+
+    # Listen-first (audio-led, passive-friendly)
+    LISTEN_EN_JPM_JPF = "listen:en,jp-m,jp-f"
+    LISTEN_JPF_JPM = "listen:jp-f,jp-m"
+    LISTEN_EN_JPF = "listen:en,jp-f"
+
+
+class TouchIntent(str, Enum):
+    """Pedagogical intent of a touch within a repetition cycle."""
+
+    INTRODUCE = "introduce"
+    RECALL = "recall"
+    REINFORCE = "reinforce"
+    CONFIRM = "confirm"
+    LOCK_IN = "lock-in"
+    TRANSLATE = "translate"
+    COMPREHEND = "comprehend"
+
+
+class RepetitionStep(BaseModel):
+    """One step in a repetition cycle: a touch type paired with its intent."""
+
+    touch_type: TouchType
+    intent: TouchIntent
+
+
+class ItemAssets(BaseModel):
+    """Rendered asset paths for a single item. Populated by the asset compiler."""
+
+    card_en: Path | None = None
+    card_jp: Path | None = None
+    card_en_jp: Path | None = None
+    audio_en: Path | None = None
+    audio_jp_f: Path | None = None
+    audio_jp_m: Path | None = None
+
+    model_config = {"arbitrary_types_allowed": True}
+
+
+LessonItem = Union[NounItem, VerbItem, Sentence]
+
+
+class CompiledItem(BaseModel):
+    """An item with all its rendered assets — output of Stage 2 (asset compiler)."""
+
+    item: NounItem | VerbItem | Sentence
+    phase: Phase
+    assets: ItemAssets = Field(default_factory=ItemAssets)
+
+    model_config = {"arbitrary_types_allowed": True}
+
+
+class Touch(BaseModel):
+    """One learner interaction — output of Stage 3 (touch compiler).
+
+    References a CompiledItem and specifies which assets to use.
+    """
+
+    compiled_item_index: int
+    touch_index: int
+    touch_type: TouchType
+    intent: TouchIntent
+    card_path: Path | None = None
+    audio_paths: list[Path] = Field(default_factory=list)
+
+    model_config = {"arbitrary_types_allowed": True}

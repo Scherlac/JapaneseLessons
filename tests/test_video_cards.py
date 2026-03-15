@@ -214,6 +214,96 @@ class TestSaveCard:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# render_en_card (touch system)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestRenderEnCard:
+    def test_returns_pil_image(self, renderer):
+        img = renderer.render_en_card("water")
+        assert isinstance(img, Image.Image)
+
+    def test_correct_size(self, renderer):
+        img = renderer.render_en_card("water")
+        assert img.size == (1920, 1080)
+
+    def test_rgb_mode(self, renderer):
+        assert renderer.render_en_card("cat").mode == "RGB"
+
+    def test_background_color(self, renderer):
+        img = renderer.render_en_card("dog")
+        assert img.getpixel((0, 0)) == _hex_to_rgb(renderer.bg_color)
+
+    def test_with_label(self, renderer):
+        img = renderer.render_en_card("cat", label="[INTRODUCE] 1/30")
+        assert isinstance(img, Image.Image)
+
+    def test_with_progress(self, renderer):
+        img = renderer.render_en_card("cat", progress=0.5)
+        assert isinstance(img, Image.Image)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# render_jp_card (touch system)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestRenderJpCard:
+    def test_returns_pil_image(self, renderer):
+        img = renderer.render_jp_card("水")
+        assert isinstance(img, Image.Image)
+
+    def test_correct_size(self, renderer):
+        img = renderer.render_jp_card("猫")
+        assert img.size == (1920, 1080)
+
+    def test_with_kana_and_romaji(self, renderer):
+        img = renderer.render_jp_card("水", kana="みず", romaji="mizu")
+        assert isinstance(img, Image.Image)
+
+    def test_with_romaji_only(self, renderer):
+        img = renderer.render_jp_card("水", romaji="mizu")
+        assert isinstance(img, Image.Image)
+
+    def test_background_color(self, renderer):
+        img = renderer.render_jp_card("犬")
+        assert img.getpixel((0, 0)) == _hex_to_rgb(renderer.bg_color)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# render_bilingual_card (touch system)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestRenderBilingualCard:
+    def test_returns_pil_image(self, renderer):
+        img = renderer.render_bilingual_card("water", "水")
+        assert isinstance(img, Image.Image)
+
+    def test_correct_size(self, renderer):
+        img = renderer.render_bilingual_card("cat", "猫")
+        assert img.size == (1920, 1080)
+
+    def test_with_all_fields(self, renderer):
+        img = renderer.render_bilingual_card(
+            "water", "水", kana="みず", romaji="mizu",
+            label="[LISTEN] 1/54", progress=0.3,
+        )
+        assert isinstance(img, Image.Image)
+
+    def test_background_color(self, renderer):
+        img = renderer.render_bilingual_card("dog", "犬")
+        assert img.getpixel((0, 0)) == _hex_to_rgb(renderer.bg_color)
+
+    def test_save_all_touch_card_types(self, renderer, tmp_path):
+        """Smoke-test: all three touch card types can be saved."""
+        en = renderer.render_en_card("cat")
+        jp = renderer.render_jp_card("猫", kana="ねこ", romaji="neko")
+        bi = renderer.render_bilingual_card("cat", "猫", kana="ねこ", romaji="neko")
+        for name, card in [("en", en), ("jp", jp), ("bilingual", bi)]:
+            out = tmp_path / f"{name}.png"
+            renderer.save_card(card, out)
+            assert out.exists(), f"{name} card was not saved"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 

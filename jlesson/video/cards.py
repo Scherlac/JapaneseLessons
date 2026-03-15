@@ -259,6 +259,116 @@ class CardRenderer:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         card.save(output_path, "PNG")
 
+    # ------------------------------------------------------------------
+    # Touch-system card renderers
+    # ------------------------------------------------------------------
+
+    def render_en_card(
+        self,
+        english: str,
+        label: str = "",
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Render an English-only card (prompt side of en→jp touches)."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+
+        if label:
+            draw.text(
+                (cx, 60), label, font=self.fonts["label"],
+                anchor="mm", fill=self.dim_color,
+            )
+
+        draw.text(
+            (cx, self.height // 2 - 40), english,
+            font=self.fonts["en_large"], anchor="mm", fill=self.accent_color,
+        )
+
+        self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
+    def render_jp_card(
+        self,
+        japanese: str,
+        kana: str = "",
+        romaji: str = "",
+        label: str = "",
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Render a Japanese-only card (prompt side of jp→en / jp→jp touches)."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+
+        if label:
+            draw.text(
+                (cx, 60), label, font=self.fonts["label"],
+                anchor="mm", fill=self.dim_color,
+            )
+
+        draw.text(
+            (cx, self.height // 2 - 80), japanese,
+            font=self.fonts["jp_large"], anchor="mm", fill=self.text_color,
+        )
+
+        parts = [p for p in (kana, romaji) if p]
+        if parts:
+            annotation = "  ·  ".join(parts)
+            draw.text(
+                (cx, self.height // 2 + 60), annotation,
+                font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color,
+            )
+
+        self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
+    def render_bilingual_card(
+        self,
+        english: str,
+        japanese: str,
+        kana: str = "",
+        romaji: str = "",
+        label: str = "",
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Render an EN+JP bilingual card (listen-first touches)."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+
+        if label:
+            draw.text(
+                (cx, 60), label, font=self.fonts["label"],
+                anchor="mm", fill=self.dim_color,
+            )
+
+        # English — upper portion
+        draw.text(
+            (cx, 300), english,
+            font=self.fonts["en_large"], anchor="mm", fill=self.accent_color,
+        )
+
+        # Divider
+        draw.line([(cx - 200, 400), (cx + 200, 400)], fill="#333333", width=2)
+
+        # Japanese — lower portion
+        draw.text(
+            (cx, 520), japanese,
+            font=self.fonts["jp_large"], anchor="mm", fill=self.text_color,
+        )
+
+        parts = [p for p in (kana, romaji) if p]
+        if parts:
+            annotation = "  ·  ".join(parts)
+            draw.text(
+                (cx, 640), annotation,
+                font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color,
+            )
+
+        self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
 
 # Convenience function
 def create_renderer(**kwargs) -> CardRenderer:
