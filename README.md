@@ -15,13 +15,13 @@ This tool produces lessons where vocabulary and grammar are always taught togeth
 
 ```bash
 # Activate your conda environment first (do NOT use conda run — it hides live output)
-conda activate base
+conda activate <your-env>
 
 # Install dependencies
 pip install -e .[all]
 conda install -c conda-forge ffmpeg
 
-# Run the two-lesson demo (requires LM Studio running on localhost:1234)
+# Run the two-lesson demo (requires LM Studio running on the network)
 python spike/spike_09_demo.py
 
 # Output:
@@ -35,26 +35,28 @@ python spike/spike_09_demo.py
 ```bash
 # List available vocab themes
 jlesson vocab list
-# (legacy: python -m jlesson.cli --list-themes)
 
 # Show current curriculum progress
 jlesson curriculum show
 
-# Print an LLM-ready lesson prompt to stdout (or file)
-jlesson lesson prompt --theme food
-jlesson lesson prompt --theme travel --nouns 4 --verbs 4 --seed 7
-jlesson lesson prompt --theme food -o prompt.md
+# Generate the next lesson (full pipeline: LLM → content → video)
+jlesson lesson next --theme food
+jlesson lesson next --theme travel --nouns 5 --verbs 4 --seed 7
+jlesson lesson next --theme food --no-video          # skip video render
+jlesson lesson next --theme food --no-cache           # bypass LLM cache
+
+# Print an LLM-ready lesson prompt to stdout (no LLM call)
+jlesson lesson prompt food
+jlesson lesson prompt travel -n 4 -v 4 -s 7
+jlesson lesson prompt food -o prompt.md
 
 # Generate a vocab file for a new theme via LLM (saves to vocab/<theme>.json)
 jlesson vocab create animals
 jlesson vocab create school --nouns 15 --verbs 12 --level intermediate
 
 # Print a vocab-generation prompt without calling the LLM
-jlesson vocab prompt shopping
+jlesson vocab generate-prompt shopping
 ```
-
-> **Note:** The argparse CLI (`python jlesson/cli.py ...`) still works for all flags
-> while the click subcommand refactor (TD-01) is in progress.
 
 ## How a Lesson Works
 
@@ -101,7 +103,7 @@ Or pass a new theme name to the demo — it will generate the vocab automaticall
 
 ```
 jlesson/              ← all production Python source
-├── cli.py            # CLI entry point (argparse, migrating to click)
+├── cli.py            # CLI entry point (click subcommands)
 ├── curriculum.py     # Grammar progression table + lesson dictionary CRUD
 ├── vocab_generator.py# LLM-driven vocab generation + schema validation
 ├── prompt_template.py# LLM prompt builders (7 pure functions)
@@ -115,7 +117,7 @@ jlesson/              ← all production Python source
 vocab/                # Vocabulary JSON files
 curriculum/           # Lesson dictionary (curriculum.json)
 docs/                 # Technology decision documents
-tests/                # Unit test suite (204 tests)
+tests/                # Unit test suite (274 tests)
 spike/                # Proof-of-concept scripts
 └── spike_09_demo.py  # End-to-end two-lesson demo with video output
 output/               # Generated lessons and videos (gitignored)
@@ -125,7 +127,7 @@ output/               # Generated lessons and videos (gitignored)
 
 ```bash
 # Activate conda environment first
-conda activate base
+conda activate <your-env>
 
 # Full install (video + LLM)
 pip install -e .[all]
@@ -146,17 +148,17 @@ Or use the automated script:
 
 **⚠️ Notes:**
 - Video generation requires internet access for TTS (Microsoft Edge TTS service)
-- LLM features require [LM Studio](https://lmstudio.ai) (or any OpenAI-compatible server) running on `localhost:1234`
+- LLM features require [LM Studio](https://lmstudio.ai) (or any OpenAI-compatible server) — configure URL in `.env`
 - Recommended model: `qwen/qwen3-14b` (best Japanese quality in testing)
 
 ## LLM Setup
 
-Configure the provider in `jlesson/config.py`:
+All LLM settings are in `.env` (project root, gitignored):
 
-```python
-LLM_BASE_URL = "http://localhost:1234/v1"   # LM Studio default
-LLM_MODEL    = "qwen/qwen3-14b"
-LLM_NO_THINK = True                          # suppress <think> blocks
+```env
+LLM_BASE_URL=http://localhost:1234/v1   # LM Studio default
+LLM_MODEL=qwen/qwen3-14b                # recommended model
+LLM_NO_THINK=true
 ```
 
 The client uses the OpenAI SDK and works with LM Studio, Ollama, or OpenAI. LM Studio requires `json_schema` response format (not `json_object`) — this is handled automatically.
@@ -164,7 +166,7 @@ The client uses the OpenAI SDK and works with LM Studio, Ollama, or OpenAI. LM S
 ## Design Principles
 
 - **YAGNI** — no frameworks, no databases, stdlib-only core
-- **KISS** — flat JSON vocab, argparse CLI, pure functions
+- **KISS** — flat JSON vocab, click CLI, pure functions
 - **DRY** — shared prompt builders, single LLM client
 - **Low coupling** — modules communicate via plain dicts and file paths
 - **LLM-driven** — natural sentences and grammar selection via LLM; video pipeline handles rendering

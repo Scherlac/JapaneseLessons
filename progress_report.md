@@ -37,7 +37,7 @@ Core principles: Cohesion / Coupling / Composition / YAGNI / KISS / DRY, spike-b
 | Pydantic data models (`models.py`) | ✅ Done — `NounItem`, `VerbItem`, `Sentence`, `LessonContent` |
 | **`PERSONS` tuple standardised (TD-08)** | ✅ Done — `PERSONS_BEGINNER` now 3-tuple; all prompt builders consistent |
 | **Seeded vocab shuffle (TD-04)** | ✅ Done — `suggest_new_vocab(seed=)` uses local RNG; CLI `--seed` wired through |
-| **LLM response cache (`llm_cache.py`)** | ✅ Done — `ask_llm_cached()`, `--cache` flag; sha256 file cache; stdlib only |
+| **LLM response cache (`llm_cache.py`)** | ✅ Done — `ask_llm_cached()`, `--no-cache` flag; sha256 file cache; stdlib only |
 | Unit test suite (254 unit / 274 total) | ✅ Done — +22 tests for cache + shuffle |
 
 ---
@@ -86,7 +86,7 @@ output/                         ← generated artifacts (gitignored)
 | `jlesson/vocab_generator.py` | LLM vocab generation + schema validation + file save | Calls `llm_client`, `prompt_template` |
 | `jlesson/llm_client.py` | OpenAI-compatible HTTP client; JSON extraction; think-stripping | Calls `config` |
 | `jlesson/llm_cache.py` | File-based LLM response cache (dev mode) | stdlib only |
-| `jlesson/config.py` | LLM connection parameters (env-overridable) | stdlib only |
+| `jlesson/config.py` | LLM connection parameters (env-overridable) | stdlib + dotenv |
 | `jlesson/lesson_pipeline.py` | `LessonContext` dataclass + stage functions + `run_pipeline()` | Application layer — composes all others |
 | `jlesson/lesson_store.py` | `save_lesson_content()` / `load_lesson_content()` | stdlib only |
 | `jlesson/video/tts_engine.py` | edge-tts async audio generation | Third-party only |
@@ -187,7 +187,7 @@ This project follows an **iterative, research-driven development cycle** designe
 - `C:/Windows/Fonts/segoeui.ttf` / `segoeuib.ttf` — English text
 
 ### LLM Provider (Local)
-- LM Studio on `localhost:1234`; default model `qwen/qwen3-14b`
+- LM Studio (OpenAI-compatible endpoint); default model `qwen/qwen3-14b`
 - `json_schema` structured output required (LM Studio rejects `json_object`)
 - Recommended model: `qwen/qwen3-14b` — best Japanese quality; 6.5s avg JSON response
 - See [`docs/development_history.md`](docs/development_history.md) for full model evaluation table
@@ -400,5 +400,5 @@ python generate_lesson.py curriculum show
 .\install.ps1   # installs edge-tts, ffmpeg (conda-forge), openai
 ```
 
-> Run all commands in an already-activated conda environment (`conda activate base`).
+> Run all commands in an already-activated conda environment.
 > Do **not** use `conda run` — it buffers output until exit, hiding LLM progress.

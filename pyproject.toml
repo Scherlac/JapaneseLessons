@@ -12,6 +12,8 @@ readme = "README.md"
 
 dependencies = [
     "python-dotenv>=1.0",
+    "click>=8.0",
+    "pydantic>=2.0",
 ]
 
 [project.optional-dependencies]
