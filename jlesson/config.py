@@ -6,6 +6,11 @@ Supports switching between Ollama (local), OpenAI cloud, and other providers.
 """
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # LLM Provider Configuration — defaults to LM Studio (local)
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")

@@ -13,6 +13,9 @@ __pycache__/
 dist/
 build/
 
+# Environment
+.env
+
 # OS
 Thumbs.db
 .DS_Store

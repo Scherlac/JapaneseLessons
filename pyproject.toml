@@ -10,7 +10,9 @@ requires-python = ">=3.10"
 license = "MIT"
 readme = "README.md"
 
-dependencies = []  # Core CLI is stdlib-only
+dependencies = [
+    "python-dotenv>=1.0",
+]
 
 [project.optional-dependencies]
 video = [
