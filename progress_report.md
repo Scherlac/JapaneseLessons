@@ -191,16 +191,20 @@ japanese/
 └── output/               # Generated lessons (gitignored)
 ```
 
-**Design principles:**
-- **YAGNI** — no templating engine, no ORM, no web framework
-- **KISS** — flat JSON vocab, argparse CLI, pure functions
-- **DRY** — shared repetition cycle logic, single entry points
-- **Low coupling** — modules communicate via simple data (dicts/paths)
-- **High cohesion** — each module has one responsibility
-- **Composition** — functions composed together, no class hierarchies
-- **🚀 Performance** — FFmpeg stream copying for 12.5x faster video generation
 
 ---
+
+## Software Design Principles
+
+**Design principles:**
+- **High cohesion** — each module has one responsibility
+- **Low coupling** — modules communicate via well-defined interfaces; no circular dependencies
+- **Composition** — composition over inheritance; implementations are composed 
+- **YAGNI** — focus on implementing the required features; don't reinvent the wheel; 
+- **KISS** — keep complexity in check; readable code; 
+- **DRY** — avoid duplication; generalize patterns into cohesive modules/functions 
+- **🚀 Performance** — FFmpeg stream copying for 12.5x faster video generation
+
 
 ## Development Cycle
 
@@ -222,7 +226,7 @@ This project follows an **iterative, research-driven development cycle** designe
 
 3. **Core Development** 🛠️
    - Implement production-ready features
-   - Follow YAGNI/KISS/DRY principles
+   - Adhere to software design principles (high cohesion, low coupling, composition, etc.)
    - Keep dependencies minimal (stdlib-first)
    - Write pure functions with clear interfaces
 
@@ -233,10 +237,16 @@ This project follows an **iterative, research-driven development cycle** designe
    - Document test results
 
 5. **Documentation & Planning** 📝
-   - Update progress report with completed work
+   - Update progress report with completed work, maintained technical debts. 
    - Document architecture and design decisions
    - Plan next iteration's scope
    - Maintain comprehensive README
+
+6. **Repository Management** 🌳
+   - Organize code into modules and directories
+   - Use version control effectively (commits, branches)
+   - Keep generated outputs gitignored
+   - Ensure reproducibility with fixed seeds and documented dependencies
 
 ### Cycle Characteristics
 
