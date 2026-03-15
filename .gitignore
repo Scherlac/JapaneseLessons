@@ -21,3 +21,5 @@ Thumbs.db
 .DS_Store
 .coverage
 .vscode/settings.json
+curriculum/curriculum.json
+memories/repo
