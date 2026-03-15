@@ -209,7 +209,7 @@ class TestLLMClientIntegration:
     """Live tests using the model configured in config.py."""
 
     def test_generate_text_returns_content(self):
-        from llm_client import get_llm_client
+        from jlesson.llm_client import get_llm_client
         client = get_llm_client()
         t0 = time.time()
         result = client.generate_text(
@@ -222,7 +222,7 @@ class TestLLMClientIntegration:
         print(f"\n  Response ({elapsed:.2f}s): {result.strip()}")
 
     def test_generate_text_strips_think_blocks(self):
-        from llm_client import get_llm_client
+        from jlesson.llm_client import get_llm_client
         client = get_llm_client()
         result = client.generate_text(
             "What is the Japanese word for 'water'?",
@@ -232,7 +232,7 @@ class TestLLMClientIntegration:
         assert "</think>" not in result
 
     def test_generate_json_returns_translation(self):
-        from llm_client import get_llm_client
+        from jlesson.llm_client import get_llm_client
         client = get_llm_client()
         t0 = time.time()
         result = client.generate_json(
@@ -251,7 +251,7 @@ class TestLLMClientIntegration:
         print(f"  ({elapsed:.2f}s)")
 
     def test_configured_model_in_lm_studio(self):
-        from config import LLM_MODEL
+        from jlesson.config import LLM_MODEL
         assert any(LLM_MODEL in m for m in _available_models), (
             f"Configured model '{LLM_MODEL}' not found in LM Studio. "
             f"Available: {_available_models}"

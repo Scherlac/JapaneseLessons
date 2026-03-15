@@ -30,9 +30,12 @@ Core principles: Cohesion / Coupling / Composition / YAGNI / KISS / DRY, spike-b
 | Video assembler (moviepy + FFmpeg) | ✅ Done |
 | Unit test suite (184 unit / 204 total) | ✅ Done |
 | End-to-end demo: 2 lessons, LLM + video render | ✅ Done |
-| **Full pipeline wired into CLI** | ❌ Gap — still in spike_09 only |
-| **Lesson content persistence** | ❌ Gap — generated text not stored |
-| **Verb practice step in pipeline** | ❌ Gap — prompt built, not wired |
+| **Full pipeline wired into CLI** | ✅ Done — `lesson_pipeline.py` + `jlesson lesson next` |
+| **Lesson content persistence** | ✅ Done — `lesson_store.py` → `output/<id>/content.json` |
+| **Verb practice step in pipeline** | ✅ Done — stage 5 of 8 in pipeline |
+| CLI refactored to click subcommands | ✅ Done — `vocab` / `lesson` / `curriculum` groups |
+| Pydantic data models (`models.py`) | ✅ Done — `NounItem`, `VerbItem`, `Sentence`, `LessonContent` |
+| Unit test suite (232 unit / 252 total) | ✅ Done — +48 tests for new modules |
 
 ---
 
@@ -193,11 +196,11 @@ This project follows an **iterative, research-driven development cycle** designe
 
 ```
 pytest tests/ -m "not integration and not internet and not video"
-→ 184 passed, 20 deselected in 6.65s
+→ 232 passed, 20 deselected in 6.85s
 ```
 
 | Test file | Unit tests | Slow markers |
-|-----------|-----------|--------------|
+|-----------|-----------|------|
 | `test_curriculum.py` | 42 | — |
 | `test_prompt_template.py` | 37 | — |
 | `test_llm_client.py` | 20 | 14 `integration` |
@@ -205,30 +208,26 @@ pytest tests/ -m "not integration and not internet and not video"
 | `test_tts_engine.py` | 22 | 4 `internet` |
 | `test_video_builder.py` | 13 | 2 `video` |
 | `test_vocab_generator.py` | 18 | — |
+| `test_lesson_store.py` | 20 | — |
+| `test_lesson_pipeline.py` | 28 | — |
 
 ---
 
 ## Technical Debt
 
-### TD-01 — Pipeline not in CLI  `HIGH`
-The full lesson generation pipeline (grammar select → sentence generate → noun practice →
-render video) lives only in `spike/spike_09_demo.py`. The CLI (`generate_lesson.py`) has no
-`--run-lesson` or `--next-lesson` command. Primary deliverable is still prototype-only.  
-**Fix**: Extract spike_09 pipeline into a new `lesson_pipeline.py` module; add a
-`--next-lesson` CLI flag that orchestrates it.
+### ~~TD-01 — Pipeline not in CLI~~  ✅ RESOLVED
+`lesson_pipeline.py` implements `LessonConfig` + `LessonContext` + 8 stage functions +
+`run_pipeline()`. CLI command `jlesson lesson next --theme <T>` triggers the full pipeline.
+Spike_09 is retained as reference only.
 
-### TD-02 — No lesson content persistence  `HIGH`
-The curriculum JSON records *which vocab/grammar was covered* per lesson, but the actual
-generated text (sentences, noun items, memory tips) is discarded after the video renders.
-It is impossible to re-render, export to Anki, or review the text without re-running the LLM.  
-**Fix**: Extend the lesson dict in `curriculum.json` to store the full `lesson_content`
-payload (noun_items, sentences) alongside the existing metadata. Alternatively introduce a
-`lesson_store.py` that writes per-lesson JSON files under `output/<lesson_id>/content.json`.
+### ~~TD-02 — No lesson content persistence~~  ✅ RESOLVED
+`lesson_store.py` exposes `save_lesson_content()` / `load_lesson_content()`. Pydantic models
+in `models.py` define the schema. Content is saved to `output/<id>/content.json` as stage 7
+of the pipeline — before video render, so LLM work survives render failures.
 
-### TD-03 — Verb practice not wired  `MEDIUM`
-`build_verb_practice_prompt()` is fully implemented and tested in `prompt_template.py`, but
-the demo pipeline only calls noun practice. Verb conjugation forms never appear in any video.  
-**Fix**: Add the verb practice LLM step between noun practice and video render in the pipeline.
+### ~~TD-03 — Verb practice not wired~~  ✅ RESOLVED
+`stage_verb_practice()` is now stage 5 of the pipeline, calling `build_verb_practice_prompt()`
+and persisting results to `LessonContent.verb_items`.
 
 ### TD-04 — `suggest_new_vocab` is deterministic / ordered  `MEDIUM`
 Always picks the first N fresh items in list order. Lessons will always use the same vocab
