@@ -71,6 +71,7 @@ class LessonConfig:
     num_verbs: int = 3
     sentences_per_grammar: int = 3
     seed: int | None = None
+    use_cache: bool = True
     render_video: bool = True
     verbose: bool = True
 
@@ -100,6 +101,14 @@ class LessonContext:
 def _log(ctx: LessonContext, msg: str) -> None:
     if ctx.config.verbose:
         print(msg)
+
+
+def _ask_llm(ctx: LessonContext, prompt: str) -> dict:
+    """Route LLM call through cache when use_cache is enabled."""
+    if ctx.config.use_cache:
+        from .llm_cache import ask_llm_cached
+        return ask_llm_cached(prompt)
+    return ask_llm_json_free(prompt)
 
 
 # ---------------------------------------------------------------------------
@@ -167,8 +176,6 @@ def _build_video_items(noun_items: list[dict], sentences: list[dict]) -> list[di
 def stage_select_vocab(ctx: LessonContext) -> LessonContext:
     """Stage 1 — Load vocab file and select fresh nouns/verbs."""
     _log(ctx, "\n  [1/8] Select vocab")
-    if ctx.config.seed is not None:
-        random.seed(ctx.config.seed)
     ctx.vocab = _load_vocab(ctx.config.theme)
     ctx.nouns, ctx.verbs = suggest_new_vocab(
         ctx.vocab["nouns"],
@@ -177,6 +184,7 @@ def stage_select_vocab(ctx: LessonContext) -> LessonContext:
         covered_verbs=ctx.curriculum.get("covered_verbs", []),
         num_nouns=ctx.config.num_nouns,
         num_verbs=ctx.config.num_verbs,
+        seed=ctx.config.seed,
     )
     _log(ctx, f"       nouns : {[n['english'] for n in ctx.nouns]}")
     _log(ctx, f"       verbs : {[v['english'] for v in ctx.verbs]}")
@@ -189,7 +197,7 @@ def stage_grammar_select(ctx: LessonContext) -> LessonContext:
     unlocked = get_next_grammar(ctx.curriculum.get("covered_grammar_ids", []))
     lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
     t0 = time.time()
-    result = ask_llm_json_free(build_grammar_select_prompt(
+    result = _ask_llm(ctx, build_grammar_select_prompt(
         unlocked, ctx.nouns, ctx.verbs, lesson_number,
         covered_grammar_ids=ctx.curriculum.get("covered_grammar_ids", []),
     ))
@@ -208,7 +216,7 @@ def stage_generate_sentences(ctx: LessonContext) -> LessonContext:
     """Stage 3 — LLM: generate practice sentences for the selected grammar."""
     _log(ctx, "\n  [3/8] Generate sentences (LLM)...")
     t0 = time.time()
-    result = ask_llm_json_free(build_grammar_generate_prompt(
+    result = _ask_llm(ctx, build_grammar_generate_prompt(
         ctx.selected_grammar, ctx.nouns, ctx.verbs,
         sentences_per_grammar=ctx.config.sentences_per_grammar,
     ))
@@ -222,7 +230,7 @@ def stage_noun_practice(ctx: LessonContext) -> LessonContext:
     _log(ctx, "\n  [4/8] Noun practice (LLM)...")
     lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
     t0 = time.time()
-    result = ask_llm_json_free(build_noun_practice_prompt(ctx.nouns, lesson_number))
+    result = _ask_llm(ctx, build_noun_practice_prompt(ctx.nouns, lesson_number))
     ctx.noun_items = result.get("noun_items", [])
     # Fill in required fields the LLM may have omitted
     for n_item, n_src in zip(ctx.noun_items, ctx.nouns):
@@ -241,7 +249,7 @@ def stage_verb_practice(ctx: LessonContext) -> LessonContext:
     _log(ctx, "\n  [5/8] Verb practice (LLM)...")
     lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
     t0 = time.time()
-    result = ask_llm_json_free(build_verb_practice_prompt(ctx.verbs, lesson_number))
+    result = _ask_llm(ctx, build_verb_practice_prompt(ctx.verbs, lesson_number))
     ctx.verb_items = result.get("verb_items", [])
     # Fill in required fields the LLM may have omitted
     for v_item, v_src in zip(ctx.verb_items, ctx.verbs):

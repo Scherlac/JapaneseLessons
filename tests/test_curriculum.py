@@ -314,6 +314,68 @@ class TestSuggestNewVocab:
         assert nouns[0]["english"] == food_nouns[0]["english"]
         assert nouns[1]["english"] == food_nouns[1]["english"]
 
+    def test_seeded_call_is_reproducible(self, food_nouns, food_verbs):
+        """Same seed must produce same noun/verb order on every call."""
+        nouns_a, verbs_a = suggest_new_vocab(
+            food_nouns, food_verbs,
+            covered_nouns=[], covered_verbs=[],
+            num_nouns=4, num_verbs=3,
+            seed=42,
+        )
+        nouns_b, verbs_b = suggest_new_vocab(
+            food_nouns, food_verbs,
+            covered_nouns=[], covered_verbs=[],
+            num_nouns=4, num_verbs=3,
+            seed=42,
+        )
+        assert [n["english"] for n in nouns_a] == [n["english"] for n in nouns_b]
+        assert [v["english"] for v in verbs_a] == [v["english"] for v in verbs_b]
+
+    def test_different_seeds_produce_different_orders(self, food_nouns, food_verbs):
+        """Different seeds should produce different orderings (with high probability on a 5-item pool)."""
+        # Use the full pool (5 nouns) so shuffles are non-trivial
+        nouns_42, _ = suggest_new_vocab(
+            food_nouns, food_verbs,
+            covered_nouns=[], covered_verbs=[],
+            num_nouns=5, num_verbs=0,
+            seed=42,
+        )
+        nouns_99, _ = suggest_new_vocab(
+            food_nouns, food_verbs,
+            covered_nouns=[], covered_verbs=[],
+            num_nouns=5, num_verbs=0,
+            seed=99,
+        )
+        assert [n["english"] for n in nouns_42] != [n["english"] for n in nouns_99]
+
+    def test_seed_none_preserves_list_order(self, food_nouns, food_verbs):
+        """seed=None (default) must not shuffle — items returned in original order."""
+        nouns, _ = suggest_new_vocab(
+            food_nouns, food_verbs,
+            covered_nouns=[], covered_verbs=[],
+            num_nouns=5, num_verbs=0,
+        )
+        assert [n["english"] for n in nouns] == [n["english"] for n in food_nouns]
+
+    def test_seed_does_not_pollute_global_random_state(self, food_nouns, food_verbs):
+        """Using a seed should not affect subsequent calls without a seed."""
+        import random
+        random.seed(123)
+        r_before = random.random()
+
+        random.seed(123)
+        suggest_new_vocab(
+            food_nouns, food_verbs,
+            covered_nouns=[], covered_verbs=[],
+            num_nouns=3, num_verbs=2,
+            seed=999,
+        )
+        r_after = random.random()
+
+        assert r_before == r_after, (
+            "suggest_new_vocab with seed= must not alter the global random state"
+        )
+
 
 # ─── summary ─────────────────────────────────────────────────────────────────
 

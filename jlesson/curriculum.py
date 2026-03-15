@@ -20,6 +20,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import random
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -356,11 +357,16 @@ def suggest_new_vocab(
     covered_verbs: list[str],
     num_nouns: int = 4,
     num_verbs: int = 3,
+    *,
+    seed: int | None = None,
 ) -> tuple[list[dict], list[dict]]:
     """Select vocab items not yet covered in previous lessons.
 
     Prioritises fresh items; fills up from already-covered items if the
     available pool is exhausted.
+
+    Pass ``seed`` for a deterministic shuffled selection; omit (or ``None``)
+    to get items in their original list order (backward-compatible).
 
     Returns:
         (selected_nouns, selected_verbs) — both lists of vocab dicts.
@@ -370,6 +376,11 @@ def suggest_new_vocab(
 
     fresh_nouns = [n for n in all_nouns if n["english"] not in covered_n]
     fresh_verbs = [v for v in all_verbs if v["english"] not in covered_v]
+
+    if seed is not None:
+        rng = random.Random(seed)
+        rng.shuffle(fresh_nouns)
+        rng.shuffle(fresh_verbs)
 
     selected_nouns = fresh_nouns[:num_nouns]
     if len(selected_nouns) < num_nouns:

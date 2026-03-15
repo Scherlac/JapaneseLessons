@@ -156,6 +156,7 @@ def lesson() -> None:
     help="Output directory (default: output/).",
 )
 @click.option("--no-video", is_flag=True, default=False, help="Skip video rendering.")
+@click.option("--no-cache", is_flag=True, default=False, help="Disable LLM response cache (always call LLM).")
 def lesson_next(
     theme: str,
     nouns: int,
@@ -165,6 +166,7 @@ def lesson_next(
     curriculum_path: str | None,
     output_dir: str | None,
     no_video: bool,
+    no_cache: bool,
 ) -> None:
     """Run the full pipeline for the next lesson.
 
@@ -181,6 +183,7 @@ def lesson_next(
         num_verbs=verbs,
         sentences_per_grammar=sentences,
         seed=seed,
+        use_cache=not no_cache,
         render_video=not no_video,
     )
     run_pipeline(config)

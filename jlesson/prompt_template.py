@@ -26,9 +26,9 @@ def _format_verb_list(verbs: list[dict]) -> str:
 
 
 PERSONS_BEGINNER = [
-    ("I", "私 (watashi)"),
-    ("You", "あなた (anata)"),
-    ("He/She", "彼/彼女 (kare/kanojo)"),
+    ("I",      "私",    "watashi"),
+    ("You",    "あなた",  "anata"),
+    ("He/She", "彼/彼女", "kare/kanojo"),
 ]
 
 GRAMMAR_PATTERNS_BEGINNER = [
@@ -59,7 +59,7 @@ def build_lesson_prompt(
     theme: str,
     nouns: list[dict],
     verbs: list[dict],
-    persons: list[tuple[str, str]] | None = None,
+    persons: list[tuple[str, str, str]] | None = None,
     grammar_patterns: list[dict] | None = None,
     dimensions: dict | None = None,
     noun_reps: int = 5,
@@ -78,7 +78,7 @@ def build_lesson_prompt(
     noun_block = _format_noun_list(nouns)
     verb_block = _format_verb_list(verbs)
 
-    person_block = "\n".join(f"  - {label}: {jp}" for label, jp in persons)
+    person_block = "\n".join(f"  - {label}: {jp} ({romaji})" for label, jp, romaji in persons)
 
     pattern_block = "\n".join(
         f"  {i}. **{p['name']}**: {p['structure']} — {p['description']}"
@@ -169,7 +169,7 @@ Begin the lesson now.
 
 
 def _build_combination_instruction(
-    persons: list[tuple[str, str]],
+    persons: list[tuple[str, str, str]],
     dimensions: dict,
 ) -> str:
     """Build a human-readable list of all person × dimension combos."""
@@ -177,7 +177,7 @@ def _build_combination_instruction(
     polarities = dimensions.get("polarity", ["affirmative"])
 
     lines = []
-    for label, _ in persons:
+    for label, *_ in persons:
         for tense in tenses:
             for polarity in polarities:
                 lines.append(f"    - {label} / {tense} / {polarity}")

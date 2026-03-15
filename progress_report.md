@@ -35,15 +35,14 @@ Core principles: Cohesion / Coupling / Composition / YAGNI / KISS / DRY, spike-b
 | **Verb practice step in pipeline** | ✅ Done — stage 5 of 8 in pipeline |
 | CLI refactored to click subcommands | ✅ Done — `vocab` / `lesson` / `curriculum` groups |
 | Pydantic data models (`models.py`) | ✅ Done — `NounItem`, `VerbItem`, `Sentence`, `LessonContent` |
-| Unit test suite (232 unit / 252 total) | ✅ Done — +48 tests for new modules |
+| **`PERSONS` tuple standardised (TD-08)** | ✅ Done — `PERSONS_BEGINNER` now 3-tuple; all prompt builders consistent |
+| **Seeded vocab shuffle (TD-04)** | ✅ Done — `suggest_new_vocab(seed=)` uses local RNG; CLI `--seed` wired through |
+| **LLM response cache (`llm_cache.py`)** | ✅ Done — `ask_llm_cached()`, `--cache` flag; sha256 file cache; stdlib only |
+| Unit test suite (254 unit / 274 total) | ✅ Done — +22 tests for cache + shuffle |
 
 ---
 
 ## Architecture
-
-> **Migration pending** — current code is flat at project root. Planned package structure
-> documented in [`docs/decision_project_structure.md`](docs/decision_project_structure.md).
-> The tree below shows the target state after migration.
 
 ```
 jlesson/                        ← all production Python source
@@ -165,7 +164,10 @@ This project follows an **iterative, research-driven development cycle** designe
 ## Dependencies
 
 ### Core (stdlib only)
-`argparse`, `json`, `random`, `pathlib`
+`json`, `random`, `pathlib`, `hashlib`
+
+### CLI
+`click` — subcommand groups, `CliRunner` for tests (already installed)
 
 ### Video Pipeline
 | Library | Version | Purpose |
@@ -196,12 +198,12 @@ This project follows an **iterative, research-driven development cycle** designe
 
 ```
 pytest tests/ -m "not integration and not internet and not video"
-→ 232 passed, 20 deselected in 6.85s
+→ 254 passed, 20 deselected in 7.03s
 ```
 
 | Test file | Unit tests | Slow markers |
 |-----------|-----------|------|
-| `test_curriculum.py` | 42 | — |
+| `test_curriculum.py` | 47 | — |
 | `test_prompt_template.py` | 37 | — |
 | `test_llm_client.py` | 20 | 14 `integration` |
 | `test_video_cards.py` | 29 | — |
@@ -210,6 +212,7 @@ pytest tests/ -m "not integration and not internet and not video"
 | `test_vocab_generator.py` | 18 | — |
 | `test_lesson_store.py` | 20 | — |
 | `test_lesson_pipeline.py` | 28 | — |
+| `test_llm_cache.py` | 20 | — |
 
 ---
 
@@ -229,10 +232,13 @@ of the pipeline — before video render, so LLM work survives render failures.
 `stage_verb_practice()` is now stage 5 of the pipeline, calling `build_verb_practice_prompt()`
 and persisting results to `LessonContent.verb_items`.
 
-### TD-04 — `suggest_new_vocab` is deterministic / ordered  `MEDIUM`
-Always picks the first N fresh items in list order. Lessons will always use the same vocab
-subset. Adding more themes won't help variety if the vocabulary selection never shuffles.  
-**Fix**: Add optional seeded shuffle to `suggest_new_vocab()`; expose `seed` parameter in CLI.
+### ~~TD-04 — `suggest_new_vocab` is deterministic / ordered~~  ✅ RESOLVED
+`suggest_new_vocab()` now accepts an optional `seed: int | None = None` keyword
+argument. When provided, a `random.Random(seed)` local instance shuffles the fresh
+noun/verb pools without touching global random state. `seed=None` (default) preserves
+original list order — all existing tests pass unchanged. The `seed` value flows from
+`LessonConfig.seed` through `stage_select_vocab` and is also exposed via
+`jlesson lesson next --seed`.
 
 ### TD-05 — Windows-only font paths hardcoded  `MEDIUM`
 `video_cards.py` contains `C:/Windows/Fonts/YuGothB.ttc`. Fails silently on Linux/macOS with
@@ -252,48 +258,36 @@ no checkpoint. All prior LLM work is lost.
 **Fix**: Write a checkpoint file after each stage in `lesson_pipeline.py`; re-load and skip
 completed stages on re-run. See `decision_pipeline_orchestration.md` for the strategy.
 
-### TD-08 — `PERSONS` tuple format inconsistency  `LOW`
-`PERSONS_BEGINNER` in `prompt_template.py` is `list[tuple[str,str]]` (2-tuple).
-`build_grammar_generate_prompt` expects `list[tuple[str,str,str]]` (3-tuple with romaji).
-The correct format is documented but lives in `spike_09_demo.py` rather than the module.  
-**Fix**: Standardise on 3-tuple in `prompt_template.py` constants and update tests. Pydantic
-model for `Person` will enforce the format when `models.py` is introduced.
+### ~~TD-08 — `PERSONS` tuple format inconsistency~~  ✅ RESOLVED
+`PERSONS_BEGINNER` is now a `list[tuple[str, str, str]]` matching the 3-tuple format
+(label, japanese, romaji) used by `build_grammar_generate_prompt`. All prompt builder
+functions now have consistent type signatures; `person_block` formatting renders
+`"  - I: 私 (watashi)"` correctly.
 
 ---
 
 ## Anticipated Next Features (Ranked by Value)
 
-### Priority 1 — High value, unblocks everything
-1. **Extract pipeline → `lesson_pipeline.py` + `--next-lesson` CLI flag**  
-   Addresses TD-01. Makes the project usable without running spike scripts.
-
-2. **Lesson content persistence** (TD-02)  
-   Required before any export format (Anki, text review, re-render) is possible.
-
-### Priority 2 — High value, natural next steps
-3. **Verb practice step in pipeline** (TD-03)  
-   All code already exists; purely a wiring task.
-
-4. **More vocab themes** — animals, school, weather, work, time, numbers  
+### Priority 1 — High value, natural next steps
+1. **More vocab themes** — animals, school, weather, work, time, numbers  
    Expands learning surface; each theme is one `--create-vocab <theme>` call away.
 
-5. **Anki export** — `.apkg` or Anki-compatible CSV  
-   High retention value; requires content persistence (item 2) first.
+2. **Anki export** — `.apkg` or Anki-compatible CSV  
+   High retention value; requires content persistence (already done) first.
 
-### Priority 3 — Quality improvements
-6. **Interactive text review mode** — CLI-based: show English, learner types romaji/Japanese  
+### Priority 2 — Quality improvements
+3. **Interactive text review mode** — CLI-based: show English, learner types romaji/Japanese  
    Alternative to video for quick review. Requires content persistence.
 
-7. **Progress tracking + scoring** — correct/incorrect per item, due-date scheduling  
+4. **Progress tracking + scoring** — correct/incorrect per item, due-date scheduling  
    Moves toward spaced-repetition. Needs lesson runner first.
 
-8. **Cross-platform font support** (TD-05)  
+5. **Cross-platform font support** (TD-05)  
    Low complexity; unblocks non-Windows use.
 
-### Priority 4 — Infrastructure
-9. **Pipeline checkpointing** (TD-07) — crash resilience for long LLM runs
-10. **`suggest_new_vocab` shuffle** (TD-04) — lesson variety as vocab grows
-11. **Multi-model flag** — `--model <id>` override per invocation
+### Priority 3 — Infrastructure
+8. **Pipeline checkpointing** (TD-07) — crash resilience for long LLM runs
+9. **Multi-model flag** — `--model <id>` override per invocation
 
 ---
 
@@ -316,12 +310,12 @@ Seven areas researched. Key finding: `click`, `pydantic`, `python-dotenv`, and `
 - `genanki` — only when Anki export is implemented (Priority 2)
 
 ### New modules implied by these decisions
-| Module | Purpose | Key dependencies |
-|--------|---------|-----------------|
-| `models.py` | Pydantic models for all data shapes (Noun, Verb, VocabFile, LessonContent…) | `pydantic` |
-| `lesson_pipeline.py` | Pipeline orchestrator with `LessonContext` dataclass + stage functions | `rich` |
-| `lesson_store.py` | `save_lesson_content()` / `load_lesson_content()` | stdlib |
-| `llm_cache.py` | `ask_llm_cached()` — file-based dev cache for LLM calls | stdlib |
+| Module | Purpose | Status |
+|--------|---------|--------|
+| `models.py` | Pydantic models for all data shapes | ✅ Done |
+| `lesson_pipeline.py` | Pipeline orchestrator with `LessonContext` dataclass + stage functions | ✅ Done |
+| `lesson_store.py` | `save_lesson_content()` / `load_lesson_content()` | ✅ Done |
+| `llm_cache.py` | `ask_llm_cached()` — file-based dev cache for LLM calls | ✅ Done |
 
 ---
 
@@ -333,7 +327,7 @@ Full analysis in [`docs/decision_project_structure.md`](docs/decision_project_st
 `exporters/` sub-packages. Replace `py-modules` in `pyproject.toml` with `packages.find`.
 Rename CLI entry point from `japanese-lesson` → `jlesson`.
 
-**Migration status:** PLANNED — no files moved yet.
+**Migration status:** DONE — all files in `jlesson/` package; entry point is `jlesson`.
 
 | Change | Detail |
 |--------|--------|
