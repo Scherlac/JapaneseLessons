@@ -17,6 +17,7 @@ from jlesson.lesson_pipeline import (
     PersistContentStep,
     RegisterLessonStep,
     RenderVideoStep,
+    ReviewSentencesStep,
     SaveReportStep,
     SelectVocabStep,
     StepInfo,
@@ -231,6 +232,212 @@ def test_generate_sentences_empty_llm_response(ctx):
     with patch("jlesson.lesson_pipeline._ask_llm", return_value={}):
         ctx = GenerateSentencesStep().execute(ctx)
     assert ctx.sentences == []
+
+
+# ---------------------------------------------------------------------------
+# ReviewSentencesStep
+# ---------------------------------------------------------------------------
+
+_SAMPLE_SENTENCES = [
+    {
+        "grammar_id": "action_present_affirmative",
+        "english": "I eat bread.",
+        "japanese": "\u79c1\u306f\u30d1\u30f3\u3092\u98df\u3079\u307e\u3059\u3002",
+        "romaji": "watashi wa pan wo tabemasu",
+        "person": "I",
+    },
+    {
+        "grammar_id": "existence_present_affirmative",
+        "english": "I exist bread.",
+        "japanese": "\u79c1\u306f\u30d1\u30f3\u304c\u3042\u308a\u307e\u3059\u3002",
+        "romaji": "watashi wa pan ga arimasu",
+        "person": "I",
+    },
+]
+
+
+def test_review_sentences_applies_revisions(ctx):
+    ctx.nouns = _NOUNS[:2]
+    ctx.verbs = _VERBS[:2]
+    ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
+    ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES]
+    mock_review = {
+        "reviews": [
+            {"index": 0, "score": 5, "is_natural": True, "issue": None, "revised_sentence": None},
+            {
+                "index": 1,
+                "score": 2,
+                "is_natural": False,
+                "issue": "Existence pattern does not pair well with bread",
+                "revised_sentence": {
+                    "grammar_id": "existence_present_affirmative",
+                    "english": "There is water in the kitchen.",
+                    "japanese": "\u53f0\u6240\u306b\u6c34\u304c\u3042\u308a\u307e\u3059\u3002",
+                    "romaji": "daidokoro ni mizu ga arimasu",
+                    "person": "I",
+                    "notes": "Revised for naturalness",
+                },
+            },
+        ],
+        "overall_naturalness": 3,
+    }
+    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+        ctx = ReviewSentencesStep().execute(ctx)
+    assert ctx.sentences[0]["english"] == "I eat bread."
+    assert ctx.sentences[1]["english"] == "There is water in the kitchen."
+    assert ctx.sentences[1]["romaji"] == "daidokoro ni mizu ga arimasu"
+
+
+def test_review_sentences_no_revisions_needed(ctx):
+    ctx.nouns = _NOUNS[:2]
+    ctx.verbs = _VERBS[:2]
+    ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
+    ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES[:1]]
+    mock_review = {
+        "reviews": [
+            {"index": 0, "score": 5, "is_natural": True, "issue": None, "revised_sentence": None},
+        ],
+        "overall_naturalness": 5,
+    }
+    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+        ctx = ReviewSentencesStep().execute(ctx)
+    assert ctx.sentences[0]["english"] == "I eat bread."
+
+
+def test_review_sentences_empty_sentences(ctx):
+    ctx.sentences = []
+    ctx = ReviewSentencesStep().execute(ctx)
+    assert ctx.sentences == []
+
+
+def test_review_sentences_empty_llm_response(ctx):
+    ctx.nouns = _NOUNS[:2]
+    ctx.verbs = _VERBS[:2]
+    ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
+    ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES]
+    with patch("jlesson.lesson_pipeline._ask_llm", return_value={}):
+        ctx = ReviewSentencesStep().execute(ctx)
+    assert len(ctx.sentences) == 2
+    assert ctx.sentences[0]["english"] == "I eat bread."
+
+
+def test_review_sentences_ignores_high_score_with_revision(ctx):
+    """Even if a revision is provided, don't apply it if score >= threshold."""
+    ctx.nouns = _NOUNS[:2]
+    ctx.verbs = _VERBS[:2]
+    ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
+    ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES[:1]]
+    mock_review = {
+        "reviews": [
+            {
+                "index": 0,
+                "score": 4,
+                "is_natural": True,
+                "issue": None,
+                "revised_sentence": {
+                    "grammar_id": "action_present_affirmative",
+                    "english": "Should not be applied.",
+                    "japanese": "X",
+                    "romaji": "x",
+                    "person": "I",
+                    "notes": "",
+                },
+            },
+        ],
+        "overall_naturalness": 4,
+    }
+    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+        ctx = ReviewSentencesStep().execute(ctx)
+    assert ctx.sentences[0]["english"] == "I eat bread."
+
+
+def test_review_sentences_ignores_out_of_bounds_index(ctx):
+    ctx.nouns = _NOUNS[:2]
+    ctx.verbs = _VERBS[:2]
+    ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
+    ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES[:1]]
+    mock_review = {
+        "reviews": [
+            {
+                "index": 99,
+                "score": 1,
+                "is_natural": False,
+                "issue": "bad",
+                "revised_sentence": {"english": "X"},
+            },
+        ],
+        "overall_naturalness": 1,
+    }
+    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+        ctx = ReviewSentencesStep().execute(ctx)
+    assert ctx.sentences[0]["english"] == "I eat bread."
+
+
+def test_review_sentences_ignores_null_revised_sentence(ctx):
+    """Low-score but null revision should not crash."""
+    ctx.nouns = _NOUNS[:2]
+    ctx.verbs = _VERBS[:2]
+    ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
+    ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES[:1]]
+    mock_review = {
+        "reviews": [
+            {"index": 0, "score": 1, "is_natural": False, "issue": "bad", "revised_sentence": None},
+        ],
+        "overall_naturalness": 1,
+    }
+    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+        ctx = ReviewSentencesStep().execute(ctx)
+    assert ctx.sentences[0]["english"] == "I eat bread."
+
+
+def test_review_sentences_adds_report_on_revisions(ctx):
+    ctx.nouns = _NOUNS[:2]
+    ctx.verbs = _VERBS[:2]
+    ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
+    ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES]
+    mock_review = {
+        "reviews": [
+            {"index": 0, "score": 5, "is_natural": True, "issue": None, "revised_sentence": None},
+            {
+                "index": 1,
+                "score": 1,
+                "is_natural": False,
+                "issue": "Forced combination",
+                "revised_sentence": {
+                    "grammar_id": "g",
+                    "english": "fixed",
+                    "japanese": "jp",
+                    "romaji": "rm",
+                    "person": "I",
+                    "notes": "",
+                },
+            },
+        ],
+        "overall_naturalness": 3,
+    }
+    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+        ctx = ReviewSentencesStep().execute(ctx)
+    md = ctx.report.render()
+    assert "## Sentence Review" in md
+    assert "1 sentence(s) revised" in md
+    assert "Forced combination" in md
+
+
+def test_review_sentences_no_report_when_all_natural(ctx):
+    ctx.nouns = _NOUNS[:2]
+    ctx.verbs = _VERBS[:2]
+    ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
+    ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES[:1]]
+    mock_review = {
+        "reviews": [
+            {"index": 0, "score": 5, "is_natural": True, "issue": None, "revised_sentence": None},
+        ],
+        "overall_naturalness": 5,
+    }
+    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+        ctx = ReviewSentencesStep().execute(ctx)
+    md = ctx.report.render()
+    assert "## Sentence Review" not in md
 
 
 # ---------------------------------------------------------------------------
@@ -535,6 +742,10 @@ def test_build_video_items_total_count():
 
 def test_run_pipeline_no_video_completes(config):
     mock_grammar = {"selected_ids": ["action_present_affirmative"]}
+    mock_review = {
+        "reviews": [{"index": 0, "score": 5, "is_natural": True, "issue": None, "revised_sentence": None}],
+        "overall_naturalness": 5,
+    }
     mock_sentences = {
         "sentences": [
             {
@@ -599,7 +810,7 @@ def test_run_pipeline_no_video_completes(config):
         patch("jlesson.lesson_pipeline._load_vocab", return_value=_VOCAB),
         patch(
             "jlesson.lesson_pipeline._ask_llm",
-            side_effect=[mock_grammar, mock_sentences, mock_nouns, mock_verbs],
+            side_effect=[mock_grammar, mock_sentences, mock_review, mock_nouns, mock_verbs],
         ),
     ):
         result = run_pipeline(config)
@@ -659,6 +870,10 @@ def test_run_pipeline_curriculum_updated(config, tmp_path):
 
 def test_run_pipeline_report_contains_all_sections(config):
     mock_grammar = {"selected_ids": ["action_present_affirmative"]}
+    mock_review = {
+        "reviews": [{"index": 0, "score": 5, "is_natural": True, "issue": None, "revised_sentence": None}],
+        "overall_naturalness": 5,
+    }
     mock_sentences = {
         "sentences": [
             {
@@ -703,7 +918,7 @@ def test_run_pipeline_report_contains_all_sections(config):
         patch("jlesson.lesson_pipeline._load_vocab", return_value=_VOCAB),
         patch(
             "jlesson.lesson_pipeline._ask_llm",
-            side_effect=[mock_grammar, mock_sentences, mock_nouns, mock_verbs],
+            side_effect=[mock_grammar, mock_sentences, mock_review, mock_nouns, mock_verbs],
         ),
     ):
         result = run_pipeline(config)

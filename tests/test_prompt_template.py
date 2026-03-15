@@ -23,6 +23,7 @@ from jlesson.prompt_template import (
     build_grammar_generate_prompt,
     build_grammar_select_prompt,
     build_noun_practice_prompt,
+    build_sentence_review_prompt,
     build_verb_practice_prompt,
 )
 
@@ -337,5 +338,104 @@ class TestBuildContentValidatePrompt:
 
     def test_works_with_empty_sentence_list(self):
         prompt = build_content_validate_prompt([])
+        assert isinstance(prompt, str)
+        assert len(prompt) > 50
+
+
+# ── build_sentence_review_prompt ─────────────────────────────────────────────
+
+class TestBuildSentenceReviewPrompt:
+    @pytest.fixture
+    def sample_grammar_specs(self):
+        return [
+            {
+                "id": "action_present_affirmative",
+                "structure": "A は B を V ます",
+                "description": "Subject does verb to object",
+                "example_en": "I eat fish.",
+                "example_jp": "私は魚を食べます。",
+            },
+        ]
+
+    @pytest.fixture
+    def review_sentences(self):
+        return [
+            {
+                "grammar_id": "action_present_affirmative",
+                "english": "I eat fish.",
+                "japanese": "私は魚を食べます。",
+                "romaji": "Watashi wa sakana o tabemasu.",
+                "person": "I",
+            },
+            {
+                "grammar_id": "action_present_affirmative",
+                "english": "You drink water.",
+                "japanese": "あなたは水を飲みます。",
+                "romaji": "Anata wa mizu o nomimasu.",
+                "person": "You",
+            },
+        ]
+
+    def test_returns_non_empty_string(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        assert isinstance(prompt, str)
+        assert len(prompt) > 100
+
+    def test_contains_each_sentence_japanese(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        for s in review_sentences:
+            assert s["japanese"] in prompt
+
+    def test_contains_each_sentence_english(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        for s in review_sentences:
+            assert s["english"] in prompt
+
+    def test_contains_grammar_ids(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        for g in sample_grammar_specs:
+            assert g["id"] in prompt
+
+    def test_contains_noun_names(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        for noun in sample_nouns:
+            assert noun["english"] in prompt
+
+    def test_contains_verb_names(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        for verb in sample_verbs:
+            assert verb["english"] in prompt
+
+    def test_contains_grammar_structure(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        assert sample_grammar_specs[0]["structure"] in prompt
+
+    def test_uses_zero_based_indices(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        assert "[0]" in prompt
+        assert "[1]" in prompt
+
+    def test_json_skeleton_has_reviews_key(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        assert '"reviews"' in prompt
+
+    def test_json_skeleton_has_score_key(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        assert '"score"' in prompt
+
+    def test_json_skeleton_has_revised_sentence_key(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        assert '"revised_sentence"' in prompt
+
+    def test_json_skeleton_has_overall_naturalness(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        assert '"overall_naturalness"' in prompt
+
+    def test_mentions_naturalness_scale(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
+        assert "1 to 5" in prompt or "1-5" in prompt
+
+    def test_works_with_empty_sentences(self, sample_nouns, sample_verbs, sample_grammar_specs):
+        prompt = build_sentence_review_prompt([], sample_nouns, sample_verbs, sample_grammar_specs)
         assert isinstance(prompt, str)
         assert len(prompt) > 50

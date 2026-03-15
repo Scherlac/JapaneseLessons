@@ -25,6 +25,7 @@ class ReportBuilder:
         "noun_practice",
         "verb_practice",
         "grammar_practice",
+        "review_notes",
         "render_details",
         "summary",
     )

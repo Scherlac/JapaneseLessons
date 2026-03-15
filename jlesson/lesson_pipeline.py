@@ -1,19 +1,20 @@
 """
 Lesson generation pipeline.
 
-Orchestrates the full lesson workflow through eleven sequential steps:
+Orchestrates the full lesson workflow through twelve sequential steps:
 
   step 1   select_vocab       — pick fresh nouns/verbs from the vocab file
   step 2   grammar_select     — LLM: pick 1-2 grammar points for this lesson
   step 3   generate_sentences — LLM: produce practice sentences
-  step 4   noun_practice      — LLM: enrich nouns with examples + memory tips
-  step 5   verb_practice      — LLM: enrich verbs with conjugations + memory tips
-  step 6   register_lesson    — add+complete the lesson in curriculum.json
-  step 7   persist_content    — save LessonContent to output/<id>/content.json
-  step 8   compile_assets     — render card images + TTS audio per item (Stage 2)
-  step 9   compile_touches    — profile-driven touch sequencing (Stage 3)
-  step 10  render_video       — assemble MP4 from touch sequence
-  step 11  save_report        — finalize and save Markdown lesson report
+  step 4   review_sentences   — LLM: rate naturalness, rewrite awkward sentences
+  step 5   noun_practice      — LLM: enrich nouns with examples + memory tips
+  step 6   verb_practice      — LLM: enrich verbs with conjugations + memory tips
+  step 7   register_lesson    — add+complete the lesson in curriculum.json
+  step 8   persist_content    — save LessonContent to output/<id>/content.json
+  step 9   compile_assets     — render card images + TTS audio per item (Stage 2)
+  step 10  compile_touches    — profile-driven touch sequencing (Stage 3)
+  step 11  render_video       — assemble MP4 from touch sequence
+  step 12  save_report        — finalize and save Markdown lesson report
 
 Each step is a PipelineStep subclass with an execute(ctx) method,
 making them individually testable and easy to extend.
@@ -65,6 +66,7 @@ from .prompt_template import (
     build_grammar_generate_prompt,
     build_grammar_select_prompt,
     build_noun_practice_prompt,
+    build_sentence_review_prompt,
     build_verb_practice_prompt,
 )
 
@@ -468,8 +470,81 @@ class GenerateSentencesStep(PipelineStep):
         return "\n".join(lines)
 
 
+class ReviewSentencesStep(PipelineStep):
+    """Step 4 — LLM: rate sentences for naturalness, rewrite awkward ones."""
+
+    name = "review_sentences"
+    description = "LLM: review sentence naturalness + rewrite"
+
+    NATURALNESS_THRESHOLD = 3
+
+    def execute(self, ctx: LessonContext) -> LessonContext:
+        if not ctx.sentences:
+            self._log(ctx, "       (no sentences to review)")
+            return ctx
+
+        result = _ask_llm(
+            ctx,
+            build_sentence_review_prompt(
+                ctx.sentences,
+                ctx.nouns,
+                ctx.verbs,
+                ctx.selected_grammar,
+            ),
+        )
+        reviews = result.get("reviews", [])
+        revised_count = 0
+        for review in reviews:
+            idx = review.get("index")
+            score = review.get("score", 5)
+            revised = review.get("revised_sentence")
+            if (
+                idx is not None
+                and score < self.NATURALNESS_THRESHOLD
+                and isinstance(revised, dict)
+                and 0 <= idx < len(ctx.sentences)
+            ):
+                original_en = ctx.sentences[idx].get("english", "")
+                ctx.sentences[idx] = revised
+                revised_count += 1
+                self._log(
+                    ctx,
+                    f"       [{idx}] score {score} — revised: {original_en!r}",
+                )
+
+        overall = result.get("overall_naturalness", "?")
+        self._log(
+            ctx,
+            f"       {len(ctx.sentences)} sentences reviewed "
+            f"(naturalness: {overall}/5, revised: {revised_count})",
+        )
+
+        if revised_count > 0:
+            ctx.report.add(
+                "review_notes",
+                self._review_section(reviews, revised_count),
+            )
+        return ctx
+
+    @staticmethod
+    def _review_section(reviews: list[dict], revised_count: int) -> str:
+        lines = [
+            "## Sentence Review",
+            "",
+            f"> {revised_count} sentence(s) revised for naturalness.",
+            "",
+        ]
+        for r in reviews:
+            score = r.get("score", "?")
+            issue = r.get("issue")
+            if issue:
+                lines.append(f"- **[{r.get('index', '?')}]** score {score}: {issue}")
+        lines.append("")
+        return "\n".join(lines)
+
+
 class NounPracticeStep(PipelineStep):
-    """Step 4 — LLM: enrich nouns with example sentences and memory tips."""
+    """Step 5 — LLM: enrich nouns with example sentences and memory tips."""
 
     name = "noun_practice"
     description = "LLM: enrich nouns with examples + memory tips"
@@ -526,7 +601,7 @@ class NounPracticeStep(PipelineStep):
 
 
 class VerbPracticeStep(PipelineStep):
-    """Step 5 — LLM: enrich verbs with conjugation forms and memory tips."""
+    """Step 6 — LLM: enrich verbs with conjugation forms and memory tips."""
 
     name = "verb_practice"
     description = "LLM: enrich verbs with conjugations + memory tips"
@@ -587,7 +662,7 @@ class VerbPracticeStep(PipelineStep):
 
 
 class RegisterLessonStep(PipelineStep):
-    """Step 6 — Register and complete the lesson in curriculum.json."""
+    """Step 7 — Register and complete the lesson in curriculum.json."""
 
     name = "register_lesson"
     description = "Add + complete the lesson in curriculum.json"
@@ -631,7 +706,7 @@ class RegisterLessonStep(PipelineStep):
 
 
 class PersistContentStep(PipelineStep):
-    """Step 7 — Save LessonContent to output/<lesson_id>/content.json."""
+    """Step 8 — Save LessonContent to output/<lesson_id>/content.json."""
 
     name = "persist_content"
     description = "Save LessonContent to output/<id>/content.json"
@@ -646,7 +721,7 @@ class PersistContentStep(PipelineStep):
 
 
 class CompileAssetsStep(PipelineStep):
-    """Step 8 — Render card images + TTS audio per item (Stage 2)."""
+    """Step 9 — Render card images + TTS audio per item (Stage 2)."""
 
     name = "compile_assets"
     description = "Render card images + TTS audio per item"
@@ -677,7 +752,7 @@ class CompileAssetsStep(PipelineStep):
 
 
 class CompileTouchesStep(PipelineStep):
-    """Step 9 — Profile-driven touch sequencing (Stage 3)."""
+    """Step 10 — Profile-driven touch sequencing (Stage 3)."""
 
     name = "compile_touches"
     description = "Profile-driven touch sequencing"
@@ -696,7 +771,7 @@ class CompileTouchesStep(PipelineStep):
 
 
 class RenderVideoStep(PipelineStep):
-    """Step 10 — Assemble MP4 from touch sequence."""
+    """Step 11 — Assemble MP4 from touch sequence."""
 
     name = "render_video"
     description = "Assemble MP4 from touch sequence"
@@ -745,7 +820,7 @@ class RenderVideoStep(PipelineStep):
 
 
 class SaveReportStep(PipelineStep):
-    """Step 11 — Finalize and save Markdown lesson report."""
+    """Step 12 — Finalize and save Markdown lesson report."""
 
     name = "save_report"
     description = "Finalize and save Markdown lesson report"
@@ -796,6 +871,7 @@ PIPELINE: list[PipelineStep] = [
     SelectVocabStep(),
     GrammarSelectStep(),
     GenerateSentencesStep(),
+    ReviewSentencesStep(),
     NounPracticeStep(),
     VerbPracticeStep(),
     RegisterLessonStep(),
@@ -810,7 +886,7 @@ PIPELINE: list[PipelineStep] = [
 def run_pipeline(config: LessonConfig) -> LessonContext:
     """Run the full lesson generation pipeline.
 
-    Loads the curriculum from config.curriculum_path, executes all eleven
+    Loads the curriculum from config.curriculum_path, executes all twelve
     steps in sequence, and returns the completed LessonContext.
     """
     ctx = LessonContext(config=config)

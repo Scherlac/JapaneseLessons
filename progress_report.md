@@ -21,7 +21,7 @@ Core principles: Cohesion / Coupling / Composition / YAGNI / KISS / DRY, spike-b
 |------|--------|
 | Grammar progression model (15 steps, levels 1-4) | ✅ Done |
 | Vocabulary database (food + travel) | ✅ Done |
-| LLM prompt templates (7 functions) | ✅ Done |
+| LLM prompt templates (8 functions) | ✅ Done |
 | LLM client (OpenAI-compatible, JSON extraction) | ✅ Done |
 | Vocab generator (LLM-driven + schema validation) | ✅ Done |
 | Curriculum / lesson dictionary CRUD | ✅ Done |
@@ -47,11 +47,13 @@ Core principles: Cohesion / Coupling / Composition / YAGNI / KISS / DRY, spike-b
 | **Touch compiler (`touch_compiler.py`)** | ✅ Done — Stage 3: round-robin interleaved touch sequence from compiled items + profile |
 | **Touch-system card renderers** | ✅ Done — `render_en_card`, `render_jp_card`, `render_bilingual_card` in `cards.py` |
 | Unit test suite (366 unit / 392 total) | ✅ Done — +87 tests for compilation pipeline |
-| **Compilation pipeline wired into lesson_pipeline.py** | ✅ Done — `CompileAssetsStep` (stage 8) + `CompileTouchesStep` (stage 9); `RenderVideoStep` reads from touch sequence; 11-step pipeline |
+| **Compilation pipeline wired into lesson_pipeline.py** | ✅ Done — `CompileAssetsStep` (stage 9) + `CompileTouchesStep` (stage 10); `RenderVideoStep` reads from touch sequence; 12-step pipeline |
 | **`--profile` CLI option** | ✅ Done — `passive_video` (default) / `active_flash_cards`; flows through `LessonConfig.profile` |
 | **Multi-audio video clips (`builder.py`)** | ✅ Done — `create_multi_audio_clip()` supports sequential audio tracks per card |
 | **Profile-aware lesson report** | ✅ Done — `SaveReportStep._summary()` uses `count_touches()` with actual profile |
 | Unit test suite (388 unit / 414 total) | ✅ Done — +22 tests for pipeline integration |
+| **Sentence review step (TD-10)** | ✅ Done — `ReviewSentencesStep` (step 4); `build_sentence_review_prompt()`; naturalness scoring + LLM rewrite; 12-step pipeline |
+| Unit test suite (424 unit / 437 total) | ✅ Done — +23 tests for review step |
 
 ---
 
@@ -68,7 +70,7 @@ jlesson/                        ← all production Python source
 ├── vocab_generator.py          ← LLM vocab generation + schema validation
 ├── llm_client.py               ← OpenAI-compatible HTTP client
 ├── llm_cache.py                ← NEW: sha256 file cache for dev
-├── lesson_pipeline.py          ← LessonContext + 11-step pipeline (compile + render)
+├── lesson_pipeline.py          ← LessonContext + 12-step pipeline (compile + render)
 ├── lesson_store.py             ← NEW: output/<id>/content.json I/O
 ├── lesson_report.py            ← NEW: Markdown lesson report generator
 ├── profiles.py                 ← NEW: touch profile definitions (passive_video, active_flash_cards)
@@ -104,7 +106,7 @@ output/                         ← generated artifacts (gitignored)
 | `jlesson/llm_client.py` | OpenAI-compatible HTTP client; JSON extraction; think-stripping | Calls `config` |
 | `jlesson/llm_cache.py` | File-based LLM response cache (dev mode) | stdlib only |
 | `jlesson/config.py` | LLM connection parameters (env-overridable) | stdlib + dotenv |
-| `jlesson/lesson_pipeline.py` | `LessonContext` dataclass + 11 pipeline steps + `run_pipeline()` | Application layer — composes all others |
+| `jlesson/lesson_pipeline.py` | `LessonContext` dataclass + 12 pipeline steps + `run_pipeline()` | Application layer — composes all others |
 | `jlesson/lesson_report.py` | Markdown report generator — mirrors video lesson structure | `models` only |
 | `jlesson/profiles.py` | Touch profile definitions; touch-type → asset mappings; repetition cycles | `models` only |
 | `jlesson/asset_compiler.py` | Stage 2: render card images + TTS audio per item based on profile | `models`, `profiles`, `video.cards`, `video.tts_engine` |
@@ -219,22 +221,22 @@ This project follows an **iterative, research-driven development cycle** designe
 
 ```
 pytest tests/ -m "not integration and not internet and not video"
-→ 401 passed, 13 deselected in 59.86s
+→ 424 passed, 13 deselected in 61.81s
 ```
 
 | Test file | Unit tests | Slow markers |
 |-----------|-----------|------|
-| `test_curriculum.py` | 47 | — |
-| `test_prompt_template.py` | 37 | — |
+| `test_curriculum.py` | 43 | — |
+| `test_prompt_template.py` | 53 | — |
 | `test_llm_client.py` | 20 | 14 `integration` |
 | `test_video_cards.py` | 43 | — |
-| `test_tts_engine.py` | 22 | 4 `internet` |
-| `test_video_builder.py` | 17 | 2 `video` |
-| `test_vocab_generator.py` | 18 | — |
-| `test_lesson_store.py` | 20 | — |
-| `test_lesson_pipeline.py` | 46 | — |
-| `test_llm_cache.py` | 20 | — |
-| `test_lesson_report.py` | 25 | — |
+| `test_tts_engine.py` | 25 | 4 `internet` |
+| `test_video_builder.py` | 19 | 2 `video` |
+| `test_vocab_generator.py` | 19 | — |
+| `test_lesson_store.py` | 19 | — |
+| `test_lesson_pipeline.py` | 64 | — |
+| `test_llm_cache.py` | 18 | — |
+| `test_lesson_report.py` | 27 | — |
 | `test_profiles.py` | 29 | — |
 | `test_touch_compiler.py` | 22 | — |
 | `test_asset_compiler.py` | 23 | — |
@@ -306,7 +308,28 @@ existing theme silently overwrites the file, losing any previous words. Addition
 3. Pass existing word lists to the LLM prompt so it avoids repeats.
 4. Warn (or abort) when the target file already exists unless `--force` is passed.
 
-### TD-10 — Sentence generation produces nonsensical combinations  `HIGH`
+### ~~TD-10 — Sentence generation produces nonsensical combinations~~  ✅ RESOLVED
+`ReviewSentencesStep` is now step 4 of the 12-step pipeline, inserted between
+`GenerateSentencesStep` (step 3) and `NounPracticeStep` (step 5).
+
+**Approach taken:** Option 1 — Review/lector step.
+
+`build_sentence_review_prompt()` in `prompt_template.py` sends all generated sentences
+back to the LLM along with the grammar specs and vocabulary pool. The LLM rates each
+sentence 1–5 for naturalness. Sentences scoring below 3 are rewritten using the same
+grammar pattern but with better-fitting vocabulary combinations. The step:
+
+- Adds one LLM call (~6.5s) per lesson — acceptable quality/performance tradeoff
+- Skips the call entirely when there are no sentences (zero cost for empty pipelines)
+- Is individually testable and purely additive (no restructuring of existing steps)
+- Logs revised sentences and adds a "Sentence Review" section to the lesson report
+- Guards against out-of-bounds indices, null revisions, and non-dict responses
+
+Original analysis and alternative options preserved below for reference.
+
+<details>
+<summary>Original analysis (superseded)</summary>
+
 The pipeline selects nouns (step 1), verbs (step 1), and grammar points (step 2)
 independently, then asks the LLM to generate sentences combining all three (step 3).
 Because each selection is made without considering the others, the LLM is sometimes
@@ -318,9 +341,7 @@ or pairing unrelated nouns with transitive verbs).
 with no validation or revision pass on the generated output.
 
 **Fix options (not mutually exclusive):**
-1. **Review/lector step** — add an LLM review step after sentence generation that scores
-   each sentence for naturalness and flags or regenerates poor fits. Could use a separate
-   prompt: "Rate these sentences 1–5 for naturalness; rewrite any scoring below 3."
+1. **Review/lector step** ← IMPLEMENTED
 2. **Grammar-aware vocab selection** — after selecting grammar points, filter the vocab
    pool to items that pair naturally with those patterns before finalising the noun/verb
    selection. Requires reordering steps 1 and 2.
@@ -330,6 +351,8 @@ with no validation or revision pass on the generated output.
 4. **Sentence-level retry** — if a generated sentence fails a quality heuristic (e.g.
    short length, repeated words, missing expected particles), retry that sentence with
    a more constrained prompt.
+
+</details>
 
 ---
 
@@ -348,7 +371,7 @@ item_sequence  ──→  compiled_items  ──→  touch_sequence  ──→  
 Touch system domain concepts (profiles, touch types, repetition cycles) are
 defined in [`docs/structure.md`](docs/structure.md).
 
-### Stage 1 — Item Sequence (steps 1–7, already implemented)
+### Stage 1 — Item Sequence (steps 1–8, already implemented)
 
 Raw lesson items (nouns, verbs, sentences) with LLM-enriched data.
 Persisted as `output/<id>/content.json` by `PersistContentStep`.
@@ -412,20 +435,20 @@ Fast and repeatable — re-running with a different format does not re-render.
 ### Pipeline Step Mapping
 
 ```
-Steps 1–7:  content generation + persistence     (unchanged, produces item_sequence)
-Step 8:     compile_assets    — Stage 2: item_sequence → compiled_items
-Step 9:     compile_touches   — Stage 3: compiled_items + profile → touch_sequence
-Step 10:    render_video      — Stage 4: touch_sequence → MP4
-Step 11:    save_report       — Stage 4: touch_sequence → Markdown
+Steps 1–8:  content generation + persistence     (unchanged, produces item_sequence)
+Step 9:     compile_assets    — Stage 2: item_sequence → compiled_items
+Step 10:    compile_touches   — Stage 3: compiled_items + profile → touch_sequence
+Step 11:    render_video      — Stage 4: touch_sequence → MP4
+Step 12:    save_report       — Stage 4: touch_sequence → Markdown
 ```
 
 `compile_assets` is item-aware (renders cards and TTS).  
 `compile_touches` is profile-aware (reads the rulebook).  
 Stage 4 steps are format-aware but profile-agnostic.
 
-**Integration status:** ✅ WIRED — `CompileAssetsStep` (step 8), `CompileTouchesStep`
-(step 9), `RenderVideoStep` (step 10, reads from touch sequence), `SaveReportStep`
-(step 11, profile-aware summary). `--profile` option on CLI. 22 new tests.
+**Integration status:** ✅ WIRED — `CompileAssetsStep` (step 9), `CompileTouchesStep`
+(step 10), `RenderVideoStep` (step 11, reads from touch sequence), `SaveReportStep`
+(step 12, profile-aware summary). `--profile` option on CLI. 22 new tests.
 
 ---
 
