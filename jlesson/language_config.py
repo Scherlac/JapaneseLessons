@@ -63,6 +63,7 @@ from .curriculum import (  # noqa: E402
     HUN_TO_ENG_GRAMMAR_PROGRESSION,
 )
 from .prompt_template import PERSONS_BEGINNER  # noqa: E402
+from .prompt_template import HUNGARIAN_PERSONS  # noqa: E402
 
 ENG_JAP_CONFIG = LanguageConfig(
     code="eng-jap",
@@ -112,7 +113,7 @@ HUN_ENG_CONFIG = LanguageConfig(
     native_font_path="C:/Windows/Fonts/segoeui.ttf",
 
     grammar_progression=tuple(HUN_TO_ENG_GRAMMAR_PROGRESSION),
-    persons=(),              # to be populated in Sprint 4
+    persons=tuple(HUNGARIAN_PERSONS),
 
     vocab_dir="vocab/hungarian",
     curriculum_file="curriculum/curriculum_hungarian.json",

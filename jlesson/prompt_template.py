@@ -621,3 +621,529 @@ Return ONLY a raw JSON object — no markdown fences, no commentary:
   "overall_naturalness": <1-5 average score>
 }}
 """.strip()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Hungarian-English prompt templates
+# ══════════════════════════════════════════════════════════════════════════════
+# Target audience: Hungarian-speaking children (ages 8-12) learning English.
+# All instructions and memory tips are in Hungarian.
+# No kanji/romaji — pronunciation uses IPA-like English guides.
+
+# ── Constants ─────────────────────────────────────────────────────────────────
+
+HUNGARIAN_PERSONS: list[tuple[str, str, str]] = [
+    ("I",    "én",        "aɪ"),
+    ("You",  "te",        "juː"),
+    ("He",   "ő (fiú)",   "hiː"),
+    ("She",  "ő (lány)",  "ʃiː"),
+    ("We",   "mi",        "wiː"),
+    ("They", "ők",        "ðeɪ"),
+]
+
+HUNGARIAN_GRAMMAR_PATTERNS: list[dict] = [
+    {
+        "name": "Subject + verb + object",
+        "pattern": "S + V + O",
+        "description": "Alapmondat — alany + ige + tárgy",
+    },
+    {
+        "name": "Subject + is/am/are + noun/adjective",
+        "pattern": "S + be + N/Adj",
+        "description": "Létige — alany + létige + főnév/melléknév",
+    },
+    {
+        "name": "There is/are + noun",
+        "pattern": "There + be + N",
+        "description": "Létezés — Van valami valahol",
+    },
+]
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _format_hungarian_noun_list(nouns: list[dict]) -> str:
+    """Format Hungarian noun list into a readable block for the prompt."""
+    lines = []
+    for i, n in enumerate(nouns, 1):
+        lines.append(
+            f"  {i}. {n['english']} — {n['hungarian']} "
+            f"(kiejtés: {n['pronunciation']})"
+        )
+    return "\n".join(lines)
+
+
+def _format_hungarian_verb_list(verbs: list[dict]) -> str:
+    """Format Hungarian verb list into a readable block for the prompt."""
+    lines = []
+    for i, v in enumerate(verbs, 1):
+        past = v.get("past_tense", "?")
+        lines.append(
+            f"  {i}. {v['english']} — {v['hungarian']} "
+            f"(kiejtés: {v['pronunciation']}) → múlt idő: {past}"
+        )
+    return "\n".join(lines)
+
+
+# ── Prompt builders ───────────────────────────────────────────────────────────
+
+
+def hungarian_build_lesson_prompt(
+    theme: str,
+    nouns: list[dict],
+    verbs: list[dict],
+    persons: list[tuple[str, str, str]] | None = None,
+    grammar_patterns: list[dict] | None = None,
+    noun_reps: int = 5,
+    verb_reps: int = 5,
+    grammar_reps: int = 3,
+) -> str:
+    """Build a complete lesson prompt for Hungarian children learning English.
+
+    Returns a plain-text prompt ready to be sent to any LLM.
+    """
+    persons = persons or HUNGARIAN_PERSONS
+    grammar_patterns = grammar_patterns or HUNGARIAN_GRAMMAR_PATTERNS
+
+    noun_block = _format_hungarian_noun_list(nouns)
+    verb_block = _format_hungarian_verb_list(verbs)
+
+    person_block = "\n".join(
+        f"  - {en}: {hu} (kiejtés: {pron})" for en, hu, pron in persons
+    )
+
+    pattern_block = "\n".join(
+        f"  {i}. **{p['name']}**: {p['pattern']} — {p['description']}"
+        for i, p in enumerate(grammar_patterns, 1)
+    )
+
+    noun_total = len(nouns) * noun_reps
+    verb_total = len(verbs) * verb_reps
+    grammar_sentences = len(grammar_patterns) * len(persons)
+    grammar_total = grammar_sentences * grammar_reps
+
+    return f"""\
+Te egy angoltanár vagy, aki 8-12 éves magyar gyerekeknek tanít angolt.
+
+=== LECKE TÉMÁJA: {theme.upper()} ===
+
+Készíts egy teljes leckét az alábbi szerkezet szerint.
+CSAK a megadott szókincset használd. NE adj hozzá extra szavakat.
+Minden magyarázat legyen magyarul, a célnyelvi példák angolul.
+
+--- SZÓKINCS ---
+
+FŐNEVEK ({len(nouns)} szó):
+{noun_block}
+
+IGÉK ({len(verbs)} szó):
+{verb_block}
+
+--- LECKE SZERKEZETE ---
+
+## 1. RÉSZ — FŐNEVEK
+
+Minden főnévhez {noun_reps} ismétlés ({noun_total} összesen):
+
+  1. [BEMUTATÁS]   Magyar → Angol (kiejtéssel)
+  2. [FELIDÉZÉS]    Angol → Magyar (a tanuló visszaemlékszik)
+  3. [MEGERŐSÍTÉS]  Magyar → Angol (megerősítés)
+  4. [ELLENŐRZÉS]   Angol mondat a szóval
+  5. [RÖGZÍTÉS]     Magyar → Angol (utolsó ismétlés)
+
+## 2. RÉSZ — IGÉK
+
+Ugyanez az ismétlési ciklus az igékhez ({verb_reps} ismétlés, {verb_total} összesen).
+Minden igénél mutasd a múlt idejű alakot is.
+
+## 3. RÉSZ — NYELVTAN
+
+Személyek:
+{person_block}
+
+Nyelvtani minták:
+{pattern_block}
+
+Minden mintához generálj mondatokat különböző személyekkel.
+Ismétlési ciklus mondatonként ({grammar_reps} ismétlés):
+  1. [FORDÍTÁS]    Magyar → Angol
+  2. [MEGÉRTÉS]    Angol → Magyar
+  3. [MEGERŐSÍTÉS] Magyar → Angol
+
+A mondatokban csak a fenti szókincset használd.
+
+--- KIMENETI FORMÁTUM ---
+
+Markdown formátum. Használj fejléceket minden részhez.
+Számozd az összes elemet, hogy a tanuló követni tudja a haladást.
+
+Összes ismétlés: {noun_total} + {verb_total} + {grammar_total} = {noun_total + verb_total + grammar_total}
+
+Kezdd el a leckét most.
+"""
+
+
+def hungarian_build_vocab_prompt(
+    theme: str,
+    num_nouns: int = 12,
+    num_verbs: int = 10,
+    level: str = "beginner",
+) -> str:
+    """Build an LLM prompt that asks for a Hungarian-English vocabulary JSON file.
+
+    The output from the LLM can be saved directly as vocab/hungarian/<theme>.json.
+    """
+    return f"""\
+Te egy angol nyelvtanár vagy, aki 8-12 éves magyar gyerekeknek készít szókincslistát.
+
+Generálj egy JSON szókincs-fájlt a következő témához: **{theme}**
+
+Követelmények:
+- Pontosan {num_nouns} főnév és {num_verbs} ige.
+- Minden szó legyen gyakori, gyakorlatias, {level} szintű, gyerekeknek megfelelő.
+- Minden főnévhez: english, hungarian, pronunciation (angol kiejtés egyszerű átírással).
+- Minden igéhez: english, hungarian, pronunciation, past_tense (az angol múlt idejű alak).
+- CSAK érvényes JSON-t adj ki, semmilyen kommentárt ne írj elé vagy mögé.
+- Pontosan az alábbi sémát használd.
+
+Séma példa:
+```json
+{{
+  "theme": "{theme}",
+  "nouns": [
+    {{"english": "dog", "hungarian": "kutya", "pronunciation": "dɒɡ"}}
+  ],
+  "verbs": [
+    {{"english": "to eat", "hungarian": "enni", "pronunciation": "tuː iːt", "past_tense": "ate"}}
+  ]
+}}
+```
+
+Most generáld a teljes JSON-t a(z) "{theme}" témához, {num_nouns} főnévvel és {num_verbs} igével.
+""".strip()
+
+
+def hungarian_build_noun_practice_prompt(
+    nouns: list[dict],
+    lesson_number: int = 1,
+) -> str:
+    """Build a prompt for an LLM to generate focused noun introduction content.
+
+    Returns JSON: {"noun_items": [{"english", "hungarian", "pronunciation",
+    "example_sentence_en", "example_sentence_hu", "memory_tip"}, ...]}
+
+    Use with ask_llm_json_free().
+    """
+    noun_block = _format_hungarian_noun_list(nouns)
+
+    return f"""\
+Te egy angoltanár vagy, aki a(z) {lesson_number}. lecke főnévbemutatóját írja \
+8-12 éves magyar gyerekeknek.
+
+BEMUTATANDÓ FŐNEVEK:
+{noun_block}
+
+Minden főnévhez készíts egy JSON bejegyzést:
+- english, hungarian, pronunciation  (pontosan másold a fenti listából)
+- example_sentence_en  — rövid, természetes angol mondat a szóval
+- example_sentence_hu  — a mondat magyar fordítása
+- memory_tip           — emlékeztető tipp magyarul, ami segít megjegyezni \
+az angol szót (pl. hasonló hangzású magyar szó, vizuális kép, vicces mondat)
+
+A memory_tip legyen kreatív és gyerekbarát — használj olyan magyar szavakat \
+vagy fogalmakat, amiket egy 8-12 éves gyerek ismer.
+
+CSAK nyers JSON objektumot adj vissza — ne használj markdown kódblokkot, ne írj kommentárt:
+{{
+  "noun_items": [
+    {{
+      "english": "...",
+      "hungarian": "...",
+      "pronunciation": "...",
+      "example_sentence_en": "...",
+      "example_sentence_hu": "...",
+      "memory_tip": "..."
+    }}
+  ]
+}}
+""".strip()
+
+
+def hungarian_build_verb_practice_prompt(
+    verbs: list[dict],
+    lesson_number: int = 1,
+) -> str:
+    """Build a prompt for an LLM to generate focused verb introduction content.
+
+    Returns JSON: {"verb_items": [{"english", "hungarian", "pronunciation",
+    "past_tense", "example_sentence_en", "example_sentence_hu",
+    "memory_tip"}, ...]}
+
+    Use with ask_llm_json_free().
+    """
+    verb_block = _format_hungarian_verb_list(verbs)
+
+    return f"""\
+Te egy angoltanár vagy, aki a(z) {lesson_number}. lecke igebemutatóját írja \
+8-12 éves magyar gyerekeknek.
+
+BEMUTATANDÓ IGÉK:
+{verb_block}
+
+Minden igéhez készíts egy JSON bejegyzést:
+- english, hungarian, pronunciation, past_tense  (pontosan másold a fenti listából)
+- example_sentence_en  — rövid, természetes angol mondat az igével (jelen idő)
+- example_sentence_hu  — a mondat magyar fordítása
+- memory_tip           — emlékeztető tipp magyarul, ami segít megjegyezni \
+az angol igét és a múlt idejű alakját
+
+A memory_tip magyarázza el egyszerűen:
+- Ha szabályos ige (pl. walk → walked): "Csak adj hozzá -ed végződést!"
+- Ha rendhagyó ige (pl. eat → ate): adj egy vicces emlékeztetőt a különleges alakhoz
+
+A tippek legyenek gyerekbarátok — használj olyan magyar szavakat vagy \
+hasonlatokat, amiket egy 8-12 éves gyerek megért.
+
+CSAK nyers JSON objektumot adj vissza — ne használj markdown kódblokkot, ne írj kommentárt:
+{{
+  "verb_items": [
+    {{
+      "english": "...",
+      "hungarian": "...",
+      "pronunciation": "...",
+      "past_tense": "...",
+      "example_sentence_en": "...",
+      "example_sentence_hu": "...",
+      "memory_tip": "..."
+    }}
+  ]
+}}
+""".strip()
+
+
+def hungarian_build_grammar_select_prompt(
+    unlocked_grammar: list[dict],
+    available_nouns: list[dict],
+    available_verbs: list[dict],
+    lesson_number: int,
+    covered_grammar_ids: list[str],
+) -> str:
+    """Ask the LLM which Hungarian→English grammar point to teach next.
+
+    Returns JSON: {"selected_ids": [...], "rationale": "..."}
+
+    Use with ask_llm_json_free().
+    """
+    grammar_lines = "\n".join(
+        f"  - id: {g['id']}\n"
+        f"    pattern: {g['pattern']}\n"
+        f"    description: {g['description']}\n"
+        f"    example: {g['example_en']} → {g['example_hu']}\n"
+        f"    level: {g['level']}"
+        for g in unlocked_grammar
+    )
+
+    noun_names = ", ".join(n["english"] for n in available_nouns)
+    verb_names = ", ".join(v["english"] for v in available_verbs)
+    covered_str = ", ".join(covered_grammar_ids) if covered_grammar_ids else "(nincs)"
+
+    return f"""\
+Te egy angol nyelvtanterv-tervező vagy, aki a(z) {lesson_number}. leckét \
+tervezi 8-12 éves magyar gyerekek számára.
+
+MÁR TANÍTOTT NYELVTAN:
+  {covered_str}
+
+ELÉRHETŐ SZÓKINCS EHHEZ A LECKÉHEZ:
+  Főnevek: {noun_names}
+  Igék: {verb_names}
+
+FELOLDOTT NYELVTANI LÉPÉSEK (előfeltételek teljesítve, még nem tanított):
+{grammar_lines}
+
+FELADAT:
+Válassz 1 VAGY 2 nyelvtani azonosítót a feloldott listából, amelyek:
+1. Megfelelő nehézségűek a(z) {lesson_number}. leckéhez (előbb az alacsonyabb szintet)
+2. Kompatibilisek a rendelkezésre álló szókinccsel (természetes gyakorlómondatok alkothatók)
+3. Ha ez egy korai lecke, előnyben részesítsd az 1. szintű lépéseket a 2. szint előtt
+
+CSAK nyers JSON objektumot adj vissza — ne használj markdown kódblokkot, ne írj kommentárt:
+{{
+  "selected_ids": ["<id1>"],
+  "rationale": "Egy mondat, ami elmagyarázza, miért ezek a nyelvtani pontok lettek kiválasztva."
+}}
+""".strip()
+
+
+def hungarian_build_grammar_generate_prompt(
+    grammar_specs: list[dict],
+    nouns: list[dict],
+    verbs: list[dict],
+    persons: list[tuple[str, str, str]] | None = None,
+    sentences_per_grammar: int = 3,
+) -> str:
+    """Generate English practice sentences with Hungarian translations.
+
+    Returns JSON: {"sentences": [{"grammar_id", "english", "hungarian",
+    "person", "notes"}, ...]}
+
+    Use with ask_llm_json_free().
+    """
+    persons = persons or HUNGARIAN_PERSONS
+
+    grammar_block = "\n".join(
+        f"  [{g['id']}] {g['pattern']} — {g['description']}\n"
+        f"  Példa: {g['example_en']} → {g['example_hu']}"
+        for g in grammar_specs
+    )
+
+    noun_block = _format_hungarian_noun_list(nouns)
+    verb_block = _format_hungarian_verb_list(verbs)
+
+    person_lines = "\n".join(
+        f"  - {en}: {hu} (kiejtés: {pron})" for en, hu, pron in persons
+    )
+
+    total = len(grammar_specs) * sentences_per_grammar
+
+    return f"""\
+Te egy angoltanár vagy, aki gyakorló mondatokat ír 8-12 éves magyar gyerekeknek.
+
+GYAKORLANDÓ NYELVTANI PONTOK:
+{grammar_block}
+
+HASZNÁLHATÓ SZÓKINCS (csak ezeket a szavakat használd):
+Főnevek:
+{noun_block}
+
+Igék:
+{verb_block}
+
+SZEMÉLYEK:
+{person_lines}
+
+FELADAT:
+Minden nyelvtani ponthoz generálj {sentences_per_grammar} természetes angol mondatot \
+a fenti szókincs felhasználásával. Használj különböző személyeket a mondatokban.
+Összesen: {total} mondat.
+
+Minden mondathoz add meg:
+- grammar_id  — melyik nyelvtani pontot gyakorolja ez a mondat
+- english     — természetes angol mondat
+- hungarian   — helyes magyar fordítás
+- person      — melyik személy (I / You / He / She / We / They)
+- notes       — rövid nyelvtani megjegyzés magyarul (pl. melyik igeidő, milyen szórend)
+
+CSAK nyers JSON objektumot adj vissza — ne használj markdown kódblokkot, ne írj kommentárt:
+{{
+  "sentences": [
+    {{
+      "grammar_id": "...",
+      "english": "...",
+      "hungarian": "...",
+      "person": "...",
+      "notes": "..."
+    }}
+  ]
+}}
+""".strip()
+
+
+def hungarian_build_sentence_review_prompt(
+    sentences: list[dict],
+    nouns: list[dict],
+    verbs: list[dict],
+    grammar_specs: list[dict],
+) -> str:
+    """Review English sentences for correctness and age-appropriateness.
+
+    Returns JSON: {"reviews": [...], "overall_naturalness": 1-5}
+    Each review: {"index", "score", "is_natural", "issue", "revised_sentence"}
+    revised_sentence is null when the sentence is natural (score >= 3).
+
+    Use with ask_llm_json_free().
+    """
+    sentence_lines = "\n".join(
+        f"  [{i}] grammar: {s.get('grammar_id', '?')}\n"
+        f"       EN: {s.get('english', '')}\n"
+        f"       HU: {s.get('hungarian', '')}\n"
+        f"       Személy: {s.get('person', '')}"
+        for i, s in enumerate(sentences)
+    )
+
+    grammar_block = "\n".join(
+        f"  [{g['id']}] {g['pattern']} — {g['description']}"
+        for g in grammar_specs
+    )
+
+    noun_names = ", ".join(
+        f"{n['english']} ({n['hungarian']})" for n in nouns
+    )
+    verb_names = ", ".join(
+        f"{v['english']} ({v['hungarian']})" for v in verbs
+    )
+
+    return f"""\
+Te egy anyanyelvi angol szakértő vagy, aki 8-12 éves magyar gyerekeknek \
+készült gyakorlómondatokat ellenőriz.
+
+Ezeket a mondatokat szókincs és nyelvtani minták önálló kombinálásával hoztuk létre.
+Egyes kombinációk lehetnek erőltetettek vagy természetellenesek. \
+A feladatod az ilyen mondatok azonosítása és javítása.
+
+HASZNÁLT NYELVTANI MINTÁK:
+{grammar_block}
+
+ELÉRHETŐ SZÓKINCS:
+  Főnevek: {noun_names}
+  Igék: {verb_names}
+
+ELLENŐRIZENDŐ MONDATOK:
+{sentence_lines}
+
+FELADAT:
+Minden mondatot értékelj 1-5 skálán a természetesség és gyerekbarátság szerint:
+  5 = Tökéletesen természetes — egy anyanyelvi beszélő is így mondaná
+  4 = Elég természetes — kicsit tankönyvízű, de elfogadható
+  3 = Határeset — nyelvtanilag helyes, de erőltetett
+  2 = Természetellenes — furcsa szó- vagy nyelvtankombináció
+  1 = Értelmetlen — a szavak nem illenek ehhez a nyelvtani mintához
+
+FONTOS: a mondatoknak 8-12 éves gyerekek számára érthetőnek kell lenniük!
+
+Ha egy mondat 3 ALATT pontoz, adj egy javított verziót, ami:
+- UGYANAZT a nyelvtani mintát használja (grammar_id változatlan marad)
+- A fenti szókincskészletből merít (cserélhet főnevet/igét a jobb illeszkedésért)
+- Lehetőleg ugyanazt a személyt tartja meg
+- Természetes és gyerekbarát
+- Helyes angol nyelvtan
+
+Ha egy mondat 3 vagy afeletti, a "revised_sentence" legyen null.
+
+CSAK nyers JSON objektumot adj vissza — ne használj markdown kódblokkot, ne írj kommentárt:
+{{
+  "reviews": [
+    {{
+      "index": 0,
+      "score": 4,
+      "is_natural": true,
+      "issue": null,
+      "revised_sentence": null
+    }},
+    {{
+      "index": 1,
+      "score": 2,
+      "is_natural": false,
+      "issue": "A létezés-minta nem illik az 'eszik' cselekvő igéhez",
+      "revised_sentence": {{
+        "grammar_id": "...",
+        "english": "...",
+        "hungarian": "...",
+        "person": "...",
+        "notes": "..."
+      }}
+    }}
+  ],
+  "overall_naturalness": <1-5 átlag>
+}}
+""".strip()
