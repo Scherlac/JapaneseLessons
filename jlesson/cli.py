@@ -20,6 +20,7 @@ import click
 
 from .curriculum import load_curriculum
 from .curriculum import summary as curriculum_summary
+from .language_config import get_language_config
 from .prompt_template import (
     DIMENSIONS_BEGINNER,
     GRAMMAR_PATTERNS_BEGINNER,
@@ -30,6 +31,14 @@ from .prompt_template import (
 
 VOCAB_DIR = Path(__file__).parent.parent / "vocab"
 DEFAULT_CURRICULUM_PATH = Path(__file__).parent.parent / "curriculum" / "curriculum.json"
+
+LANGUAGE_OPTION = click.option(
+    "--language",
+    default="eng-jap",
+    show_default=True,
+    type=click.Choice(["eng-jap", "hun-eng"]),
+    help="Language pair: eng-jap (default) or hun-eng.",
+)
 
 
 def _friendly_error(exc: Exception) -> str:
@@ -59,14 +68,16 @@ def _friendly_error(exc: Exception) -> str:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _list_themes() -> list[str]:
-    return sorted(p.stem for p in VOCAB_DIR.glob("*.json"))
+def _list_themes(vocab_dir: Path | None = None) -> list[str]:
+    d = vocab_dir or VOCAB_DIR
+    return sorted(p.stem for p in d.glob("*.json"))
 
 
-def _load_vocab(theme: str) -> dict:
-    path = VOCAB_DIR / f"{theme}.json"
+def _load_vocab(theme: str, vocab_dir: Path | None = None) -> dict:
+    d = vocab_dir or VOCAB_DIR
+    path = d / f"{theme}.json"
     if not path.exists():
-        available = ", ".join(_list_themes()) or "(none)"
+        available = ", ".join(_list_themes(d)) or "(none)"
         raise click.ClickException(f"theme '{theme}' not found. Available: {available}")
     with open(path, encoding="utf-8") as f:
         return json.load(f)
@@ -100,15 +111,17 @@ def vocab() -> None:
 
 
 @vocab.command("list")
-def vocab_list() -> None:
+@LANGUAGE_OPTION
+def vocab_list(language: str) -> None:
     """List available vocabulary themes."""
-    themes = _list_themes()
+    vocab_dir = Path(__file__).parent.parent / get_language_config(language).vocab_dir
+    themes = _list_themes(vocab_dir)
     if themes:
         click.echo("Available themes:")
         for t in themes:
             click.echo(f"  - {t}")
     else:
-        click.echo(f"No themes found. Add JSON files to: {VOCAB_DIR}")
+        click.echo(f"No themes found. Add JSON files to: {vocab_dir}")
 
 
 @vocab.command("create")
@@ -122,11 +135,17 @@ def vocab_list() -> None:
     type=click.Choice(["beginner", "intermediate", "advanced"]),
     help="Difficulty level.",
 )
-def vocab_create(theme: str, nouns: int, verbs: int, level: str) -> None:
+@LANGUAGE_OPTION
+def vocab_create(theme: str, nouns: int, verbs: int, level: str, language: str) -> None:
     """Generate vocabulary for THEME via LLM and save to vocab/<THEME>.json."""
     from .vocab_generator import generate_vocab
+    lang_cfg = get_language_config(language)
+    output_dir = Path(__file__).parent.parent / lang_cfg.vocab_dir
     try:
-        generate_vocab(theme=theme, num_nouns=nouns, num_verbs=verbs, level=level)
+        generate_vocab(
+            theme=theme, num_nouns=nouns, num_verbs=verbs, level=level,
+            output_dir=output_dir, language=language,
+        )
     except Exception as exc:
         raise click.ClickException(_friendly_error(exc)) from exc
 
@@ -143,9 +162,14 @@ def vocab_create(theme: str, nouns: int, verbs: int, level: str) -> None:
     help="Difficulty level.",
 )
 @click.option("--output", "-o", type=click.Path(), default=None, help="Write to file instead of stdout.")
-def vocab_generate_prompt(theme: str, nouns: int, verbs: int, level: str, output: str | None) -> None:
+@LANGUAGE_OPTION
+def vocab_generate_prompt(theme: str, nouns: int, verbs: int, level: str, output: str | None, language: str) -> None:
     """Print the LLM prompt for generating vocabulary for THEME (no LLM call)."""
-    prompt = build_vocab_prompt(theme=theme, num_nouns=nouns, num_verbs=verbs, level=level)
+    if language == "hun-eng":
+        from .prompt_template import hungarian_build_vocab_prompt
+        prompt = hungarian_build_vocab_prompt(theme=theme, num_nouns=nouns, num_verbs=verbs, level=level)
+    else:
+        prompt = build_vocab_prompt(theme=theme, num_nouns=nouns, num_verbs=verbs, level=level)
     if output:
         Path(output).write_text(prompt, encoding="utf-8")
         click.echo(f"Prompt written to: {output}", err=True)
@@ -191,6 +215,7 @@ def lesson() -> None:
     type=click.Choice(["passive_video", "active_flash_cards"]),
     help="Touch profile for asset compilation and video rendering.",
 )
+@LANGUAGE_OPTION
 def lesson_next(
     theme: str,
     nouns: int,
@@ -203,6 +228,7 @@ def lesson_next(
     no_cache: bool,
     dry_run: bool,
     profile: str,
+    language: str,
 ) -> None:
     """Run the full pipeline for the next lesson.
 
@@ -211,9 +237,14 @@ def lesson_next(
     """
     from .lesson_pipeline import LessonConfig, run_pipeline
 
+    lang_cfg = get_language_config(language)
+    resolved_curriculum = (
+        Path(curriculum_path) if curriculum_path
+        else Path(__file__).parent.parent / lang_cfg.curriculum_file
+    )
     config = LessonConfig(
         theme=theme,
-        curriculum_path=Path(curriculum_path) if curriculum_path else DEFAULT_CURRICULUM_PATH,
+        curriculum_path=resolved_curriculum,
         output_dir=Path(output_dir) if output_dir else None,
         num_nouns=nouns,
         num_verbs=verbs,
@@ -223,6 +254,7 @@ def lesson_next(
         render_video=not no_video,
         dry_run=dry_run,
         profile=profile,
+        language=language,
     )
     try:
         run_pipeline(config)
@@ -237,6 +269,7 @@ def lesson_next(
 @click.option("--seed", "-s", type=int, default=None, help="Random seed.")
 @click.option("--no-shuffle", is_flag=True, default=False, help="Pick first N items without shuffling.")
 @click.option("--output", "-o", type=click.Path(), default=None, help="Write to file instead of stdout.")
+@LANGUAGE_OPTION
 def lesson_prompt(
     theme: str,
     nouns: int,
@@ -244,21 +277,32 @@ def lesson_prompt(
     seed: int | None,
     no_shuffle: bool,
     output: str | None,
+    language: str,
 ) -> None:
     """Generate a lesson prompt text for THEME (no LLM call, no pipeline)."""
     if seed is not None:
         random.seed(seed)
-    vocab = _load_vocab(theme)
+    lang_cfg = get_language_config(language)
+    vocab_dir = Path(__file__).parent.parent / lang_cfg.vocab_dir
+    vocab = _load_vocab(theme, vocab_dir)
     selected_nouns = _pick_items(vocab["nouns"], nouns, shuffle=not no_shuffle)
     selected_verbs = _pick_items(vocab["verbs"], verbs, shuffle=not no_shuffle)
-    prompt = build_lesson_prompt(
-        theme=theme,
-        nouns=selected_nouns,
-        verbs=selected_verbs,
-        persons=PERSONS_BEGINNER,
-        grammar_patterns=GRAMMAR_PATTERNS_BEGINNER,
-        dimensions=DIMENSIONS_BEGINNER,
-    )
+    if language == "hun-eng":
+        from .prompt_template import hungarian_build_lesson_prompt
+        prompt = hungarian_build_lesson_prompt(
+            theme=theme,
+            nouns=selected_nouns,
+            verbs=selected_verbs,
+        )
+    else:
+        prompt = build_lesson_prompt(
+            theme=theme,
+            nouns=selected_nouns,
+            verbs=selected_verbs,
+            persons=PERSONS_BEGINNER,
+            grammar_patterns=GRAMMAR_PATTERNS_BEGINNER,
+            dimensions=DIMENSIONS_BEGINNER,
+        )
     if output:
         Path(output).write_text(prompt, encoding="utf-8")
         click.echo(f"Prompt written to: {output}", err=True)
@@ -283,9 +327,13 @@ def curriculum() -> None:
     type=click.Path(),
     help="Path to curriculum JSON (default: curriculum/curriculum.json).",
 )
-def curriculum_show(curriculum_path: str | None) -> None:
+@LANGUAGE_OPTION
+def curriculum_show(curriculum_path: str | None, language: str) -> None:
     """Display the current curriculum progress."""
-    path = Path(curriculum_path) if curriculum_path else DEFAULT_CURRICULUM_PATH
+    if curriculum_path:
+        path = Path(curriculum_path)
+    else:
+        path = Path(__file__).parent.parent / get_language_config(language).curriculum_file
     cur = load_curriculum(path)
     click.echo(curriculum_summary(cur))
 

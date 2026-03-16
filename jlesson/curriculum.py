@@ -575,21 +575,35 @@ def _get_lesson(curriculum: dict, lesson_id: int) -> dict:
 
 # ── Grammar Progression ───────────────────────────────────────────────────────
 
-def get_next_grammar(covered_grammar_ids: list[str]) -> list[dict]:
-    """Return grammar steps that are unlocked but not yet covered.
+def get_next_grammar_from(
+    progression: list[dict],
+    covered_grammar_ids: list[str],
+) -> list[dict]:
+    """Return unlocked grammar steps from *progression* not in *covered*.
 
+    Parameterized version of :func:`get_next_grammar` that accepts an
+    explicit progression list instead of the module-level default.
     A step is unlocked when all its prerequisites appear in covered_grammar_ids.
     Results are sorted by level (easiest first).
     """
     covered = set(covered_grammar_ids)
     return sorted(
         [
-            g for g in GRAMMAR_PROGRESSION
+            g for g in progression
             if g["id"] not in covered
             and all(req in covered for req in g["requires"])
         ],
         key=lambda g: g["level"],
     )
+
+
+def get_next_grammar(covered_grammar_ids: list[str]) -> list[dict]:
+    """Return grammar steps that are unlocked but not yet covered.
+
+    A step is unlocked when all its prerequisites appear in covered_grammar_ids.
+    Results are sorted by level (easiest first).
+    """
+    return get_next_grammar_from(GRAMMAR_PROGRESSION, covered_grammar_ids)
 
 
 def get_grammar_by_id(grammar_id: str) -> dict:

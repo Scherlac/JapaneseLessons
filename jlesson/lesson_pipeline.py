@@ -45,10 +45,12 @@ from .curriculum import (
     complete_lesson,
     get_grammar_by_id,
     get_next_grammar,
+    get_next_grammar_from,
     load_curriculum,
     save_curriculum,
     suggest_new_vocab,
 )
+from .language_config import LanguageConfig, get_language_config
 from .lesson_report import ReportBuilder, save_report
 from .lesson_store import save_lesson_content
 from .llm_client import ask_llm_json_free
@@ -68,6 +70,11 @@ from .prompt_template import (
     build_noun_practice_prompt,
     build_sentence_review_prompt,
     build_verb_practice_prompt,
+    hungarian_build_grammar_generate_prompt,
+    hungarian_build_grammar_select_prompt,
+    hungarian_build_noun_practice_prompt,
+    hungarian_build_sentence_review_prompt,
+    hungarian_build_verb_practice_prompt,
 )
 
 # ---------------------------------------------------------------------------
@@ -91,6 +98,7 @@ class LessonConfig:
     dry_run: bool = False
     verbose: bool = True
     profile: str = "passive_video"
+    language: str = "eng-jap"
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +147,11 @@ class LessonContext:
     content_path: Path | None = None
     video_path: Path | None = None
     report_path: Path | None = None
+    language_config: LanguageConfig | None = None
+
+    def __post_init__(self) -> None:
+        if self.language_config is None:
+            self.language_config = get_language_config(self.config.language)
 
 
 # ---------------------------------------------------------------------------
@@ -175,16 +188,17 @@ class PipelineStep(ABC):
 _VOCAB_DIR = Path(__file__).parent.parent / "vocab"
 
 
-def _load_vocab(theme: str) -> dict:
+def _load_vocab(theme: str, vocab_dir: Path | None = None) -> dict:
     """Load vocab file; generate via LLM if missing."""
-    path = _VOCAB_DIR / f"{theme}.json"
+    base_dir = vocab_dir if vocab_dir is not None else _VOCAB_DIR
+    path = base_dir / f"{theme}.json"
     if path.exists():
         with open(path, encoding="utf-8") as f:
             return json.load(f)
     print(f"  [vocab] {theme}.json not found — generating via LLM...")
     from .vocab_generator import generate_vocab
 
-    return generate_vocab(theme=theme, num_nouns=12, num_verbs=10, output_dir=_VOCAB_DIR)
+    return generate_vocab(theme=theme, num_nouns=12, num_verbs=10, output_dir=base_dir)
 
 
 def _ask_llm(ctx: LessonContext, prompt: str) -> dict:
@@ -371,7 +385,8 @@ class SelectVocabStep(PipelineStep):
     description = "Pick fresh nouns/verbs from the vocab file"
 
     def execute(self, ctx: LessonContext) -> LessonContext:
-        ctx.vocab = _load_vocab(ctx.config.theme)
+        vocab_dir = Path(__file__).parent.parent / ctx.language_config.vocab_dir
+        ctx.vocab = _load_vocab(ctx.config.theme, vocab_dir)
         ctx.nouns, ctx.verbs = suggest_new_vocab(
             ctx.vocab["nouns"],
             ctx.vocab["verbs"],
@@ -393,26 +408,37 @@ class GrammarSelectStep(PipelineStep):
     description = "LLM: pick 1-2 grammar points for this lesson"
 
     def execute(self, ctx: LessonContext) -> LessonContext:
-        unlocked = get_next_grammar(ctx.curriculum.get("covered_grammar_ids", []))
+        lang_cfg = ctx.language_config
+        progression = list(lang_cfg.grammar_progression)
+        covered = ctx.curriculum.get("covered_grammar_ids", [])
+        unlocked = get_next_grammar_from(progression, covered)
+        grammar_map = {g["id"]: g for g in progression}
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
-        result = _ask_llm(
-            ctx,
-            build_grammar_select_prompt(
+        if lang_cfg.code == "hun-eng":
+            prompt = hungarian_build_grammar_select_prompt(
                 unlocked,
                 ctx.nouns,
                 ctx.verbs,
                 lesson_number,
-                covered_grammar_ids=ctx.curriculum.get("covered_grammar_ids", []),
-            ),
-        )
+                covered_grammar_ids=covered,
+            )
+        else:
+            prompt = build_grammar_select_prompt(
+                unlocked,
+                ctx.nouns,
+                ctx.verbs,
+                lesson_number,
+                covered_grammar_ids=covered,
+            )
+        result = _ask_llm(ctx, prompt)
         selected_ids: list[str] = result.get("selected_ids") or [
             g["id"] for g in unlocked[:2]
         ]
         ctx.selected_grammar = []
         for gid in selected_ids:
-            try:
-                ctx.selected_grammar.append(get_grammar_by_id(gid))
-            except KeyError:
+            if gid in grammar_map:
+                ctx.selected_grammar.append(grammar_map[gid])
+            else:
                 self._log(
                     ctx, f"       Warning: unknown grammar id {gid!r}, skipping"
                 )
@@ -429,15 +455,21 @@ class GenerateSentencesStep(PipelineStep):
     description = "LLM: produce practice sentences"
 
     def execute(self, ctx: LessonContext) -> LessonContext:
-        result = _ask_llm(
-            ctx,
-            build_grammar_generate_prompt(
+        if ctx.language_config.code == "hun-eng":
+            prompt = hungarian_build_grammar_generate_prompt(
                 ctx.selected_grammar,
                 ctx.nouns,
                 ctx.verbs,
                 sentences_per_grammar=ctx.config.sentences_per_grammar,
-            ),
-        )
+            )
+        else:
+            prompt = build_grammar_generate_prompt(
+                ctx.selected_grammar,
+                ctx.nouns,
+                ctx.verbs,
+                sentences_per_grammar=ctx.config.sentences_per_grammar,
+            )
+        result = _ask_llm(ctx, prompt)
         ctx.sentences = result.get("sentences", [])
         self._log(ctx, f"       {len(ctx.sentences)} sentences")
         if ctx.sentences:
@@ -483,15 +515,21 @@ class ReviewSentencesStep(PipelineStep):
             self._log(ctx, "       (no sentences to review)")
             return ctx
 
-        result = _ask_llm(
-            ctx,
-            build_sentence_review_prompt(
+        if ctx.language_config.code == "hun-eng":
+            prompt = hungarian_build_sentence_review_prompt(
                 ctx.sentences,
                 ctx.nouns,
                 ctx.verbs,
                 ctx.selected_grammar,
-            ),
-        )
+            )
+        else:
+            prompt = build_sentence_review_prompt(
+                ctx.sentences,
+                ctx.nouns,
+                ctx.verbs,
+                ctx.selected_grammar,
+            )
+        result = _ask_llm(ctx, prompt)
         reviews = result.get("reviews", [])
         revised_count = 0
         for review in reviews:
@@ -551,13 +589,20 @@ class NounPracticeStep(PipelineStep):
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
-        result = _ask_llm(ctx, build_noun_practice_prompt(ctx.nouns, lesson_number))
+        if ctx.language_config.code == "hun-eng":
+            result = _ask_llm(ctx, hungarian_build_noun_practice_prompt(ctx.nouns, lesson_number))
+        else:
+            result = _ask_llm(ctx, build_noun_practice_prompt(ctx.nouns, lesson_number))
         ctx.noun_items = result.get("noun_items", [])
         for n_item, n_src in zip(ctx.noun_items, ctx.nouns):
             n_item.setdefault("english", n_src["english"])
-            n_item.setdefault("japanese", n_src["japanese"])
-            n_item.setdefault("kanji", n_src.get("kanji", n_src["japanese"]))
-            n_item.setdefault("romaji", n_src["romaji"])
+            if ctx.language_config.code == "hun-eng":
+                n_item.setdefault("hungarian", n_src.get("hungarian", ""))
+                n_item.setdefault("pronunciation", n_src.get("pronunciation", ""))
+            else:
+                n_item.setdefault("japanese", n_src["japanese"])
+                n_item.setdefault("kanji", n_src.get("kanji", n_src["japanese"]))
+                n_item.setdefault("romaji", n_src["romaji"])
         if not ctx.noun_items:
             ctx.noun_items = [dict(n) for n in ctx.nouns]
         self._log(ctx, f"       {len(ctx.noun_items)} noun items")
@@ -608,14 +653,22 @@ class VerbPracticeStep(PipelineStep):
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
-        result = _ask_llm(ctx, build_verb_practice_prompt(ctx.verbs, lesson_number))
+        if ctx.language_config.code == "hun-eng":
+            result = _ask_llm(ctx, hungarian_build_verb_practice_prompt(ctx.verbs, lesson_number))
+        else:
+            result = _ask_llm(ctx, build_verb_practice_prompt(ctx.verbs, lesson_number))
         ctx.verb_items = result.get("verb_items", [])
         for v_item, v_src in zip(ctx.verb_items, ctx.verbs):
             v_item.setdefault("english", v_src["english"])
-            v_item.setdefault("japanese", v_src["japanese"])
-            v_item.setdefault("kanji", v_src.get("kanji", v_src["japanese"]))
-            v_item.setdefault("romaji", v_src["romaji"])
-            v_item.setdefault("masu_form", v_src["masu_form"])
+            if ctx.language_config.code == "hun-eng":
+                v_item.setdefault("hungarian", v_src.get("hungarian", ""))
+                v_item.setdefault("pronunciation", v_src.get("pronunciation", ""))
+                v_item.setdefault("past_tense", v_src.get("past_tense", ""))
+            else:
+                v_item.setdefault("japanese", v_src["japanese"])
+                v_item.setdefault("kanji", v_src.get("kanji", v_src["japanese"]))
+                v_item.setdefault("romaji", v_src["romaji"])
+                v_item.setdefault("masu_form", v_src["masu_form"])
         if not ctx.verb_items:
             ctx.verb_items = [dict(v) for v in ctx.verbs]
         self._log(ctx, f"       {len(ctx.verb_items)} verb items")
@@ -890,6 +943,7 @@ def run_pipeline(config: LessonConfig) -> LessonContext:
     steps in sequence, and returns the completed LessonContext.
     """
     ctx = LessonContext(config=config)
+    ctx.language_config = get_language_config(config.language)
     ctx.curriculum = load_curriculum(config.curriculum_path)
     total = len(PIPELINE)
 
