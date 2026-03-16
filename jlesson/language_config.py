@@ -19,6 +19,81 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass
+class FieldMap:
+    """Maps generic semantic role names to language-specific model field names.
+
+    The mapping is used by pipeline stages (report builder, asset compiler,
+    card renderer) so they can operate on ``source``/``target`` roles instead
+    of hard-coding language-specific field names such as ``japanese`` or
+    ``hungarian``.
+
+    Role semantics
+    --------------
+    source
+        The learner's *native* language text — the prompt side of a flash card.
+        e.g. ``"english"`` for eng-jap, ``"hungarian"`` for hun-eng.
+    target
+        The *language being learned* — the reveal side of a flash card.
+        e.g. ``"japanese"`` for eng-jap, ``"english"`` for hun-eng.
+    target_phonetic
+        A phonetic / romanisation field for the target text (may be empty).
+        e.g. ``"romaji"`` for eng-jap, ``"pronunciation"`` (IPA) for hun-eng.
+    target_special
+        Additional named fields for the target language, accessed by role.
+        e.g. ``{"kanji": "kanji", "masu_form": "masu_form"}`` for eng-jap.
+    example_sentence_source / example_sentence_target
+        Field names for example sentences in source / target language.
+    source_label / target_label / phonetic_label
+        Human-readable display names used by the report builder.
+    """
+
+    source: str
+    target: str
+    target_phonetic: str = ""
+    target_special: dict[str, str] = field(default_factory=dict)
+    example_sentence_source: str = ""
+    example_sentence_target: str = ""
+    source_label: str = ""
+    target_label: str = ""
+    phonetic_label: str = ""
+
+    def view(self, item: Any) -> dict[str, Any]:
+        """Return a generic-keyed dict extracted from *item*.
+
+        *item* may be a Pydantic model (extra fields accessible via
+        ``model_extra``) or a plain :class:`dict`.  Unknown field names
+        silently resolve to ``""`` so callers never get ``KeyError``.
+        """
+
+        def _get(field_name: str) -> str:
+            if not field_name:
+                return ""
+            if isinstance(item, dict):
+                return item.get(field_name) or ""
+            val = getattr(item, field_name, None)
+            if val is None:
+                extra = getattr(item, "model_extra", None)
+                if extra is not None:
+                    val = extra.get(field_name)
+            return val or ""
+
+        return {
+            "source": _get(self.source),
+            "target": _get(self.target),
+            "target_phonetic": _get(self.target_phonetic),
+            "target_special": {
+                role: _get(fname) for role, fname in self.target_special.items()
+            },
+            "example_sentence_source": _get(self.example_sentence_source),
+            "example_sentence_target": _get(self.example_sentence_target),
+            "source_label": self.source_label,
+            "target_label": self.target_label,
+            "phonetic_label": self.phonetic_label,
+        }
 
 
 @dataclass(frozen=True)
@@ -50,6 +125,9 @@ class LanguageConfig:
     # ── File-system layout ────────────────────────────────────────────────
     vocab_dir: str = "vocab"
     curriculum_file: str = "curriculum/curriculum.json"
+
+    # ── Field role mapping ────────────────────────────────────────────────
+    field_map: FieldMap = field(default_factory=lambda: FieldMap(source="", target=""))
 
 
 # ── Pre-built configs ─────────────────────────────────────────────────────────
@@ -90,6 +168,18 @@ ENG_JAP_CONFIG = LanguageConfig(
 
     vocab_dir="vocab",
     curriculum_file="curriculum/curriculum.json",
+
+    field_map=FieldMap(
+        source="english",
+        target="japanese",
+        target_phonetic="romaji",
+        target_special={"kanji": "kanji", "masu_form": "masu_form"},
+        example_sentence_source="example_sentence_en",
+        example_sentence_target="example_sentence_jp",
+        source_label="English",
+        target_label="Japanese",
+        phonetic_label="Romaji",
+    ),
 )
 
 HUN_ENG_CONFIG = LanguageConfig(
@@ -117,6 +207,18 @@ HUN_ENG_CONFIG = LanguageConfig(
 
     vocab_dir="vocab/hungarian",
     curriculum_file="curriculum/curriculum_hungarian.json",
+
+    field_map=FieldMap(
+        source="hungarian",
+        target="english",
+        target_phonetic="pronunciation",
+        target_special={},
+        example_sentence_source="example_sentence_hu",
+        example_sentence_target="example_sentence_en",
+        source_label="Magyar",
+        target_label="English",
+        phonetic_label="Pronunciation",
+    ),
 )
 
 # ── Registry ──────────────────────────────────────────────────────────────────

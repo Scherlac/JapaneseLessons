@@ -477,30 +477,35 @@ class GenerateSentencesStep(PipelineStep):
         self._log(ctx, f"       {len(ctx.sentences)} sentences")
         if ctx.sentences:
             ctx.report.add(
-                "grammar_practice", self._grammar_section(ctx.sentences)
+                "grammar_practice",
+                self._grammar_section(ctx.sentences, ctx.language_config.field_map),
             )
         return ctx
 
     @staticmethod
-    def _grammar_section(sentences: list[dict]) -> str:
+    def _grammar_section(sentences: list[dict], fm) -> str:
+        src_lbl = fm.source_label or "Source"
+        tgt_lbl = fm.target_label or "Target"
+        ph_lbl = fm.phonetic_label or "Phonetic"
+        header = f"| # | Person | {src_lbl} | {tgt_lbl} |"
+        sep = "|---|--------|---------|----------|"
+        if fm.target_phonetic:
+            header += f" {ph_lbl} |"
+            sep += "--------|"
         lines: list[str] = ["## Phase 3 \u2014 Grammar Practice", ""]
         by_grammar: dict[str, list[dict]] = {}
         for s in sentences:
             by_grammar.setdefault(s.get("grammar_id", ""), []).append(s)
         for gid, sents in by_grammar.items():
-            lines.extend(
-                [
-                    f"### {gid}",
-                    "",
-                    "| # | Person | English | Japanese | Romaji |",
-                    "|---|--------|---------|----------|--------|",
-                ]
-            )
+            lines.extend([f"### {gid}", "", header, sep])
             for i, s in enumerate(sents, 1):
-                lines.append(
-                    f"| {i} | {s.get('person', '')} | {s.get('english', '')} "
-                    f"| {s.get('japanese', '')} | {s.get('romaji', '')} |"
+                v = fm.view(s)
+                row = (
+                    f"| {i} | {s.get('person', '')} | {v['source']} | {v['target']} |"
                 )
+                if fm.target_phonetic:
+                    row += f" {v['target_phonetic']} |"
+                lines.append(row)
             lines.append("")
         return "\n".join(lines)
 
@@ -609,39 +614,46 @@ class NounPracticeStep(PipelineStep):
         if not ctx.noun_items:
             ctx.noun_items = [dict(n) for n in ctx.nouns]
         self._log(ctx, f"       {len(ctx.noun_items)} noun items")
-        ctx.report.add("vocabulary", self._vocab_table(ctx.noun_items))
-        ctx.report.add("noun_practice", self._practice_section(ctx.noun_items))
+        fm = ctx.language_config.field_map
+        ctx.report.add("vocabulary", self._vocab_table(ctx.noun_items, fm))
+        ctx.report.add("noun_practice", self._practice_section(ctx.noun_items, fm))
         return ctx
 
     @staticmethod
-    def _vocab_table(items: list[dict]) -> str:
-        lines = [
-            "## Vocabulary",
-            "",
-            "### Nouns",
-            "",
-            "| # | English | Japanese | Romaji |",
-            "|---|---------|----------|--------|",
-        ]
+    def _vocab_table(items: list[dict], fm) -> str:
+        tgt_lbl = fm.target_label or "Target"
+        src_lbl = fm.source_label or "Source"
+        ph_lbl = fm.phonetic_label or "Phonetic"
+        header = f"| # | {src_lbl} | {tgt_lbl} |"
+        sep = "|---|---------|----------|"
+        if fm.target_phonetic:
+            header += f" {ph_lbl} |"
+            sep += "--------|"
+        lines = ["## Vocabulary", "", "### Nouns", "", header, sep]
         for i, n in enumerate(items, 1):
-            lines.append(
-                f"| {i} | {n.get('english', '')} | {n.get('japanese', '')} "
-                f"| {n.get('romaji', '')} |"
-            )
+            v = fm.view(n)
+            row = f"| {i} | {v['source']} | {v['target']} |"
+            if fm.target_phonetic:
+                row += f" {v['target_phonetic']} |"
+            lines.append(row)
         lines.append("")
         return "\n".join(lines)
 
     @staticmethod
-    def _practice_section(items: list[dict]) -> str:
+    def _practice_section(items: list[dict], fm) -> str:
+        tgt_lbl = fm.target_label or "Target"
+        ph_lbl = fm.phonetic_label or "Phonetic"
         lines: list[str] = ["## Phase 1 \u2014 Noun Practice", ""]
         for i, n in enumerate(items, 1):
-            lines.extend([f"### {i}. {n.get('english', '')}", ""])
-            lines.append(f"- **Japanese:** {n.get('japanese', '')}")
-            lines.append(f"- **Romaji:** {n.get('romaji', '')}")
-            if n.get("example_sentence_jp"):
-                lines.append(f"- **Example:** {n['example_sentence_jp']}")
-            if n.get("example_sentence_en"):
-                lines.append(f"  *{n['example_sentence_en']}*")
+            v = fm.view(n)
+            lines.extend([f"### {i}. {v['source']}", ""])
+            lines.append(f"- **{tgt_lbl}:** {v['target']}")
+            if v["target_phonetic"]:
+                lines.append(f"- **{ph_lbl}:** {v['target_phonetic']}")
+            if v["example_sentence_target"]:
+                lines.append(f"- **Example:** {v['example_sentence_target']}")
+            if v["example_sentence_source"]:
+                lines.append(f"  *{v['example_sentence_source']}*")
             if n.get("memory_tip"):
                 lines.append(f"- **Memory tip:** {n['memory_tip']}")
             lines.append("")
@@ -675,42 +687,60 @@ class VerbPracticeStep(PipelineStep):
         if not ctx.verb_items:
             ctx.verb_items = [dict(v) for v in ctx.verbs]
         self._log(ctx, f"       {len(ctx.verb_items)} verb items")
-        ctx.report.add("vocabulary", self._vocab_table(ctx.verb_items))
-        ctx.report.add("verb_practice", self._practice_section(ctx.verb_items))
+        fm = ctx.language_config.field_map
+        ctx.report.add("vocabulary", self._vocab_table(ctx.verb_items, fm))
+        ctx.report.add("verb_practice", self._practice_section(ctx.verb_items, fm))
         return ctx
 
     @staticmethod
-    def _vocab_table(items: list[dict]) -> str:
-        lines = [
-            "### Verbs",
-            "",
-            "| # | English | Japanese | Romaji | Polite form |",
-            "|---|---------|----------|--------|-------------|",
-        ]
+    def _vocab_table(items: list[dict], fm) -> str:
+        tgt_lbl = fm.target_label or "Target"
+        src_lbl = fm.source_label or "Source"
+        ph_lbl = fm.phonetic_label or "Phonetic"
+        masu_lbl = "Polite form"
+        has_masu = "masu_form" in fm.target_special
+        header = f"| # | {src_lbl} | {tgt_lbl} |"
+        sep = "|---|---------|----------|"
+        if fm.target_phonetic:
+            header += f" {ph_lbl} |"
+            sep += "--------|"
+        if has_masu:
+            header += f" {masu_lbl} |"
+            sep += "-------------|"
+        lines = ["### Verbs", "", header, sep]
         for i, v in enumerate(items, 1):
-            lines.append(
-                f"| {i} | {v.get('english', '')} | {v.get('japanese', '')} "
-                f"| {v.get('romaji', '')} | {v.get('masu_form', '')} |"
-            )
+            view = fm.view(v)
+            row = f"| {i} | {view['source']} | {view['target']} |"
+            if fm.target_phonetic:
+                row += f" {view['target_phonetic']} |"
+            if has_masu:
+                row += f" {view['target_special'].get('masu_form', '')} |"
+            lines.append(row)
         lines.append("")
         return "\n".join(lines)
 
     @staticmethod
-    def _practice_section(items: list[dict]) -> str:
+    def _practice_section(items: list[dict], fm) -> str:
+        tgt_lbl = fm.target_label or "Target"
+        ph_lbl = fm.phonetic_label or "Phonetic"
+        has_masu = "masu_form" in fm.target_special
         lines: list[str] = ["## Phase 2 \u2014 Verb Practice", ""]
         for i, v in enumerate(items, 1):
-            lines.extend([f"### {i}. {v.get('english', '')}", ""])
-            lines.append(f"- **Japanese:** {v.get('japanese', '')}")
-            lines.append(f"- **Romaji:** {v.get('romaji', '')}")
-            lines.append(f"- **Polite form:** {v.get('masu_form', '')}")
+            view = fm.view(v)
+            lines.extend([f"### {i}. {view['source']}", ""])
+            lines.append(f"- **{tgt_lbl}:** {view['target']}")
+            if view["target_phonetic"]:
+                lines.append(f"- **{ph_lbl}:** {view['target_phonetic']}")
+            if has_masu and view["target_special"].get("masu_form"):
+                lines.append(f"- **Polite form:** {view['target_special']['masu_form']}")
             polite = v.get("polite_forms", {})
             if polite:
                 for form_name, form_val in polite.items():
                     lines.append(f"  - {form_name}: {form_val}")
-            if v.get("example_sentence_jp"):
-                lines.append(f"- **Example:** {v['example_sentence_jp']}")
-            if v.get("example_sentence_en"):
-                lines.append(f"  *{v['example_sentence_en']}*")
+            if view["example_sentence_target"]:
+                lines.append(f"- **Example:** {view['example_sentence_target']}")
+            if view["example_sentence_source"]:
+                lines.append(f"  *{view['example_sentence_source']}*")
             if v.get("memory_tip"):
                 lines.append(f"- **Memory tip:** {v['memory_tip']}")
             lines.append("")
@@ -796,11 +826,13 @@ class CompileAssetsStep(PipelineStep):
             self._log(ctx, f"       (dry-run) {total_items} items — cards only")
             ctx.compiled_items = compile_assets_sync(
                 items_by_phase, profile, lesson_dir,
+                lang_cfg=ctx.language_config,
             )
         else:
             self._log(ctx, f"       {total_items} items → cards + TTS")
             ctx.compiled_items = asyncio.run(
-                compile_assets(items_by_phase, profile, lesson_dir)
+                compile_assets(items_by_phase, profile, lesson_dir,
+                               lang_cfg=ctx.language_config)
             )
 
         self._log(ctx, f"       {len(ctx.compiled_items)} compiled items")

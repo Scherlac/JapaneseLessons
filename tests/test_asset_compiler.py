@@ -14,6 +14,7 @@ from jlesson.asset_compiler import (
     compile_assets,
     compile_assets_sync,
 )
+from jlesson.language_config import get_language_config
 from jlesson.models import (
     CompiledItem,
     ItemAssets,
@@ -23,6 +24,9 @@ from jlesson.models import (
     VerbItem,
 )
 from jlesson.profiles import ACTIVE_FLASH_CARDS, PASSIVE_VIDEO
+
+ENG_JAP = get_language_config("eng-jap")
+HUN_ENG = get_language_config("hun-eng")
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +58,18 @@ def _mock_renderer():
     r.render_en_card.return_value = MagicMock()
     r.render_jp_card.return_value = MagicMock()
     r.render_bilingual_card.return_value = MagicMock()
+    r.render_hun_card.return_value = MagicMock()
+    r.render_hun_bilingual_card.return_value = MagicMock()
     return r
+
+
+def _hun_noun() -> NounItem:
+    """NounItem carrying Hungarian extra fields."""
+    return NounItem.model_validate({
+        "english": "cat",
+        "hungarian": "macska",
+        "pronunciation": "/ˈmɒtʃkɒ/",
+    })
 
 
 def _mock_engine_factory():
@@ -125,6 +140,57 @@ class TestRenderItemCards:
         assert paths["card_en"].name == "005_en.png"
         assert paths["card_jp"].name == "005_jp.png"
         assert paths["card_en_jp"].name == "005_en_jp.png"
+
+
+# ---------------------------------------------------------------------------
+# _render_item_cards — Hungarian dispatch (via lang_cfg)
+# ---------------------------------------------------------------------------
+
+
+class TestRenderItemCardsHungarian:
+    def test_card_en_uses_hun_card(self, tmp_path):
+        """card_en in hun-eng mode should render the Hungarian source word."""
+        renderer = _mock_renderer()
+        _render_item_cards(_hun_noun(), {"card_en"}, tmp_path, 1, renderer, lang_cfg=HUN_ENG)
+        renderer.render_hun_card.assert_called_once()
+        call_kwargs = renderer.render_hun_card.call_args.kwargs
+        assert call_kwargs["hungarian"] == "macska"
+        assert call_kwargs["pronunciation"] == "/ˈmɒtʃkɒ/"
+
+    def test_card_jp_uses_en_card_for_english_target(self, tmp_path):
+        """card_jp in hun-eng mode should render the English *target* word."""
+        renderer = _mock_renderer()
+        _render_item_cards(_hun_noun(), {"card_jp"}, tmp_path, 1, renderer, lang_cfg=HUN_ENG)
+        renderer.render_en_card.assert_called_once()
+        call_kwargs = renderer.render_en_card.call_args.kwargs
+        assert call_kwargs["english"] == "cat"
+
+    def test_card_en_jp_uses_hun_bilingual(self, tmp_path):
+        """card_en_jp in hun-eng mode should render the bilingual Hungarian card."""
+        renderer = _mock_renderer()
+        _render_item_cards(_hun_noun(), {"card_en_jp"}, tmp_path, 1, renderer, lang_cfg=HUN_ENG)
+        renderer.render_hun_bilingual_card.assert_called_once()
+        call_kwargs = renderer.render_hun_bilingual_card.call_args.kwargs
+        assert call_kwargs["english"] == "cat"
+        assert call_kwargs["hungarian"] == "macska"
+
+    def test_japanese_renderers_not_called_for_hungarian(self, tmp_path):
+        renderer = _mock_renderer()
+        _render_item_cards(
+            _hun_noun(),
+            {"card_en", "card_jp", "card_en_jp"},
+            tmp_path, 1, renderer, lang_cfg=HUN_ENG,
+        )
+        renderer.render_jp_card.assert_not_called()
+        renderer.render_bilingual_card.assert_not_called()
+
+    def test_eng_jap_still_uses_japanese_renderers_when_lang_cfg_provided(self, tmp_path):
+        renderer = _mock_renderer()
+        _render_item_cards(_noun(), {"card_en", "card_jp", "card_en_jp"}, tmp_path, 1, renderer, lang_cfg=ENG_JAP)
+        renderer.render_en_card.assert_called_once()
+        renderer.render_jp_card.assert_called_once()
+        renderer.render_bilingual_card.assert_called_once()
+        renderer.render_hun_card.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
