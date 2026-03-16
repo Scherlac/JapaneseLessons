@@ -343,13 +343,13 @@ Open `jlesson/curriculum.py` and tell Copilot:
 > - `past_simple_negative` — pattern: 'Subject + did not + verb', example: 'I did not eat fish.'
 > - `past_simple_question` — pattern: 'Did + subject + verb?', example: 'Did you run today?'
 > - `be_was_were` — pattern: 'Subject + was/were + noun/adjective', example: 'They were happy last week.'
+> - `regular_verbs_formation` — pattern: 'Base verb + ed' for regular verbs, example: 'walk/walked', 'play/played'
 > - `irregular_verbs_3forms_1` — common irregular verbs with their base, past, and past participle forms (e.g., go/went/gone, eat/ate/eaten)
 >
 > **Level 5** (requires Level 4):
 > - `past_continuous` — pattern: 'Subject + was/were + verb-ing', example: 'I was eating when you called.'
 > - `past_continuous_question` — pattern: 'Was/Were + subject + verb-ing?', example: 'Were you eating when I called?'
 > - `past_continuous_negative` — pattern: 'Subject + was/were not + verb-ing', example: 'She was not eating when I arrived.'
-> - `regular_verbs_formation` — pattern: 'Base verb + ed' for regular verbs, example: 'walk/walked', 'play/played'
 > - `irregular_verbs_3forms_2` — more irregular verbs with their base, past, and past participle forms (e.g., see/saw/seen, take/took/taken)
 > - `will_future` — pattern: 'Subject + will + verb', example: 'I will eat later.'
 > - `going_to_future` — pattern: 'Subject + is/am/are going to + verb', example: 'I am going to eat lunch.'
