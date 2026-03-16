@@ -343,4 +343,9 @@ def curriculum_show(curriculum_path: str | None, language: str) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    import sys
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
     cli()
