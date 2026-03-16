@@ -2,126 +2,126 @@
   "theme": "farm-animals",
   "nouns": [
     {
-      "english": "dog",
-      "hungarian": "kutya",
-      "pronunciation": "ˈdɒɡ"
-    },
-    {
       "english": "cow",
-      "hungarian": "tehen",
-      "pronunciation": "kaʊ"
+      "hungarian": "tehén",
+      "pronunciation": "kuː"
     },
     {
       "english": "pig",
-      "hungarian": "szarvas",
+      "hungarian": "disznó",
       "pronunciation": "pɪɡ"
     },
     {
-      "english": "sheep",
-      "hungarian": "bánya",
-      "pronunciation": "shiːp"
-    },
-    {
-      "english": "horse",
-      "hungarian": "lovagló",
-      "pronunciation": "hɔrs"
-    },
-    {
       "english": "chicken",
-      "hungarian": "tyúk",
-      "pronunciation": "tjuːk"
+      "hungarian": "csirke",
+      "pronunciation": "ˈtʃɪkɪn"
     },
     {
-      "english": "duck",
-      "hungarian": "liba",
-      "pronunciation": "dʌk"
+      "english": "sheep",
+      "hungarian": "juh",
+      "pronunciation": "ʃiːp"
     },
     {
       "english": "goat",
       "hungarian": "kecske",
-      "pronunciation": "ɡoʊt"
+      "pronunciation": "ɡəʊt"
     },
     {
-      "english": "rooster",
-      "hungarian": "tyúkfajzat",
-      "pronunciation": "rʊsˈtər"
+      "english": "horse",
+      "hungarian": "ló",
+      "pronunciation": "hɔːs"
     },
     {
       "english": "donkey",
       "hungarian": "szamár",
-      "pronunciation": "dɒŋki"
+      "pronunciation": "ˈdɒŋki"
     },
     {
-      "english": "turkey",
-      "hungarian": "liba",
-      "pronunciation": "ˈtɜːrkɪ"
+      "english": "duck",
+      "hungarian": "kacsa",
+      "pronunciation": "dʌk"
     },
     {
       "english": "hen",
       "hungarian": "tyúk",
       "pronunciation": "hɛn"
+    },
+    {
+      "english": "rooster",
+      "hungarian": "sas",
+      "pronunciation": "ˈrʌstər"
+    },
+    {
+      "english": "farm",
+      "hungarian": "gazdaság",
+      "pronunciation": "fɑːm"
+    },
+    {
+      "english": "barn",
+      "hungarian": "istálló",
+      "pronunciation": "bɑːrn"
     }
   ],
   "verbs": [
     {
-      "english": "to eat",
-      "hungarian": "enni",
-      "pronunciation": "ˈiːt",
-      "past_tense": "ate"
+      "english": "to graze",
+      "hungarian": "legel",
+      "pronunciation": "ɡreɪz",
+      "past_tense": "grazed"
     },
     {
-      "english": "to drink",
-      "hungarian": "inni",
-      "pronunciation": "iːn",
-      "past_tense": "drank"
+      "english": "to milk",
+      "hungarian": "tejet szed",
+      "pronunciation": "mɪlk",
+      "past_tense": "milked"
     },
     {
-      "english": "to run",
-      "hungarian": "futni",
-      "pronunciation": "fuːtɲ",
-      "past_tense": "ran"
+      "english": "to plow",
+      "hungarian": "eget",
+      "pronunciation": "plaʊ",
+      "past_tense": "plowed"
     },
     {
-      "english": "to jump",
-      "hungarian": "ugrani",
-      "pronunciation": "uˈɡrɒnɪ",
-      "past_tense": "jumped"
+      "english": "to feed",
+      "hungarian": "takarmányt ad",
+      "pronunciation": "fiːd",
+      "past_tense": "fed"
     },
     {
-      "english": "to sleep",
-      "hungarian": "aludni",
-      "pronunciation": "aˈluːdɲi",
-      "past_tense": "slept"
+      "english": "to hatch",
+      "hungarian": "kikel",
+      "pronunciation": "hætʃ",
+      "past_tense": "hatched"
     },
     {
-      "english": "to play",
-      "hungarian": "játszani",
-      "pronunciation": "jaːtʃaːni",
-      "past_tense": "played"
+      "english": "to cluck",
+      "hungarian": "kökörcsöl",
+      "pronunciation": "klʌk",
+      "past_tense": "clucked"
     },
     {
-      "english": "to give",
-      "hungarian": "adni",
-      "pronunciation": "ɑdni",
-      "past_tense": "gave"
+      "english": "to neigh",
+      "hungarian": "csikar",
+      "pronunciation": "neɪ",
+      "past_tense": "neighed"
     },
     {
-      "english": "to take",
-      "hungarian": "venni",
-      "pronunciation": "ˈvɛn",
-      "past_tense": "took"
+      "english": "to dig",
+      "hungarian": "ás",
+      "pronunciation": "dɪɡ",
+      "past_tense": "dug"
     },
     {
-      "english": "to see",
-      "hungarian": "látni",
-      "pronunciation": "laːtɲi",
-      "past_tense": "saw"
+      "english": "to graze",
+      "hungarian": "legel",
+      "pronunciation": "ɡreɪz",
+      "past_tense": "grazed"
     },
     {
-      "english": "to hear",
-      "hungarian": "hallani",
-      "pronunciation": "haˈlɒni",
-      "past_tense": "heard"
+      "english": "to harvest",
+      "hungarian": "természt gyűjt",
+      "pronunciation": "ˈhɑːrvəst",
+      "past_tense": "harvested"
     }
   ]
 }
