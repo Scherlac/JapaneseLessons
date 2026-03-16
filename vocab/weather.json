@@ -1,0 +1,307 @@
+{
+  "theme": "weather",
+  "nouns": [
+    {
+      "english": "sun",
+      "japanese": "たいよう",
+      "kanji": "太陽",
+      "romaji": "taiyou"
+    },
+    {
+      "english": "moon",
+      "japanese": "つき",
+      "kanji": "月",
+      "romaji": "tsuki"
+    },
+    {
+      "english": "cloud",
+      "japanese": "くも",
+      "kanji": "雲",
+      "romaji": "kumo"
+    },
+    {
+      "english": "rain",
+      "japanese": "あめ",
+      "kanji": "雨",
+      "romaji": "ame"
+    },
+    {
+      "english": "snow",
+      "japanese": "ゆき",
+      "kanji": "雪",
+      "romaji": "yuki"
+    },
+    {
+      "english": "wind",
+      "japanese": "かぜ",
+      "kanji": "風",
+      "romaji": "kaze"
+    },
+    {
+      "english": "storm",
+      "japanese": "しけ",
+      "kanji": "嵐",
+      "romaji": "shike"
+    },
+    {
+      "english": "sunny",
+      "japanese": "はれこ",
+      "kanji": "晴天",
+      "romaji": "hareko"
+    },
+    {
+      "english": "cloudy",
+      "japanese": "くもり",
+      "kanji": "曇り",
+      "romaji": "kumori"
+    },
+    {
+      "english": "rainy",
+      "japanese": "あめの",
+      "kanji": "雨天",
+      "romaji": "amenono"
+    },
+    {
+      "english": "sunny day",
+      "japanese": "はれびより",
+      "kanji": "晴れ間",
+      "romaji": "harebiyori"
+    },
+    {
+      "english": "sunlight",
+      "japanese": "ひかり",
+      "kanji": "光",
+      "romaji": "hikari"
+    },
+    {
+      "english": "temperature",
+      "japanese": "おんどの",
+      "kanji": "温度",
+      "romaji": "ondono"
+    },
+    {
+      "english": "forecast",
+      "japanese": "とくい",
+      "kanji": "予報",
+      "romaji": "tokui"
+    },
+    {
+      "english": "weather",
+      "japanese": "てっきょう",
+      "kanji": "天気",
+      "romaji": "tekkyou"
+    },
+    {
+      "english": "humid",
+      "japanese": "しとやか",
+      "kanji": "湿り",
+      "romaji": "shitoyaka"
+    },
+    {
+      "english": "dry",
+      "japanese": "かんばら",
+      "kanji": "乾燥",
+      "romaji": "kankara"
+    },
+    {
+      "english": "thunder",
+      "japanese": "かみなり",
+      "kanji": "雷",
+      "romaji": "kaminari"
+    },
+    {
+      "english": "lightning",
+      "japanese": "いかずち",
+      "kanji": "稲妻",
+      "romaji": "ikazuchi"
+    },
+    {
+      "english": "hail",
+      "japanese": "ひょう",
+      "kanji": "雹",
+      "romaji": "hyou"
+    },
+    {
+      "english": "fog",
+      "japanese": "きり",
+      "kanji": "霧",
+      "romaji": "kiri"
+    },
+    {
+      "english": "drought",
+      "japanese": "かんばれ",
+      "kanji": "干ばつ",
+      "romaji": "kankabare"
+    },
+    {
+      "english": "flood",
+      "japanese": "こうげい",
+      "kanji": "洪水",
+      "romaji": "kougei"
+    },
+    {
+      "english": "cold",
+      "japanese": "つめたい",
+      "kanji": "寒さ",
+      "romaji": "tsumetai"
+    },
+    {
+      "english": "heat",
+      "japanese": "ねつ",
+      "kanji": "熱",
+      "romaji": "netsu"
+    },
+    {
+      "english": "air",
+      "japanese": "くうき",
+      "kanji": "空気",
+      "romaji": "kuuki"
+    },
+    {
+      "english": "barometer",
+      "japanese": "はりょうし",
+      "kanji": "気圧計",
+      "romaji": "hariyoushi"
+    },
+    {
+      "english": "humidity",
+      "japanese": "しつど",
+      "kanji": "湿度",
+      "romaji": "shitsudo"
+    },
+    {
+      "english": "wind speed",
+      "japanese": "かぜのひき",
+      "kanji": "風速",
+      "romaji": "kaze no hiki"
+    },
+    {
+      "english": "atmosphere",
+      "japanese": "たいき",
+      "kanji": "大気",
+      "romaji": "taiki"
+    }
+  ],
+  "verbs": [
+    {
+      "english": "to rain",
+      "japanese": "あめる",
+      "kanji": "雨る",
+      "romaji": "ameru",
+      "type": "る-verb",
+      "masu_form": "rains"
+    },
+    {
+      "english": "to snow",
+      "japanese": "ゆう",
+      "kanji": "雪ぐ",
+      "romaji": "yuu",
+      "type": "う-verb",
+      "masu_form": "snows"
+    },
+    {
+      "english": "to be cloudy",
+      "japanese": "くもる",
+      "kanji": "曇る",
+      "romaji": "komoru",
+      "type": "る-verb",
+      "masu_form": "becomes cloudy"
+    },
+    {
+      "english": "to shine",
+      "japanese": "かがやく",
+      "kanji": "輝く",
+      "romaji": "kagayaku",
+      "type": "う-verb",
+      "masu_form": "shines"
+    },
+    {
+      "english": "to blow (wind)",
+      "japanese": "ふく",
+      "kanji": "吹く",
+      "romaji": "fuku",
+      "type": "う-verb",
+      "masu_form": "blows"
+    },
+    {
+      "english": "to fall (rain/snow)",
+      "japanese": "おちる",
+      "kanji": "落ちる",
+      "romaji": "ochiru",
+      "type": "る-verb",
+      "masu_form": "falls"
+    },
+    {
+      "english": "to freeze",
+      "japanese": "こおりつける",
+      "kanji": "凍える",
+      "romaji": "kooritsukeru",
+      "type": "る-verb",
+      "masu_form": "freezes"
+    },
+    {
+      "english": "to heat up",
+      "japanese": "あたためる",
+      "kanji": "温める",
+      "romaji": "atatemaru",
+      "type": "る-verb",
+      "masu_form": "heats up"
+    },
+    {
+      "english": "to cool down",
+      "japanese": "さます",
+      "kanji": "冷ます",
+      "romaji": "samasu",
+      "type": "う-verb",
+      "masu_form": "cools down"
+    },
+    {
+      "english": "to measure",
+      "japanese": "はかる",
+      "kanji": "測る",
+      "romaji": "hakaru",
+      "type": "る-verb",
+      "masu_form": "measures"
+    },
+    {
+      "english": "to watch (weather)",
+      "japanese": "みる",
+      "kanji": "見る",
+      "romaji": "miru",
+      "type": "る-verb",
+      "masu_form": "watches"
+    },
+    {
+      "english": "to feel",
+      "japanese": "かんじる",
+      "kanji": "感じる",
+      "romaji": "kanjiru",
+      "type": "る-verb",
+      "masu_form": "feels"
+    },
+    {
+      "english": "to come (weather)",
+      "japanese": "くる",
+      "kanji": "",
+      "romaji": "kuru",
+      "type": "irregular",
+      "masu_form": "comes"
+    },
+    {
+      "english": "to do (as in 'do the weather forecast')",
+      "japanese": "する",
+      "kanji": "",
+      "romaji": "suru",
+      "type": "irregular",
+      "masu_form": "does"
+    },
+    {
+      "english": "to change (weather)",
+      "japanese": "かわる",
+      "kanji": "変る",
+      "romaji": "kawaru",
+      "type": "う-verb",
+      "masu_form": "changes"
+    }
+  ]
+}

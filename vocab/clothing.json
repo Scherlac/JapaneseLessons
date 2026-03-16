@@ -1,0 +1,307 @@
+{
+  "theme": "clothing",
+  "nouns": [
+    {
+      "english": "shirt",
+      "japanese": "シャツ",
+      "kanji": "シャツ",
+      "romaji": "shatsu"
+    },
+    {
+      "english": "pants",
+      "japanese": "ズボン",
+      "kanji": "ズボン",
+      "romaji": "zubon"
+    },
+    {
+      "english": "skirt",
+      "japanese": "スカート",
+      "kanji": "スカート",
+      "romaji": "sukāto"
+    },
+    {
+      "english": "dress",
+      "japanese": "ワンピース",
+      "kanji": "ワンピース",
+      "romaji": "wanpīsu"
+    },
+    {
+      "english": "socks",
+      "japanese": "靴下",
+      "kanji": "靴下",
+      "romaji": "kutsushita"
+    },
+    {
+      "english": "shoes",
+      "japanese": "靴",
+      "kanji": "靴",
+      "romaji": "kutsu"
+    },
+    {
+      "english": "hat",
+      "japanese": "帽子",
+      "kanji": "帽子",
+      "romaji": "bou"
+    },
+    {
+      "english": "glasses",
+      "japanese": "眼鏡",
+      "kanji": "眼鏡",
+      "romaji": "megane"
+    },
+    {
+      "english": "belt",
+      "japanese": "ベルト",
+      "kanji": "ベルト",
+      "romaji": "beruto"
+    },
+    {
+      "english": "tie",
+      "japanese": "ネクタイ",
+      "kanji": "ネクタイ",
+      "romaji": "nekutai"
+    },
+    {
+      "english": "watch",
+      "japanese": "時計",
+      "kanji": "時計",
+      "romaji": "tokei"
+    },
+    {
+      "english": "bag",
+      "japanese": "バッグ",
+      "kanji": "バッグ",
+      "romaji": "bakkusu"
+    },
+    {
+      "english": "umbrella",
+      "japanese": "傘",
+      "kanji": "傘",
+      "romaji": "kasa"
+    },
+    {
+      "english": "jacket",
+      "japanese": "ジャケット",
+      "kanji": "ジャケット",
+      "romaji": "jaketto"
+    },
+    {
+      "english": "coat",
+      "japanese": "コート",
+      "kanji": "コート",
+      "romaji": "kōto"
+    },
+    {
+      "english": "jeans",
+      "japanese": "ジーンズ",
+      "kanji": "ジーンズ",
+      "romaji": "jiːnzu"
+    },
+    {
+      "english": "shorts",
+      "japanese": "ショーツ",
+      "kanji": "ショーツ",
+      "romaji": "shōtsu"
+    },
+    {
+      "english": "gloves",
+      "japanese": "手袋",
+      "kanji": "手袋",
+      "romaji": "tebukuro"
+    },
+    {
+      "english": "socks",
+      "japanese": "靴下",
+      "kanji": "靴下",
+      "romaji": "kutsushita"
+    },
+    {
+      "english": "underwear",
+      "japanese": "下着",
+      "kanji": "下着",
+      "romaji": "shikakushi"
+    },
+    {
+      "english": "hat",
+      "japanese": "帽子",
+      "kanji": "帽子",
+      "romaji": "bou"
+    },
+    {
+      "english": "cap",
+      "japanese": "キャップ",
+      "kanji": "キャップ",
+      "romaji": "kyappu"
+    },
+    {
+      "english": "scarf",
+      "japanese": "スカーフ",
+      "kanji": "スカーフ",
+      "romaji": "sukāfu"
+    },
+    {
+      "english": "glove",
+      "japanese": "手袋",
+      "kanji": "手袋",
+      "romaji": "tebukuro"
+    },
+    {
+      "english": "ring",
+      "japanese": "指輪",
+      "kanji": "指輪",
+      "romaji": "yubiwa"
+    },
+    {
+      "english": "necklace",
+      "japanese": "ネックレス",
+      "kanji": "ネックレス",
+      "romaji": "nekkeresu"
+    },
+    {
+      "english": "bracelet",
+      "japanese": "ブレスレット",
+      "kanji": "ブレスレット",
+      "romaji": "buresuretto"
+    },
+    {
+      "english": "earring",
+      "japanese": "耳飾り",
+      "kanji": "耳飾り",
+      "romaji": "mimikazuri"
+    },
+    {
+      "english": "socks",
+      "japanese": "靴下",
+      "kanji": "靴下",
+      "romaji": "kutsushita"
+    },
+    {
+      "english": "coat",
+      "japanese": "コート",
+      "kanji": "コート",
+      "romaji": "kōto"
+    }
+  ],
+  "verbs": [
+    {
+      "english": "to wear",
+      "japanese": "着る",
+      "kanji": "着る",
+      "romaji": "kiru",
+      "type": "う-verb",
+      "masu_form": "着ます"
+    },
+    {
+      "english": "to put on",
+      "japanese": "着ける",
+      "kanji": "着ける",
+      "romaji": "kakeru",
+      "type": "う-verb",
+      "masu_form": "着けます"
+    },
+    {
+      "english": "to take off",
+      "japanese": "脱ぐ",
+      "kanji": "脱ぐ",
+      "romaji": "nugu",
+      "type": "う-verb",
+      "masu_form": "脱ぎます"
+    },
+    {
+      "english": "to wash",
+      "japanese": "洗う",
+      "kanji": "洗う",
+      "romaji": "arau",
+      "type": "う-verb",
+      "masu_form": "洗います"
+    },
+    {
+      "english": "to dry",
+      "japanese": "乾かす",
+      "kanji": "乾かす",
+      "romaji": "kawagasu",
+      "type": "る-verb",
+      "masu_form": "乾かします"
+    },
+    {
+      "english": "to iron",
+      "japanese": "アイロンがける",
+      "kanji": "アイロンがける",
+      "romaji": "airon ga kerasu",
+      "type": "irregular",
+      "masu_form": "アイロンがけます"
+    },
+    {
+      "english": "to fold",
+      "japanese": "折る",
+      "kanji": "折る",
+      "romaji": "oriru",
+      "type": "う-verb",
+      "masu_form": "折ります"
+    },
+    {
+      "english": "to put in",
+      "japanese": "入れる",
+      "kanji": "入れる",
+      "romaji": "ireru",
+      "type": "る-verb",
+      "masu_form": "入れます"
+    },
+    {
+      "english": "to take out",
+      "japanese": "出す",
+      "kanji": "出す",
+      "romaji": "dasu",
+      "type": "う-verb",
+      "masu_form": "出します"
+    },
+    {
+      "english": "to wear (accessory)",
+      "japanese": "つける",
+      "kanji": "つける",
+      "romaji": "tsukeru",
+      "type": "う-verb",
+      "masu_form": "つけます"
+    },
+    {
+      "english": "to remove",
+      "japanese": "外す",
+      "kanji": "外す",
+      "romaji": "hazusu",
+      "type": "う-verb",
+      "masu_form": "外します"
+    },
+    {
+      "english": "to break",
+      "japanese": "壊れる",
+      "kanji": "壊れる",
+      "romaji": "kowareru",
+      "type": "る-verb",
+      "masu_form": "壊れます"
+    },
+    {
+      "english": "to mend",
+      "japanese": "直す",
+      "kanji": "直す",
+      "romaji": "naosu",
+      "type": "う-verb",
+      "masu_form": "直します"
+    },
+    {
+      "english": "to measure",
+      "japanese": "測る",
+      "kanji": "測る",
+      "romaji": "hakaru",
+      "type": "う-verb",
+      "masu_form": "測ります"
+    },
+    {
+      "english": "to buy",
+      "japanese": "買う",
+      "kanji": "買う",
+      "romaji": "kau",
+      "type": "う-verb",
+      "masu_form": "買います"
+    }
+  ]
+}
