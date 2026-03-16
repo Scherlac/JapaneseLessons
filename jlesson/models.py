@@ -54,6 +54,44 @@ class Sentence(BaseModel):
     notes: str = ""
 
 
+# ---------------------------------------------------------------------------
+# Hungarian-English data models
+# ---------------------------------------------------------------------------
+
+
+class HungarianNounItem(BaseModel):
+    """A vocabulary noun for Hungarian-English lessons."""
+
+    english: str = ""
+    hungarian: str = ""
+    pronunciation: str = ""
+    example_sentence_en: str = ""
+    example_sentence_hu: str = ""
+    memory_tip: str = ""
+
+
+class HungarianVerbItem(BaseModel):
+    """A vocabulary verb for Hungarian-English lessons."""
+
+    english: str = ""
+    hungarian: str = ""
+    pronunciation: str = ""
+    past_tense: str = ""
+    example_sentence_en: str = ""
+    example_sentence_hu: str = ""
+    memory_tip: str = ""
+
+
+class HungarianSentence(BaseModel):
+    """A grammar practice sentence for Hungarian-English lessons."""
+
+    grammar_id: str = ""
+    english: str = ""
+    hungarian: str = ""
+    person: str = ""
+    notes: str = ""
+
+
 class LessonContent(BaseModel):
     """Full structured content for one lesson — persisted to content.json."""
 

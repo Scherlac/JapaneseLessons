@@ -1,0 +1,93 @@
+{
+  "theme": "food",
+  "nouns": [
+    {
+      "english": "bread",
+      "hungarian": "kenyér",
+      "pronunciation": "bred"
+    },
+    {
+      "english": "milk",
+      "hungarian": "tej",
+      "pronunciation": "mɪlk"
+    },
+    {
+      "english": "water",
+      "hungarian": "víz",
+      "pronunciation": "ˈwɔːtər"
+    },
+    {
+      "english": "apple",
+      "hungarian": "alma",
+      "pronunciation": "ˈæpəl"
+    },
+    {
+      "english": "egg",
+      "hungarian": "tojás",
+      "pronunciation": "eɡ"
+    },
+    {
+      "english": "cheese",
+      "hungarian": "sajt",
+      "pronunciation": "tʃiːz"
+    },
+    {
+      "english": "soup",
+      "hungarian": "leves",
+      "pronunciation": "suːp"
+    },
+    {
+      "english": "rice",
+      "hungarian": "rizs",
+      "pronunciation": "raɪs"
+    },
+    {
+      "english": "meat",
+      "hungarian": "hús",
+      "pronunciation": "miːt"
+    },
+    {
+      "english": "cake",
+      "hungarian": "torta",
+      "pronunciation": "keɪk"
+    }
+  ],
+  "verbs": [
+    {
+      "english": "to eat",
+      "hungarian": "enni",
+      "pronunciation": "tuː iːt",
+      "past_tense": "ate"
+    },
+    {
+      "english": "to drink",
+      "hungarian": "inni",
+      "pronunciation": "tuː drɪŋk",
+      "past_tense": "drank"
+    },
+    {
+      "english": "to cook",
+      "hungarian": "főzni",
+      "pronunciation": "tuː kʊk",
+      "past_tense": "cooked"
+    },
+    {
+      "english": "to cut",
+      "hungarian": "vágni",
+      "pronunciation": "tuː kʌt",
+      "past_tense": "cut"
+    },
+    {
+      "english": "to taste",
+      "hungarian": "kóstolni",
+      "pronunciation": "tuː teɪst",
+      "past_tense": "tasted"
+    },
+    {
+      "english": "to bake",
+      "hungarian": "sütni",
+      "pronunciation": "tuː beɪk",
+      "past_tense": "baked"
+    }
+  ]
+}

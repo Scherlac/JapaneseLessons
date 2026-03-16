@@ -1,0 +1,81 @@
+{
+  "theme": "colors",
+  "nouns": [
+    {
+      "english": "red",
+      "hungarian": "piros",
+      "pronunciation": "red"
+    },
+    {
+      "english": "blue",
+      "hungarian": "kék",
+      "pronunciation": "bluː"
+    },
+    {
+      "english": "green",
+      "hungarian": "zöld",
+      "pronunciation": "ɡriːn"
+    },
+    {
+      "english": "yellow",
+      "hungarian": "sárga",
+      "pronunciation": "ˈjeloʊ"
+    },
+    {
+      "english": "white",
+      "hungarian": "fehér",
+      "pronunciation": "waɪt"
+    },
+    {
+      "english": "black",
+      "hungarian": "fekete",
+      "pronunciation": "blæk"
+    },
+    {
+      "english": "orange",
+      "hungarian": "narancssárga",
+      "pronunciation": "ˈɒrɪndʒ"
+    },
+    {
+      "english": "pink",
+      "hungarian": "rózsaszín",
+      "pronunciation": "pɪŋk"
+    },
+    {
+      "english": "purple",
+      "hungarian": "lila",
+      "pronunciation": "ˈpɜːrpəl"
+    },
+    {
+      "english": "brown",
+      "hungarian": "barna",
+      "pronunciation": "braʊn"
+    }
+  ],
+  "verbs": [
+    {
+      "english": "to paint",
+      "hungarian": "festeni",
+      "pronunciation": "tuː peɪnt",
+      "past_tense": "painted"
+    },
+    {
+      "english": "to draw",
+      "hungarian": "rajzolni",
+      "pronunciation": "tuː drɔː",
+      "past_tense": "drew"
+    },
+    {
+      "english": "to color",
+      "hungarian": "színezni",
+      "pronunciation": "tuː ˈkʌlər",
+      "past_tense": "colored"
+    },
+    {
+      "english": "to see",
+      "hungarian": "látni",
+      "pronunciation": "tuː siː",
+      "past_tense": "saw"
+    }
+  ]
+}

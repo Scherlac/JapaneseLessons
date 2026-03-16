@@ -1,0 +1,87 @@
+{
+  "theme": "animals",
+  "nouns": [
+    {
+      "english": "dog",
+      "hungarian": "kutya",
+      "pronunciation": "dɒɡ"
+    },
+    {
+      "english": "cat",
+      "hungarian": "macska",
+      "pronunciation": "kæt"
+    },
+    {
+      "english": "bird",
+      "hungarian": "madár",
+      "pronunciation": "bɜːrd"
+    },
+    {
+      "english": "fish",
+      "hungarian": "hal",
+      "pronunciation": "fɪʃ"
+    },
+    {
+      "english": "horse",
+      "hungarian": "ló",
+      "pronunciation": "hɔːrs"
+    },
+    {
+      "english": "rabbit",
+      "hungarian": "nyúl",
+      "pronunciation": "ˈræbɪt"
+    },
+    {
+      "english": "bear",
+      "hungarian": "medve",
+      "pronunciation": "ber"
+    },
+    {
+      "english": "elephant",
+      "hungarian": "elefánt",
+      "pronunciation": "ˈelɪfənt"
+    },
+    {
+      "english": "frog",
+      "hungarian": "béka",
+      "pronunciation": "frɒɡ"
+    },
+    {
+      "english": "mouse",
+      "hungarian": "egér",
+      "pronunciation": "maʊs"
+    }
+  ],
+  "verbs": [
+    {
+      "english": "to run",
+      "hungarian": "futni",
+      "pronunciation": "tuː rʌn",
+      "past_tense": "ran"
+    },
+    {
+      "english": "to swim",
+      "hungarian": "úszni",
+      "pronunciation": "tuː swɪm",
+      "past_tense": "swam"
+    },
+    {
+      "english": "to fly",
+      "hungarian": "repülni",
+      "pronunciation": "tuː flaɪ",
+      "past_tense": "flew"
+    },
+    {
+      "english": "to jump",
+      "hungarian": "ugrani",
+      "pronunciation": "tuː dʒʌmp",
+      "past_tense": "jumped"
+    },
+    {
+      "english": "to sleep",
+      "hungarian": "aludni",
+      "pronunciation": "tuː sliːp",
+      "past_tense": "slept"
+    }
+  ]
+}
