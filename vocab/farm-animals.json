@@ -1,0 +1,159 @@
+{
+  "theme": "farm-animals",
+  "nouns": [
+    {
+      "english": "cow",
+      "japanese": "うし",
+      "kanji": "牛",
+      "romaji": "ushi"
+    },
+    {
+      "english": "horse",
+      "japanese": "うま",
+      "kanji": "馬",
+      "romaji": "uma"
+    },
+    {
+      "english": "sheep",
+      "japanese": "ひつじ",
+      "kanji": "羊",
+      "romaji": "hitsuji"
+    },
+    {
+      "english": "goat",
+      "japanese": "やぎ",
+      "kanji": "ヤギ",
+      "romaji": "yagi"
+    },
+    {
+      "english": "pig",
+      "japanese": "いぬ",
+      "kanji": "猪",
+      "romaji": "inu"
+    },
+    {
+      "english": "chicken",
+      "japanese": "にわとり",
+      "kanji": "鶏",
+      "romaji": "niwatori"
+    },
+    {
+      "english": "duck",
+      "japanese": "かも",
+      "kanji": "雁",
+      "romaji": "kamo"
+    },
+    {
+      "english": "hen",
+      "japanese": "ひな",
+      "kanji": "雛",
+      "romaji": "hina"
+    },
+    {
+      "english": "rooster",
+      "japanese": "とり",
+      "kanji": "雄鶏",
+      "romaji": "tori"
+    },
+    {
+      "english": "cowboy",
+      "japanese": "カウボーイ",
+      "kanji": "",
+      "romaji": "kau-bō-i"
+    },
+    {
+      "english": "farmer",
+      "japanese": "のうじん",
+      "kanji": "農人",
+      "romaji": "nōjin"
+    },
+    {
+      "english": "shepherd",
+      "japanese": "しゃこ",
+      "kanji": "牧羊人",
+      "romaji": "shakō"
+    }
+  ],
+  "verbs": [
+    {
+      "english": "to eat",
+      "japanese": "たべる",
+      "kanji": "食べる",
+      "romaji": "taberu",
+      "type": "る-verb",
+      "masu_form": "食べます"
+    },
+    {
+      "english": "to drink",
+      "japanese": "のむ",
+      "kanji": "飲む",
+      "romaji": "nomu",
+      "type": "う-verb",
+      "masu_form": "飲みます"
+    },
+    {
+      "english": "to walk",
+      "japanese": "あるく",
+      "kanji": "歩く",
+      "romaji": "aruku",
+      "type": "う-verb",
+      "masu_form": "歩きます"
+    },
+    {
+      "english": "to run",
+      "japanese": "はしる",
+      "kanji": "走る",
+      "romaji": "hashiru",
+      "type": "る-verb",
+      "masu_form": "走ります"
+    },
+    {
+      "english": "to sleep",
+      "japanese": "ねる",
+      "kanji": "寝る",
+      "romaji": "neru",
+      "type": "る-verb",
+      "masu_form": "寝ます"
+    },
+    {
+      "english": "to feed",
+      "japanese": "くう",
+      "kanji": "与える",
+      "romaji": "kū",
+      "type": "う-verb",
+      "masu_form": "与えます"
+    },
+    {
+      "english": "to care for",
+      "japanese": "かんがえる",
+      "kanji": "考える",
+      "romaji": "kangaeru",
+      "type": "る-verb",
+      "masu_form": "考えます"
+    },
+    {
+      "english": "to work",
+      "japanese": "はたらく",
+      "kanji": "働く",
+      "romaji": "hataru",
+      "type": "う-verb",
+      "masu_form": "働きます"
+    },
+    {
+      "english": "to come",
+      "japanese": "くる",
+      "kanji": "来る",
+      "romaji": "kuru",
+      "type": "irregular",
+      "masu_form": "来ます"
+    },
+    {
+      "english": "to do",
+      "japanese": "する",
+      "kanji": "する",
+      "romaji": "suru",
+      "type": "irregular",
+      "masu_form": "します"
+    }
+  ]
+}
