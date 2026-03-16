@@ -93,6 +93,8 @@ VOICES = {
     "japanese_male": "ja-JP-KeitaNeural",
     "english_female": "en-US-AriaNeural",
     "english_male": "en-US-ZiraNeural",
+    "hungarian_female": "hu-HU-NoemiNeural",
+    "hungarian_male": "hu-HU-TamasNeural",
 }
 
 

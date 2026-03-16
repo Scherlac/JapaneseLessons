@@ -64,6 +64,10 @@ class CardRenderer:
             "en_medium": ImageFont.truetype(en_font_path, 40),
             "en_small": ImageFont.truetype(en_font_path, 28),
             "label": ImageFont.truetype(en_bold_font_path, 24),
+            # Hungarian-English cards — Segoe UI for both (Latin script)
+            "hun_target_large": ImageFont.truetype(en_bold_font_path, 80),
+            "hun_native_medium": ImageFont.truetype(en_font_path, 48),
+            "hun_pron": ImageFont.truetype(en_font_path, 32),
         }
 
     def _draw_progress_bar(
@@ -365,6 +369,230 @@ class CardRenderer:
                 (cx, 640), annotation,
                 font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color,
             )
+
+        self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
+
+    # ------------------------------------------------------------------
+    # Hungarian-English card renderers
+    # ------------------------------------------------------------------
+    # English is the target language (shown prominently).
+    # Hungarian is the native language (shown smaller, below).
+    # Pronunciation guides use a distinct colour.
+
+    def render_hun_card(
+        self,
+        hungarian: str,
+        pronunciation: str = "",
+        label: str = "",
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Render a Hungarian-only card (native language prompt)."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+
+        if label:
+            draw.text(
+                (cx, 60), label, font=self.fonts["label"],
+                anchor="mm", fill=self.dim_color,
+            )
+
+        draw.text(
+            (cx, self.height // 2 - 40), hungarian,
+            font=self.fonts["hun_native_medium"], anchor="mm",
+            fill=self.text_color,
+        )
+
+        if pronunciation:
+            draw.text(
+                (cx, self.height // 2 + 40), pronunciation,
+                font=self.fonts["hun_pron"], anchor="mm",
+                fill=self.accent_color,
+            )
+
+        self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
+    def render_hun_bilingual_card(
+        self,
+        english: str,
+        hungarian: str,
+        pronunciation: str = "",
+        label: str = "",
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Render an EN+HU bilingual card (English prominent, Hungarian below)."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+
+        if label:
+            draw.text(
+                (cx, 60), label, font=self.fonts["label"],
+                anchor="mm", fill=self.dim_color,
+            )
+
+        # English — prominent, upper portion
+        draw.text(
+            (cx, 300), english,
+            font=self.fonts["hun_target_large"], anchor="mm",
+            fill=self.accent_color,
+        )
+
+        # Divider
+        draw.line([(cx - 200, 420), (cx + 200, 420)], fill="#333333", width=2)
+
+        # Hungarian — smaller, lower portion
+        draw.text(
+            (cx, 540), hungarian,
+            font=self.fonts["hun_native_medium"], anchor="mm",
+            fill=self.text_color,
+        )
+
+        # Pronunciation guide
+        if pronunciation:
+            draw.text(
+                (cx, 620), pronunciation,
+                font=self.fonts["hun_pron"], anchor="mm",
+                fill=self.dim_color,
+            )
+
+        self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
+    def render_hun_introduce_card(
+        self,
+        english: str,
+        hungarian: str,
+        pronunciation: str,
+        step_label: str,
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Render a Hungarian [INTRODUCE] card: Hungarian → English reveal."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+
+        # Step label
+        draw.text(
+            (cx, 60), f"[BEMUTATÁS]  {step_label}",
+            font=self.fonts["label"], anchor="mm", fill=self.dim_color,
+        )
+
+        # Hungarian word (prompt — what the child knows)
+        draw.text(
+            (cx, 280), hungarian,
+            font=self.fonts["hun_native_medium"], anchor="mm",
+            fill=self.text_color,
+        )
+
+        # Divider
+        draw.line([(cx - 200, 380), (cx + 200, 380)], fill="#333333", width=2)
+
+        # English word (reveal — target language, prominent)
+        draw.text(
+            (cx, 500), english,
+            font=self.fonts["hun_target_large"], anchor="mm",
+            fill=self.accent_color,
+        )
+
+        # Pronunciation guide
+        draw.text(
+            (cx, 620), pronunciation,
+            font=self.fonts["hun_pron"], anchor="mm", fill=self.dim_color,
+        )
+
+        self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
+    def render_hun_recall_card(
+        self,
+        english: str,
+        hungarian: str,
+        pronunciation: str,
+        step_label: str,
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Render a Hungarian [RECALL] card: English → Hungarian recall."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+
+        # Step label
+        draw.text(
+            (cx, 60), f"[FELIDÉZÉS]  {step_label}",
+            font=self.fonts["label"], anchor="mm", fill=self.dim_color,
+        )
+
+        # English word (prompt — target language)
+        draw.text(
+            (cx, 280), english,
+            font=self.fonts["hun_target_large"], anchor="mm",
+            fill=self.accent_color,
+        )
+
+        # Pronunciation
+        draw.text(
+            (cx, 380), pronunciation,
+            font=self.fonts["hun_pron"], anchor="mm", fill=self.dim_color,
+        )
+
+        # Divider
+        draw.line([(cx - 200, 440), (cx + 200, 440)], fill="#333333", width=2)
+
+        # Hungarian (reveal — child recalls native translation)
+        draw.text(
+            (cx, 560), hungarian,
+            font=self.fonts["hun_native_medium"], anchor="mm",
+            fill=self.text_color,
+        )
+
+        self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
+    def render_hun_translate_card(
+        self,
+        english: str,
+        hungarian: str,
+        context: str,
+        step_label: str,
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Render a Hungarian [TRANSLATE] grammar card."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+
+        # Step label
+        draw.text(
+            (cx, 60), f"[FORDÍTÁS]  {step_label}",
+            font=self.fonts["label"], anchor="mm", fill=self.dim_color,
+        )
+
+        # Grammar context
+        draw.text(
+            (cx, 160), context,
+            font=self.fonts["en_small"], anchor="mm", fill="#666666",
+        )
+
+        # Hungarian sentence (prompt — what the child knows)
+        draw.text(
+            (cx, 300), hungarian,
+            font=self.fonts["hun_native_medium"], anchor="mm",
+            fill=self.text_color,
+        )
+
+        # Divider
+        draw.line([(cx - 300, 400), (cx + 300, 400)], fill="#333333", width=2)
+
+        # English sentence (reveal — target language)
+        draw.text(
+            (cx, 540), english,
+            font=self.fonts["hun_target_large"], anchor="mm",
+            fill=self.accent_color,
+        )
 
         self._draw_progress_bar(draw, self.height - 80, progress)
         return img
