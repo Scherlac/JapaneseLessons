@@ -211,9 +211,11 @@ def _ask_llm(ctx: LessonContext, prompt: str) -> dict:
 
 
 def _resolve_output_dir(config: LessonConfig) -> Path:
-    if config.output_dir is not None:
-        return Path(config.output_dir)
-    return Path(__file__).parent.parent / "output"
+    base = Path(config.output_dir) if config.output_dir is not None else Path(__file__).parent.parent / "output"
+    if config.language != "eng-jap":
+        lang_cfg = get_language_config(config.language)
+        return base / lang_cfg.native_language.lower()
+    return base
 
 
 def _build_video_items(noun_items: list[dict], sentences: list[dict]) -> list[dict]:
@@ -259,6 +261,7 @@ def _build_content(ctx: LessonContext) -> LessonContent:
     return LessonContent(
         lesson_id=ctx.lesson_id,
         theme=ctx.config.theme,
+        language=ctx.config.language,
         grammar_ids=[g["id"] for g in ctx.selected_grammar],
         noun_items=[NounItem.model_validate(n) for n in ctx.noun_items],
         verb_items=[VerbItem.model_validate(v) for v in ctx.verb_items],
