@@ -23,6 +23,7 @@
 13. [Day-to-Day Workflow](#day-to-day-workflow)
 14. [Troubleshooting](#troubleshooting)
 15. [Key Files Reference](#key-files-reference)
+16. [Quick Reference Card](#quick-reference-card)
 
 ---
 
@@ -133,7 +134,7 @@ GitHub Copilot is your AI programming assistant. You tell it what to do **in pla
 | What you want | What to type in Copilot Chat |
 |---|---|
 | Understand a file | "Explain what `jlesson/curriculum.py` does in simple terms" |
-| Add new code | "Add a HUNGARIAN_GRAMMAR_PROGRESSION list alongside the existing Japanese GRAMMAR_PROGRESSION. Keep the Japanese one unchanged." |
+| Add new code | "Add a HUN_TO_ENG_GRAMMAR_PROGRESSION list alongside the existing ENG_TO_JAP_GRAMMAR_PROGRESSION. Keep the Japanese one unchanged." |
 | Run tests | "Run the tests to check if anything is broken" |
 | Check your work | "Run just the Japanese tests to make sure I didn't break anything" |
 | Fix an error | Copy-paste the error and ask "What does this error mean and how do I fix it?" |
@@ -191,8 +192,8 @@ Right now, Japanese-specific settings are scattered across 8+ files. Instead of 
 Tell Copilot:
 
 > "Create a new file `jlesson/language_config.py`. It should define a `LanguageConfig` dataclass with these fields:
-> - `code`: str — short identifier like 'eng-jap' or 'hun-eng' (format: native-target)
-> - `display_name`: str — human-readable name like 'Japanese' or 'Hungarian-English'
+> - `code`: str — short identifier like 'eng-jap' or 'hun-eng'. The format is **native-target**: the first part is the learner's native language, the second is the language being learned. So 'hun-eng' means "Hungarian speaker learning English".
+> - `display_name`: str — human-readable name like 'English-Japanese' or 'Hungarian-English'
 > - `target_language`: str — the language being learned (e.g., 'Japanese' or 'English')
 > - `native_language`: str — the learner's native language (e.g., 'English' or 'Hungarian')
 > - `vocab_noun_fields`: list of required field names for noun vocabulary items
@@ -203,7 +204,7 @@ Tell Copilot:
 > - `native_font_path`: str — path to font for native language text
 > - `grammar_progression`: list — the grammar points for this language (can be set later)
 > - `persons`: list — pronouns used in sentence generation
-> - `vocab_dir`: str — subfolder name under vocab/ (e.g., 'eng-jap' or 'hun-eng')
+> - `vocab_dir`: str — path to vocab folder. For Japanese this is `'vocab'` (the existing root folder), for Hungarian this is `'vocab/hungarian'`
 > - `curriculum_file`: str — path to curriculum JSON for this language
 >
 > Then create two instances:
@@ -309,17 +310,17 @@ git push
 ### Step 3.1 — Understand the current grammar system
 
 Tell Copilot:
-> "@workspace explain the grammar progression system in `jlesson/curriculum.py`. What is GRAMMAR_PROGRESSION and how is it structured?"
+> "@workspace explain the grammar progression system in `jlesson/curriculum.py`. What is GRAMMAR_PROGRESSION and how is it structured? We will rename it to ENG_TO_JAP_GRAMMAR_PROGRESSION."
 
 ### Step 3.2 — Add English grammar progression
 
 Open `jlesson/curriculum.py` and tell Copilot:
 
-> "Add a new `HUNGARIAN_GRAMMAR_PROGRESSION` list alongside the existing `GRAMMAR_PROGRESSION` (rename the existing one to `JAPANESE_GRAMMAR_PROGRESSION` if needed, or just add the new one).
+> "Rename the existing `GRAMMAR_PROGRESSION` to `ENG_TO_JAP_GRAMMAR_PROGRESSION`, then add a new `HUN_TO_ENG_GRAMMAR_PROGRESSION` list alongside it. Update all references to the old name so existing code keeps working.
 >
-> **Keep all existing Japanese grammar code exactly as it is.**
+> **Keep all existing Japanese grammar logic exactly as it is.**
 >
-> The new English grammar progression for Hungarian kids should have these grammar points organized by level:
+> The new Hungarian-to-English grammar progression for Hungarian kids should have these grammar points organized by level:
 >
 > **Level 1** (beginner):
 > - `present_simple_affirmative` — pattern: 'Subject + verb + object', example: 'I eat bread.'
@@ -352,7 +353,7 @@ Open `jlesson/curriculum.py` and tell Copilot:
 >
 > Each grammar point needs: id, label, level, pattern, example, prerequisites (list of IDs from earlier levels).
 >
-> Also add `HUNGARIAN_PERSONS` for English pronouns: I, You, He, She, We, They."
+> The naming convention is **direction-based**: `ENG_TO_JAP` = English speaker learning Japanese, `HUN_TO_ENG` = Hungarian speaker learning English. This makes it instantly clear what each progression teaches."
 
 ### Step 3.3 — Create a Hungarian curriculum file
 
@@ -421,7 +422,7 @@ This is the biggest sprint. Tell Copilot:
 > 7. `hungarian_build_sentence_review_prompt()` — asks the LLM to review generated sentences for correctness and age-appropriateness.
 >
 > Also add:
-> - `HUNGARIAN_PERSONS` — English pronouns: [('I', 'én', 'aɪ'), ('You', 'te', 'juː'), ('He', 'ő (fiú)', 'hiː'), ('She', 'ő (lány)', 'ʃiː'), ('We', 'mi', 'wiː'), ('They', 'ők', 'ðeɪ')]
+> - `HUNGARIAN_PERSONS` — English pronouns with Hungarian translations: [('I', 'én', 'aɪ'), ('You', 'te', 'juː'), ('He', 'ő (fiú)', 'hiː'), ('She', 'ő (lány)', 'ʃiː'), ('We', 'mi', 'wiː'), ('They', 'ők', 'ðeɪ')]. This is the single source of truth for pronouns in the Hungarian mode — the grammar functions in Sprint 3 and prompt functions here should both use this list.
 > - `HUNGARIAN_GRAMMAR_PATTERNS` — basic English sentence patterns
 >
 > All content and instructions in prompts should be designed for 8-12 year old Hungarian children learning English.
@@ -581,7 +582,7 @@ Tell Copilot:
 > 1. HungarianNounItem and HungarianVerbItem can be created with correct fields
 > 2. Hungarian vocabulary files in `vocab/hungarian/` are valid JSON with correct fields
 > 3. Hungarian prompt functions return non-empty strings
-> 4. HUNGARIAN_GRAMMAR_PROGRESSION has valid structure (ids, levels, prerequisites)
+> 4. HUN_TO_ENG_GRAMMAR_PROGRESSION has valid structure (ids, levels, prerequisites)
 > 5. Hungarian language config has all required fields
 >
 > Model the tests after the existing test files. Use `@pytest.mark.unit` marker."
@@ -748,7 +749,7 @@ Your baseline pass count (before any changes) should never go down.
 | File | What to add |
 |------|------------|
 | `jlesson/models.py` | `HungarianNounItem`, `HungarianVerbItem`, `HungarianSentence` classes |
-| `jlesson/curriculum.py` | `HUNGARIAN_GRAMMAR_PROGRESSION`, `HUNGARIAN_PERSONS` |
+| `jlesson/curriculum.py` | `HUN_TO_ENG_GRAMMAR_PROGRESSION`, `HUNGARIAN_PERSONS` |
 | `jlesson/prompt_template.py` | `hungarian_build_*()` prompt functions |
 | `jlesson/vocab_generator.py` | Hungarian validation + prompt functions |
 | `jlesson/video/tts_engine.py` | Hungarian voice entries in VOICES dict |
