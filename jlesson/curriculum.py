@@ -24,12 +24,18 @@ import random
 from datetime import datetime, timezone
 from pathlib import Path
 
-# ── Grammar Progression Table ─────────────────────────────────────────────────
+# ── Grammar Progression Tables ────────────────────────────────────────────────
 # Each entry defines one grammar dimension with its prerequisites.
 # Items are ordered: easiest first, prerequisites always listed before dependents.
+#
+# Naming convention — direction-based:
+#   ENG_TO_JAP  = English speaker learning Japanese
+#   HUN_TO_ENG  = Hungarian speaker learning English
+
+# ── English → Japanese (existing, levels 1-4) ────────────────────────────────
 # "level" is a rough JLPT-aligned difficulty bucket (1 = absolute beginner).
 
-GRAMMAR_PROGRESSION: list[dict] = [
+ENG_TO_JAP_GRAMMAR_PROGRESSION: list[dict] = [
     # ── Level 1 — absolute beginner, no prerequisites ────────────────────────
     {
         "id": "action_present_affirmative",
@@ -216,7 +222,178 @@ GRAMMAR_PROGRESSION: list[dict] = [
     },
 ]
 
-# Fast lookup by id
+# Backward-compat alias — existing code imports GRAMMAR_PROGRESSION everywhere.
+GRAMMAR_PROGRESSION = ENG_TO_JAP_GRAMMAR_PROGRESSION
+
+
+# ── Hungarian → English (levels 1-6) ─────────────────────────────────────────
+# English grammar progression for Hungarian-speaking children (ages 8-12).
+# No Japanese-specific fields (structure, tenses, polarities are not used).
+
+HUN_TO_ENG_GRAMMAR_PROGRESSION: list[dict] = [
+    # ── Level 1 — absolute beginner, no prerequisites ────────────────────────
+    {
+        "id": "present_simple_affirmative",
+        "pattern": "Subject + verb + object",
+        "description": "Simple present tense — affirmative",
+        "example_en": "I eat bread.",
+        "example_hu": "Én kenyeret eszem.",
+        "requires": [],
+        "level": 1,
+    },
+    {
+        "id": "identity_is_am_are",
+        "pattern": "Subject + is/am/are + noun/adjective",
+        "description": "Identity / description with be-verb",
+        "example_en": "She is a teacher.",
+        "example_hu": "Ő tanárnő.",
+        "requires": [],
+        "level": 1,
+    },
+    # ── Level 2 — requires Level 1 ───────────────────────────────────────────
+    {
+        "id": "present_simple_negative",
+        "pattern": "Subject + do/does not + verb",
+        "description": "Simple present tense — negative",
+        "example_en": "I do not eat fish.",
+        "example_hu": "Én nem eszem halat.",
+        "requires": ["present_simple_affirmative"],
+        "level": 2,
+    },
+    {
+        "id": "present_simple_question",
+        "pattern": "Do/Does + subject + verb?",
+        "description": "Simple present tense — yes/no question",
+        "example_en": "Do you like cats?",
+        "example_hu": "Szereted a macskákat?",
+        "requires": ["present_simple_affirmative"],
+        "level": 2,
+    },
+    {
+        "id": "past_simple_affirmative",
+        "pattern": "Subject + past verb + object",
+        "description": "Simple past tense — affirmative",
+        "example_en": "I ate bread yesterday.",
+        "example_hu": "Tegnap kenyeret ettem.",
+        "requires": ["present_simple_affirmative"],
+        "level": 2,
+    },
+    # ── Level 3 — requires Level 2 ───────────────────────────────────────────
+    {
+        "id": "past_simple_negative",
+        "pattern": "Subject + did not + verb",
+        "description": "Simple past tense — negative",
+        "example_en": "I did not eat fish.",
+        "example_hu": "Nem ettem halat.",
+        "requires": ["present_simple_negative", "past_simple_affirmative"],
+        "level": 3,
+    },
+    {
+        "id": "past_simple_question",
+        "pattern": "Did + subject + verb?",
+        "description": "Simple past tense — yes/no question",
+        "example_en": "Did you run today?",
+        "example_hu": "Futottál ma?",
+        "requires": ["present_simple_question", "past_simple_affirmative"],
+        "level": 3,
+    },
+    {
+        "id": "can_ability",
+        "pattern": "Subject + can + verb",
+        "description": "Ability with can",
+        "example_en": "I can swim fast.",
+        "example_hu": "Tudok gyorsan úszni.",
+        "requires": ["present_simple_affirmative"],
+        "level": 3,
+    },
+    # ── Level 4 — requires Level 3 ───────────────────────────────────────────
+    {
+        "id": "present_continuous",
+        "pattern": "Subject + is/am/are + verb-ing",
+        "description": "Present continuous — action happening now",
+        "example_en": "I am eating now.",
+        "example_hu": "Most eszem.",
+        "requires": ["present_simple_affirmative", "identity_is_am_are"],
+        "level": 4,
+    },
+    {
+        "id": "there_is_are",
+        "pattern": "There is/are + noun",
+        "description": "Existence — there is / there are",
+        "example_en": "There is a cat on the table.",
+        "example_hu": "Van egy macska az asztalon.",
+        "requires": ["identity_is_am_are"],
+        "level": 4,
+    },
+    {
+        "id": "have_got",
+        "pattern": "Subject + have/has got + noun",
+        "description": "Possession with have got",
+        "example_en": "I have got a dog.",
+        "example_hu": "Van egy kutyám.",
+        "requires": ["present_simple_affirmative"],
+        "level": 4,
+    },
+    # ── Level 5 — requires Level 4 ───────────────────────────────────────────
+    {
+        "id": "past_continuous",
+        "pattern": "Subject + was/were + verb-ing",
+        "description": "Past continuous — action was happening",
+        "example_en": "I was eating when you called.",
+        "example_hu": "Éppen ettem, amikor hívtál.",
+        "requires": ["present_continuous", "past_simple_affirmative"],
+        "level": 5,
+    },
+    {
+        "id": "will_future",
+        "pattern": "Subject + will + verb",
+        "description": "Simple future with will",
+        "example_en": "I will eat later.",
+        "example_hu": "Később fogok enni.",
+        "requires": ["present_simple_affirmative"],
+        "level": 5,
+    },
+    {
+        "id": "going_to_future",
+        "pattern": "Subject + is/am/are going to + verb",
+        "description": "Near future with going to",
+        "example_en": "I am going to eat lunch.",
+        "example_hu": "Ebédelni fogok.",
+        "requires": ["present_continuous"],
+        "level": 5,
+    },
+    # ── Level 6 — requires Level 5 ───────────────────────────────────────────
+    {
+        "id": "first_conditional",
+        "pattern": "If + present, subject + will + verb",
+        "description": "First conditional — real possibility",
+        "example_en": "If it rains, I will stay home.",
+        "example_hu": "Ha esik az eső, otthon maradok.",
+        "requires": ["will_future", "present_simple_affirmative"],
+        "level": 6,
+    },
+    {
+        "id": "must_should",
+        "pattern": "Subject + must/should + verb",
+        "description": "Obligation and advice — must / should",
+        "example_en": "You must study every day.",
+        "example_hu": "Minden nap tanulnod kell.",
+        "requires": ["present_simple_affirmative", "can_ability"],
+        "level": 6,
+    },
+    {
+        "id": "comparisons",
+        "pattern": "noun + is + adjective-er + than + noun",
+        "description": "Comparatives — comparing two things",
+        "example_en": "The dog is bigger than the cat.",
+        "example_hu": "A kutya nagyobb, mint a macska.",
+        "requires": ["identity_is_am_are"],
+        "level": 6,
+    },
+]
+
+
+# Fast lookup by id — Japanese
 _GRAMMAR_BY_ID: dict[str, dict] = {g["id"]: g for g in GRAMMAR_PROGRESSION}
 
 

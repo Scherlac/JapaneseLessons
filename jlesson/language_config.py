@@ -57,9 +57,11 @@ class LanguageConfig:
 # Sources: models.py, vocab_generator.py, tts_engine.py, cards.py,
 #          curriculum.py, prompt_template.py
 
-# Lazy import to avoid circular dependencies and keep curriculum.py unchanged.
-# GRAMMAR_PROGRESSION is a module-level list in curriculum.py.
-from .curriculum import GRAMMAR_PROGRESSION  # noqa: E402
+# Lazy imports to avoid circular dependencies and keep source modules unchanged.
+from .curriculum import (  # noqa: E402
+    ENG_TO_JAP_GRAMMAR_PROGRESSION,
+    HUN_TO_ENG_GRAMMAR_PROGRESSION,
+)
 from .prompt_template import PERSONS_BEGINNER  # noqa: E402
 
 ENG_JAP_CONFIG = LanguageConfig(
@@ -82,7 +84,7 @@ ENG_JAP_CONFIG = LanguageConfig(
     target_font_path="C:/Windows/Fonts/YuGothB.ttc",
     native_font_path="C:/Windows/Fonts/segoeui.ttf",
 
-    grammar_progression=tuple(GRAMMAR_PROGRESSION),
+    grammar_progression=tuple(ENG_TO_JAP_GRAMMAR_PROGRESSION),
     persons=tuple(PERSONS_BEGINNER),
 
     vocab_dir="vocab",
@@ -109,7 +111,7 @@ HUN_ENG_CONFIG = LanguageConfig(
     target_font_path="C:/Windows/Fonts/segoeui.ttf",
     native_font_path="C:/Windows/Fonts/segoeui.ttf",
 
-    grammar_progression=(),  # to be populated in Sprint 3
+    grammar_progression=tuple(HUN_TO_ENG_GRAMMAR_PROGRESSION),
     persons=(),              # to be populated in Sprint 4
 
     vocab_dir="vocab/hungarian",

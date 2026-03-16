@@ -329,27 +329,36 @@ Open `jlesson/curriculum.py` and tell Copilot:
 > **Level 2** (requires Level 1):
 > - `present_simple_negative` — pattern: 'Subject + do/does not + verb', example: 'I do not eat fish.'
 > - `present_simple_question` — pattern: 'Do/Does + subject + verb?', example: 'Do you like cats?'
-> - `past_simple_affirmative` — pattern: 'Subject + past verb + object', example: 'I ate bread yesterday.'
+> - `can_ability` — pattern: 'Subject + can + verb', example: 'I can swim fast.'
+> - `have_got` — pattern: 'Subject + have/has got + noun', example: 'I have got a dog.'
 >
 > **Level 3** (requires Level 2):
-> - `past_simple_negative` — pattern: 'Subject + did not + verb', example: 'I did not eat fish.'
-> - `past_simple_question` — pattern: 'Did + subject + verb?', example: 'Did you run today?'
-> - `can_ability` — pattern: 'Subject + can + verb', example: 'I can swim fast.'
+> - `present_continuous` — pattern: 'Subject + is/am/are + verb-ing', example: 'I am eating now.'
+> - `present_continuous_question` — pattern: 'Is/Am/Are + subject + verb-ing?', example: 'Are you eating now?'
+> - `present_continuous_negative` — pattern: 'Subject + is/am/are not + verb-ing', example: 'She is not eating right now.'
+> - `there_is_are` — pattern: 'There is/are + noun', example: 'There is a cat on the table.'
 >
 > **Level 4** (requires Level 3):
-> - `present_continuous` — pattern: 'Subject + is/am/are + verb-ing', example: 'I am eating now.'
-> - `there_is_are` — pattern: 'There is/are + noun', example: 'There is a cat on the table.'
-> - `have_got` — pattern: 'Subject + have/has got + noun', example: 'I have got a dog.'
+> - `past_simple_affirmative` — pattern: 'Subject + past verb + object', example: 'I ate bread yesterday.'
+> - `past_simple_negative` — pattern: 'Subject + did not + verb', example: 'I did not eat fish.'
+> - `past_simple_question` — pattern: 'Did + subject + verb?', example: 'Did you run today?'
+> - `be_was_were` — pattern: 'Subject + was/were + noun/adjective', example: 'They were happy last week.'
+> - `irregular_verbs_3forms_1` — common irregular verbs with their base, past, and past participle forms (e.g., go/went/gone, eat/ate/eaten)
 >
 > **Level 5** (requires Level 4):
 > - `past_continuous` — pattern: 'Subject + was/were + verb-ing', example: 'I was eating when you called.'
+> - `past_continuous_question` — pattern: 'Was/Were + subject + verb-ing?', example: 'Were you eating when I called?'
+> - `past_continuous_negative` — pattern: 'Subject + was/were not + verb-ing', example: 'She was not eating when I arrived.'
+> - `regular_verbs_formation` — pattern: 'Base verb + ed' for regular verbs, example: 'walk/walked', 'play/played'
+> - `irregular_verbs_3forms_2` — more irregular verbs with their base, past, and past participle forms (e.g., see/saw/seen, take/took/taken)
 > - `will_future` — pattern: 'Subject + will + verb', example: 'I will eat later.'
 > - `going_to_future` — pattern: 'Subject + is/am/are going to + verb', example: 'I am going to eat lunch.'
 >
 > **Level 6** (requires Level 5):
+> - `comparisons` — pattern: 'noun + is + adjective-er + than + noun', example: 'The dog is bigger than the cat.'
+> - `present_perfect` — pattern: 'Subject + has/have + past participle', example: 'I have eaten already.'
 > - `first_conditional` — pattern: 'If + present, subject + will + verb', example: 'If it rains, I will stay home.'
 > - `must_should` — pattern: 'Subject + must/should + verb', example: 'You must study every day.'
-> - `comparisons` — pattern: 'noun + is + adjective-er + than + noun', example: 'The dog is bigger than the cat.'
 >
 > Each grammar point needs: id, label, level, pattern, example, prerequisites (list of IDs from earlier levels).
 >
