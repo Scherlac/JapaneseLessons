@@ -111,9 +111,9 @@ class HunEngItemGenerator(ItemGenerator):
     def convert_verb(self, llm_item: dict, source_item: dict) -> GeneralItem:
         v_item = {**source_item, **llm_item}
         return GeneralItem(
-            source=PartialItem(display_text=v_item["english"]),
+            source=PartialItem(display_text=v_item.get("hungarian", "")),
             target=PartialItem(
-                display_text=v_item.get("hungarian", ""),
+                display_text=v_item.get("english", ""),
                 pronunciation=v_item.get("pronunciation", ""),
                 extra={"past_tense": v_item.get("past_tense", "")}
             )
@@ -135,6 +135,6 @@ class HunEngItemGenerator(ItemGenerator):
 
     def convert_raw_verb(self, source_item: dict) -> GeneralItem:
         return GeneralItem(
-            source=PartialItem(display_text=source_item["english"]),
-            target=PartialItem(display_text=source_item.get("hungarian", ""), pronunciation=source_item.get("pronunciation", ""), extra={"past_tense": source_item.get("past_tense", "")})
+            source=PartialItem(display_text=source_item.get("hungarian", "")),
+            target=PartialItem(display_text=source_item["english"], pronunciation=source_item.get("pronunciation", ""), extra={"past_tense": source_item.get("past_tense", "")})
         )
