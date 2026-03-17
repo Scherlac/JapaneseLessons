@@ -100,6 +100,7 @@ class CardRenderer:
             "en_medium": ImageFont.truetype(en_font_path, 40),
             "en_small": ImageFont.truetype(en_font_path, 28),
             "label": ImageFont.truetype(en_bold_font_path, 24),
+            "jp_small": ImageFont.truetype(jp_font_path, 40),
             # Hungarian-English cards — Segoe UI for both (Latin script)
             "hun_target_large": ImageFont.truetype(en_bold_font_path, 80),
             "hun_native_medium": ImageFont.truetype(en_font_path, 48),
@@ -171,26 +172,85 @@ class CardRenderer:
         draw.line([(cx - 200, 400), (cx + 200, 400)], fill="#333333", width=2)
 
         if intent.show_target():
-            # Target  (reveal)
-            draw.text((cx, 520), item.target.display_text, font=self.target_fonts["large"],
-                    anchor="mm", fill=self.text_color)
-
-            # Target pronunciation (reveal) + special
-            if item.target.extra and len(item.target.extra) > 0:
-                annotation = ""
-                special = list(item.target.extra.values()) + [item.target.pronunciation]
-                annotation = " / ".join(special)
-            else:
-                annotation = f"{item.target.pronunciation}"
-
-            # FIXME size issue with long annotations 
-            draw.text((cx, 640), annotation, font=self.target_fonts["medium"],
-                    anchor="mm", fill=self.dim_color)
+            extra_keys = (
+                lang_cfg.field_map.extra_display_keys if lang_cfg else []
+            )
+            extra_font_keys = (
+                lang_cfg.field_map.card_extra_font_keys if lang_cfg else {}
+            )
+            self._draw_target_block(
+                draw, cx, 440, item,
+                self.target_fonts, self.fonts,
+                extra_font_keys, extra_keys,
+                self.text_color, self.dim_color,
+            )
 
         # Progress bar
         self._draw_progress_bar(draw, self.height - 80, step.progress)
 
         return img
+
+    @staticmethod
+    def _draw_target_block(
+        draw: ImageDraw.Draw,
+        cx: int,
+        y_top: int,
+        item: GeneralItem,
+        target_fonts: dict,
+        all_fonts: dict,
+        extra_font_keys: dict,
+        extra_display_keys: list,
+        text_color: str,
+        dim_color: str,
+        gap_after_main: int = 20,
+        gap_after_line: int = 12,
+    ) -> None:
+        """Draw the target reveal block: display text, pronunciation, then extra fields.
+
+        All elements are stacked vertically and sized dynamically using getbbox()
+        so no text overflows into the progress bar.
+
+        Parameters
+        ----------
+        extra_font_keys
+            Per-extra-key font mapping ``{extra_key: font_key}``.
+            ``font_key`` must be a key in ``all_fonts``.
+            Unrecognised or absent keys fall back to ``"en_small"``.
+        """
+
+        def _draw_line(y: int, text: str, font, fill: str) -> int:
+            """Draw *text* centred at *cx*, top-aligned to *y*. Returns new y."""
+            if not text or font is None:
+                return y
+            bbox = font.getbbox(text)
+            h = bbox[3] - bbox[1]
+            draw.text((cx, y + h // 2), text, font=font, anchor="mm", fill=fill)
+            return y + h
+
+        y = y_top
+
+        # 1. Main target display text (large)
+        font_main = target_fonts.get("large")
+        if font_main and item.target.display_text:
+            y = _draw_line(y, item.target.display_text, font_main, text_color)
+            y += gap_after_main
+
+        # 2. Pronunciation / romaji
+        font_pron = target_fonts.get("medium", font_main)
+        if font_pron and item.target.pronunciation:
+            y = _draw_line(y, item.target.pronunciation, font_pron, dim_color)
+            y += gap_after_line
+
+        # 3. Extra fields — each may have its own font
+        _fallback = all_fonts.get("en_small")
+        keys = extra_display_keys if extra_display_keys else list(item.target.extra.keys())
+        for key in keys:
+            val = item.target.extra.get(key) or ""
+            if val:
+                fk = extra_font_keys.get(key, "en_small")
+                font_extra = all_fonts.get(fk, _fallback)
+                y = _draw_line(y, str(val), font_extra, dim_color)
+                y += gap_after_line
 
     def save_card(self, img: Image.Image, path: Path) -> None:
         """Save a rendered card image to disk.

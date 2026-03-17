@@ -68,6 +68,14 @@ class FieldMap:
     source_voice: str = "english_female"      # audio_src asset
     target_voice_female: str = "japanese_female"  # audio_tar_f asset
     target_voice_male: str = "japanese_male"      # audio_tar_m asset
+    # Card rendering — target block layout
+    # extra_display_keys: ordered list of item.target.extra keys to show on cards.
+    #   Leave empty to show all extras in dict order.
+    # card_extra_font_keys: per-extra-key font mapping  {extra_key: font_key}.
+    #   font_key must match a key in CardRenderer.fonts.
+    #   If a key is absent, falls back to "en_small".
+    extra_display_keys: list = field(default_factory=list)
+    card_extra_font_keys: dict = field(default_factory=dict)
 
     def view(self, item: Any) -> dict[str, Any]:
         """Return a generic-keyed dict extracted from *item*.
@@ -197,6 +205,10 @@ ENG_JAP_CONFIG = LanguageConfig(
         source_voice="english_female",
         target_voice_female="japanese_female",
         target_voice_male="japanese_male",
+        # Show kana then masu-form under the main Japanese text on cards.
+        # kana and masu_form are Japanese script → use jp_small
+        extra_display_keys=["kana", "masu_form"],
+        card_extra_font_keys={"kana": "jp_small", "masu_form": "jp_small"},
     ),
 
     generator=EngJapItemGenerator(),
@@ -238,6 +250,10 @@ HUN_ENG_CONFIG = LanguageConfig(
         source_voice="hungarian_female",
         target_voice_female="english_female",
         target_voice_male="english_male",
+        # Pronunciation already in target.pronunciation; no extra fields needed.
+        # No extra display keys for hun-eng; pronunciation is already shown
+        extra_display_keys=[],
+        card_extra_font_keys={},
     ),
 
     generator=HunEngItemGenerator(),
