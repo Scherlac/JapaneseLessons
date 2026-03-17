@@ -248,8 +248,8 @@ HUN_ENG_CONFIG = LanguageConfig(
         target_label="English",
         phonetic_label="Pronunciation",
         source_voice="hungarian_female",
-        target_voice_female="english_female",
-        target_voice_male="english_male",
+        target_voice_female="english_uk_female",
+        target_voice_male="english_uk_male",
         # Pronunciation already in target.pronunciation; no extra fields needed.
         # No extra display keys for hun-eng; pronunciation is already shown
         extra_display_keys=[],

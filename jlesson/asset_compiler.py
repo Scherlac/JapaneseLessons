@@ -116,7 +116,13 @@ async def _render_item_audio(
                 if attempt < 2:
                     await asyncio.sleep(2**attempt)
                 else:
-                    raise
+                    raise RuntimeError(
+                        f"TTS failed for asset '{asset_key}' after 3 attempts.\n"
+                        f"  voice_key : {voice_key!r}\n"
+                        f"  resolved  : {getattr(engine, 'voice', '?')!r}\n"
+                        f"  text      : {text!r}\n"
+                        f"  cause     : {exc}"
+                    ) from exc
         if asset_key == "audio_src":
             item.source.assets[asset_key] = path
         else:
