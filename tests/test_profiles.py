@@ -53,9 +53,9 @@ class TestPassiveVideo:
     def test_noun_cycle_types(self):
         types = [s.touch_type for s in PASSIVE_VIDEO.cycle_for(Phase.NOUNS)]
         assert types == [
-            TouchType.LISTEN_EN_JPM_JPF,
-            TouchType.LISTEN_JPF_JPM,
-            TouchType.LISTEN_EN_JPM_JPF,
+            TouchType.LISTEN_DUAL_M,
+            TouchType.LISTEN_REVERSE_F,
+            TouchType.LISTEN_DUAL_M,
         ]
 
     def test_noun_cycle_intents(self):
@@ -81,17 +81,17 @@ class TestPassiveVideo:
 
     def test_required_assets_nouns(self):
         assets = PASSIVE_VIDEO.required_assets(Phase.NOUNS)
-        assert "card_en_jp" in assets
-        assert "card_jp" in assets
-        assert "audio_en" in assets
-        assert "audio_jp_f" in assets
-        assert "audio_jp_m" in assets
+        assert "card_src_tar" in assets
+        assert "card_tar" in assets
+        assert "audio_src" in assets
+        assert "audio_tar_f" in assets
+        assert "audio_tar_m" in assets
 
     def test_required_assets_grammar(self):
         assets = PASSIVE_VIDEO.required_assets(Phase.GRAMMAR)
-        assert "card_en_jp" in assets
-        assert "audio_en" in assets
-        assert "audio_jp_f" in assets
+        assert "card_src_tar" in assets
+        assert "audio_src" in assets
+        assert "audio_tar_f" in assets
 
 
 # ---------------------------------------------------------------------------
@@ -112,11 +112,11 @@ class TestActiveFlashCards:
     def test_noun_cycle_types(self):
         types = [s.touch_type for s in ACTIVE_FLASH_CARDS.cycle_for(Phase.NOUNS)]
         assert types == [
-            TouchType.EN_JP,
-            TouchType.JP_EN,
-            TouchType.EN_JP,
-            TouchType.JP_JP,
-            TouchType.EN_JP,
+            TouchType.SOURCE_TARGET,
+            TouchType.TARGET_SOURCE,
+            TouchType.SOURCE_TARGET,
+            TouchType.TARGET_ONLY,
+            TouchType.SOURCE_TARGET,
         ]
 
     def test_noun_cycle_intents(self):
@@ -140,12 +140,12 @@ class TestActiveFlashCards:
 
     def test_required_assets_nouns(self):
         assets = ACTIVE_FLASH_CARDS.required_assets(Phase.NOUNS)
-        assert "card_en" in assets
-        assert "card_jp" in assets
-        assert "audio_jp_f" in assets
-        # Active cards don't use EN audio or JP male for nouns
-        assert "audio_en" not in assets
-        assert "audio_jp_m" not in assets
+        assert "card_src" in assets
+        assert "card_tar" in assets
+        assert "audio_tar_f" in assets
+        # Active cards don't use src audio or tar male for nouns
+        assert "audio_src" not in assets
+        assert "audio_tar_m" not in assets
 
 
 # ---------------------------------------------------------------------------
@@ -166,23 +166,23 @@ class TestTouchTypeMappings:
         for tt in TouchType:
             assert tt in TOUCH_TYPE_AUDIO
 
-    def test_en_jp_assets(self):
-        assert TOUCH_TYPE_ASSETS[TouchType.EN_JP] == {"card_en", "card_jp", "audio_jp_f"}
+    def test_source_target_assets(self):
+        assert TOUCH_TYPE_ASSETS[TouchType.SOURCE_TARGET] == {"card_src", "card_tar", "audio_tar_f"}
 
-    def test_listen_en_jpm_jpf_assets(self):
-        assert TOUCH_TYPE_ASSETS[TouchType.LISTEN_EN_JPM_JPF] == {
-            "card_en_jp", "audio_en", "audio_jp_m", "audio_jp_f",
+    def test_listen_dual_m_assets(self):
+        assert TOUCH_TYPE_ASSETS[TouchType.LISTEN_DUAL_M] == {
+            "card_src_tar", "audio_src", "audio_tar_m", "audio_tar_f",
         }
 
-    def test_en_jp_card_is_en(self):
-        assert TOUCH_TYPE_CARD[TouchType.EN_JP] == "card_en"
+    def test_source_target_card_is_src(self):
+        assert TOUCH_TYPE_CARD[TouchType.SOURCE_TARGET] == "card_src"
 
-    def test_jp_en_card_is_jp(self):
-        assert TOUCH_TYPE_CARD[TouchType.JP_EN] == "card_jp"
+    def test_target_source_card_is_tar(self):
+        assert TOUCH_TYPE_CARD[TouchType.TARGET_SOURCE] == "card_tar"
 
-    def test_listen_audio_order(self):
-        assert TOUCH_TYPE_AUDIO[TouchType.LISTEN_EN_JPM_JPF] == [
-            "audio_en", "audio_jp_m", "audio_jp_f",
+    def test_listen_dual_audio_order(self):
+        assert TOUCH_TYPE_AUDIO[TouchType.LISTEN_DUAL_M] == [
+            "audio_src", "audio_tar_m", "audio_tar_f",
         ]
 
 

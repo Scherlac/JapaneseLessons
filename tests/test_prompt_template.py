@@ -18,6 +18,8 @@ Each test asserts that the generated prompt string:
 import pytest
 
 from jlesson.curriculum import GRAMMAR_PROGRESSION
+from jlesson.item_generator import EngJapItemGenerator
+from jlesson.models import GrammarItem, Sentence, TextSegment
 from jlesson.prompt_template import (
     build_content_validate_prompt,
     build_grammar_generate_prompt,
@@ -31,15 +33,17 @@ from jlesson.prompt_template import (
 
 @pytest.fixture
 def sample_nouns():
-    return [
+    raw = [
         {"english": "water", "japanese": "みず", "kanji": "水", "romaji": "mizu"},
         {"english": "fish",  "japanese": "さかな", "kanji": "魚", "romaji": "sakana"},
     ]
+    gen = EngJapItemGenerator()
+    return [gen.convert_raw_noun(n) for n in raw]
 
 
 @pytest.fixture
 def sample_verbs():
-    return [
+    raw = [
         {
             "english": "to eat", "japanese": "たべる", "kanji": "食べる",
             "romaji": "taberu", "type": "る-verb", "masu_form": "食べます",
@@ -49,11 +53,14 @@ def sample_verbs():
             "romaji": "nomu", "type": "う-verb", "masu_form": "飲みます",
         },
     ]
+    gen = EngJapItemGenerator()
+    return [gen.convert_raw_verb(v) for v in raw]
 
 
 @pytest.fixture
 def level1_grammar():
-    return [g for g in GRAMMAR_PROGRESSION if g["level"] == 1]
+    raw = [g for g in GRAMMAR_PROGRESSION if g["level"] == 1]
+    return [GrammarItem(**g) for g in raw]
 
 
 @pytest.fixture
@@ -348,32 +355,31 @@ class TestBuildSentenceReviewPrompt:
     @pytest.fixture
     def sample_grammar_specs(self):
         return [
-            {
-                "id": "action_present_affirmative",
-                "structure": "A は B を V ます",
-                "description": "Subject does verb to object",
-                "example_en": "I eat fish.",
-                "example_jp": "私は魚を食べます。",
-            },
+            GrammarItem(
+                id="action_present_affirmative",
+                pattern="A は B を V ます",
+                description="Subject does verb to object",
+                example_source="I eat fish.",
+                example_target="私は魚を食べます。",
+                level=1,
+            ),
         ]
 
     @pytest.fixture
     def review_sentences(self):
         return [
-            {
-                "grammar_id": "action_present_affirmative",
-                "english": "I eat fish.",
-                "japanese": "私は魚を食べます。",
-                "romaji": "Watashi wa sakana o tabemasu.",
-                "person": "I",
-            },
-            {
-                "grammar_id": "action_present_affirmative",
-                "english": "You drink water.",
-                "japanese": "あなたは水を飲みます。",
-                "romaji": "Anata wa mizu o nomimasu.",
-                "person": "You",
-            },
+            Sentence(
+                source=TextSegment(display_text="I eat fish."),
+                target=TextSegment(display_text="私は魚を食べます。", pronunciation="Watashi wa sakana o tabemasu."),
+                grammar_id="action_present_affirmative",
+                grammar_parameters={"person": "I"},
+            ),
+            Sentence(
+                source=TextSegment(display_text="You drink water."),
+                target=TextSegment(display_text="あなたは水を飲みます。", pronunciation="Anata wa mizu o nomimasu."),
+                grammar_id="action_present_affirmative",
+                grammar_parameters={"person": "You"},
+            ),
         ]
 
     def test_returns_non_empty_string(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
@@ -408,7 +414,7 @@ class TestBuildSentenceReviewPrompt:
 
     def test_contains_grammar_structure(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
         prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
-        assert sample_grammar_specs[0]["structure"] in prompt
+        assert "A は B を V ます" in prompt
 
     def test_uses_zero_based_indices(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
         prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)

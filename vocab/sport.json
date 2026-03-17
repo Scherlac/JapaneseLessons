@@ -1,0 +1,159 @@
+{
+  "theme": "sport",
+  "nouns": [
+    {
+      "english": "ball",
+      "japanese": "ボール",
+      "kanji": "ボール",
+      "romaji": "bōru"
+    },
+    {
+      "english": "court",
+      "japanese": "コート",
+      "kanji": "コート",
+      "romaji": "kōto"
+    },
+    {
+      "english": "field",
+      "japanese": "フィールド",
+      "kanji": "フィールド",
+      "romaji": "fīrudo"
+    },
+    {
+      "english": "goal",
+      "japanese": "ゴール",
+      "kanji": "ゴール",
+      "romaji": "gōru"
+    },
+    {
+      "english": "player",
+      "japanese": "プレイヤー",
+      "kanji": "プレイヤー",
+      "romaji": "pureiyā"
+    },
+    {
+      "english": "team",
+      "japanese": "チーム",
+      "kanji": "チーム",
+      "romaji": "chīmu"
+    },
+    {
+      "english": "game",
+      "japanese": "ゲーム",
+      "kanji": "ゲーム",
+      "romaji": "gēmu"
+    },
+    {
+      "english": "match",
+      "japanese": "試合",
+      "kanji": "試合",
+      "romaji": "shiai"
+    },
+    {
+      "english": "score",
+      "japanese": "得点",
+      "kanji": "得点",
+      "romaji": "tōku"
+    },
+    {
+      "english": "win",
+      "japanese": "勝ち",
+      "kanji": "勝ち",
+      "romaji": "kachi"
+    },
+    {
+      "english": "loss",
+      "japanese": "負け",
+      "kanji": "負け",
+      "romaji": "make"
+    },
+    {
+      "english": "rule",
+      "japanese": "ルール",
+      "kanji": "ルール",
+      "romaji": "rūru"
+    }
+  ],
+  "verbs": [
+    {
+      "english": "to play (sports)",
+      "japanese": "あそぶ",
+      "kanji": "遊ぶ",
+      "romaji": "asobu",
+      "type": "う-verb",
+      "masu_form": "遊びます"
+    },
+    {
+      "english": "to run",
+      "japanese": "はしる",
+      "kanji": "走る",
+      "romaji": "hashiru",
+      "type": "る-verb",
+      "masu_form": "走ります"
+    },
+    {
+      "english": "to jump",
+      "japanese": "とぶ",
+      "kanji": "飛ぶ",
+      "romaji": "tobu",
+      "type": "う-verb",
+      "masu_form": "飛びます"
+    },
+    {
+      "english": "to throw",
+      "japanese": "なげる",
+      "kanji": "投げる",
+      "romaji": "nageru",
+      "type": "る-verb",
+      "masu_form": "投げます"
+    },
+    {
+      "english": "to kick",
+      "japanese": "ける",
+      "kanji": "蹴る",
+      "romaji": "keru",
+      "type": "る-verb",
+      "masu_form": "蹴ります"
+    },
+    {
+      "english": "to swim",
+      "japanese": "およぐ",
+      "kanji": "泳ぐ",
+      "romaji": "oyogu",
+      "type": "う-verb",
+      "masu_form": "泳ぎます"
+    },
+    {
+      "english": "to do (sports)",
+      "japanese": "する",
+      "kanji": "する",
+      "romaji": "suru",
+      "type": "irregular",
+      "masu_form": "します"
+    },
+    {
+      "english": "to come back",
+      "japanese": "戻る",
+      "kanji": "戻る",
+      "romaji": "modoru",
+      "type": "う-verb",
+      "masu_form": "戻ります"
+    },
+    {
+      "english": "to score (point)",
+      "japanese": "得点する",
+      "kanji": "得点する",
+      "romaji": "tōku suru",
+      "type": "irregular",
+      "masu_form": "得点します"
+    },
+    {
+      "english": "to win",
+      "japanese": "勝つ",
+      "kanji": "勝つ",
+      "romaji": "katsu",
+      "type": "う-verb",
+      "masu_form": "勝ちます"
+    }
+  ]
+}

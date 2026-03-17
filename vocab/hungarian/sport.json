@@ -1,0 +1,127 @@
+{
+  "theme": "sport",
+  "nouns": [
+    {
+      "english": "ball",
+      "hungarian": "labda",
+      "pronunciation": "/ˈlɑb.dɑ/"
+    },
+    {
+      "english": "goal",
+      "hungarian": "kapu",
+      "pronunciation": "/ˈɡoʊl/"
+    },
+    {
+      "english": "team",
+      "hungarian": "csapat",
+      "pronunciation": "/ˈtʃeɪm/"
+    },
+    {
+      "english": "score",
+      "hungarian": "eredmény",
+      "pronunciation": "/ˈskɔr/"
+    },
+    {
+      "english": "player",
+      "hungarian": "játékos",
+      "pronunciation": "/ˈpleɪ.ər/"
+    },
+    {
+      "english": "court",
+      "hungarian": "pálya",
+      "pronunciation": "/kɔrt/"
+    },
+    {
+      "english": "jersey",
+      "hungarian": "meztelen",
+      "pronunciation": "/ˈdʒɜr.si/"
+    },
+    {
+      "english": "referee",
+      "hungarian": "bíró",
+      "pronunciation": "/ˌrɛf.əˈri/"
+    },
+    {
+      "english": "penalty",
+      "hungarian": "büntetés",
+      "pronunciation": "/ˈpɛn.əl.ti/"
+    },
+    {
+      "english": "trophy",
+      "hungarian": "trófea",
+      "pronunciation": "/ˈtrəʊ.fi/"
+    },
+    {
+      "english": "medal",
+      "hungarian": "érem",
+      "pronunciation": "/ˈmɛd.əl/"
+    },
+    {
+      "english": "coach",
+      "hungarian": "edző",
+      "pronunciation": "/kəʊtʃ/"
+    }
+  ],
+  "verbs": [
+    {
+      "english": "to run",
+      "hungarian": "fut",
+      "pronunciation": "/rʌn/",
+      "past_tense": "ran"
+    },
+    {
+      "english": "to kick",
+      "hungarian": "lök",
+      "pronunciation": "/kɪk/",
+      "past_tense": "kicked"
+    },
+    {
+      "english": "to throw",
+      "hungarian": "dob",
+      "pronunciation": "/θroʊ/",
+      "past_tense": "threw"
+    },
+    {
+      "english": "to score",
+      "hungarian": "gól",
+      "pronunciation": "/skɔr/",
+      "past_tense": "scored"
+    },
+    {
+      "english": "to play",
+      "hungarian": "játszik",
+      "pronunciation": "/pleɪ/",
+      "past_tense": "played"
+    },
+    {
+      "english": "to train",
+      "hungarian": "edz",
+      "pronunciation": "/treɪn/",
+      "past_tense": "trained"
+    },
+    {
+      "english": "to cheer",
+      "hungarian": "vívódik",
+      "pronunciation": "/tʃɪər/",
+      "past_tense": "cheered"
+    },
+    {
+      "english": "to win",
+      "hungarian": "nyer",
+      "pronunciation": "/wɪn/",
+      "past_tense": "won"
+    },
+    {
+      "english": "to lose",
+      "hungarian": "veszít",
+      "pronunciation": "/luːz/",
+      "past_tense": "lost"
+    },
+    {
+      "english": "to practice",
+      "hungarian": "gyakorol",
+      "pronunciation": "/ˈpræktɪs/",
+      "past_tense": "practiced"
+    }
+  ]
+}

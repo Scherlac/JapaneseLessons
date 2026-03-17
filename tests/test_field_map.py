@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from jlesson.language_config import FieldMap, get_language_config
-from jlesson.models import NounItem, VerbItem, Sentence
+from jlesson.models import GeneralItem, NounItem, PartialItem, VerbItem, Sentence
 
 
 # ---------------------------------------------------------------------------
@@ -16,28 +16,19 @@ ENG_JAP = get_language_config("eng-jap")
 HUN_ENG = get_language_config("hun-eng")
 
 
-def _jap_noun() -> NounItem:
-    return NounItem(
-        english="cat",
-        japanese="猫",
-        kanji="猫",
-        romaji="neko",
-        example_sentence_jp="猫が好きです。",
-        example_sentence_en="I like cats.",
-        memory_tip="Think of 'neck-oh'",
+def _jap_noun() -> GeneralItem:
+    return GeneralItem(
+        source=PartialItem(display_text="cat", extra={"example_sentence_en": "I like cats."}),
+        target=PartialItem(display_text="猫", pronunciation="neko", extra={"kanji": "猫", "example_sentence_jp": "猫が好きです。"}),
     )
 
 
-def _hun_noun() -> NounItem:
-    """NounItem with Hungarian extra fields stored via extra='allow'."""
-    return NounItem.model_validate({
-        "english": "cat",
-        "hungarian": "macska",
-        "pronunciation": "/ˈmɒtʃkɒ/",
-        "example_sentence_en": "I like cats.",
-        "example_sentence_hu": "Szeretem a macskákat.",
-        "memory_tip": "Sounds like 'match-ka'",
-    })
+def _hun_noun() -> GeneralItem:
+    """GeneralItem with Hungarian extra fields."""
+    return GeneralItem(
+        source=PartialItem(display_text="macska", extra={"example_sentence_hu": "Szeretem a macskákat."}),
+        target=PartialItem(display_text="cat", pronunciation="/ˈmɒtʃkɒ/", extra={"example_sentence_en": "I like cats."}),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -97,12 +88,8 @@ class TestFieldMapViewPydanticModel:
 class TestFieldMapViewDict:
     def test_eng_jap_dict(self):
         d = {
-            "english": "dog",
-            "japanese": "犬",
-            "romaji": "inu",
-            "kanji": "犬",
-            "example_sentence_jp": "犬がいます。",
-            "example_sentence_en": "There is a dog.",
+            "source": {"display_text": "dog", "extra": {"example_sentence_en": "There is a dog."}},
+            "target": {"display_text": "犬", "pronunciation": "inu", "extra": {"kanji": "犬", "example_sentence_jp": "犬がいます。"}},
         }
         v = ENG_JAP.field_map.view(d)
         assert v["source"] == "dog"
@@ -113,11 +100,8 @@ class TestFieldMapViewDict:
 
     def test_hun_eng_dict(self):
         d = {
-            "hungarian": "kutya",
-            "english": "dog",
-            "pronunciation": "/ˈkutjɒ/",
-            "example_sentence_en": "There is a dog.",
-            "example_sentence_hu": "Van egy kutya.",
+            "source": {"display_text": "kutya", "extra": {"example_sentence_hu": "Van egy kutya."}},
+            "target": {"display_text": "dog", "pronunciation": "/ˈkutjɒ/", "extra": {"example_sentence_en": "There is a dog."}},
         }
         v = HUN_ENG.field_map.view(d)
         assert v["source"] == "kutya"
@@ -126,7 +110,7 @@ class TestFieldMapViewDict:
         assert v["example_sentence_source"] == "Van egy kutya."
 
     def test_missing_field_returns_empty_string(self):
-        d = {"english": "fish"}
+        d = {"source": {"display_text": "fish"}}
         v = ENG_JAP.field_map.view(d)
         assert v["target"] == ""
         assert v["target_phonetic"] == ""
@@ -165,12 +149,9 @@ class TestFieldMapTargetSpecial:
         assert fm.target_special == {}
 
     def test_masu_form_via_view(self):
-        verb = VerbItem(
-            english="to eat",
-            japanese="たべる",
-            kanji="食べる",
-            romaji="taberu",
-            masu_form="食べます",
+        verb = GeneralItem(
+            source=PartialItem(display_text="to eat"),
+            target=PartialItem(display_text="たべる", pronunciation="taberu", extra={"kanji": "食べる", "masu_form": "食べます"}),
         )
         v = ENG_JAP.field_map.view(verb)
         assert v["target_special"]["masu_form"] == "食べます"
@@ -191,3 +172,39 @@ class TestFieldMapEmptyFieldName:
         v = fm.view({"english": "tree", "japanese": "木"})
         assert v["example_sentence_source"] == ""
         assert v["example_sentence_target"] == ""
+
+
+# ---------------------------------------------------------------------------
+# FieldMap voice keys
+# ---------------------------------------------------------------------------
+
+class TestFieldMapVoices:
+    def test_eng_jap_source_voice(self):
+        assert ENG_JAP.field_map.source_voice == "english_female"
+
+    def test_eng_jap_target_voice_female(self):
+        assert ENG_JAP.field_map.target_voice_female == "japanese_female"
+
+    def test_eng_jap_target_voice_male(self):
+        assert ENG_JAP.field_map.target_voice_male == "japanese_male"
+
+    def test_hun_eng_source_voice(self):
+        assert HUN_ENG.field_map.source_voice == "hungarian_female"
+
+    def test_hun_eng_target_voice_female(self):
+        assert HUN_ENG.field_map.target_voice_female == "english_female"
+
+    def test_hun_eng_target_voice_male(self):
+        assert HUN_ENG.field_map.target_voice_male == "english_male"
+
+    def test_source_voice_key_in_config_voices(self):
+        for cfg in (ENG_JAP, HUN_ENG):
+            assert cfg.field_map.source_voice in cfg.voices
+
+    def test_target_voice_female_key_in_config_voices(self):
+        for cfg in (ENG_JAP, HUN_ENG):
+            assert cfg.field_map.target_voice_female in cfg.voices
+
+    def test_target_voice_male_key_in_config_voices(self):
+        for cfg in (ENG_JAP, HUN_ENG):
+            assert cfg.field_map.target_voice_male in cfg.voices

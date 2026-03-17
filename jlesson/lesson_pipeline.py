@@ -56,6 +56,8 @@ from .lesson_store import save_lesson_content
 from .llm_client import ask_llm_json_free
 from .models import (
     CompiledItem,
+    GeneralItem,
+    GrammarItem,
     LessonContent,
     NounItem,
     Phase,
@@ -119,6 +121,11 @@ class StepInfo:
     def label(self) -> str:
         return f"[{self.index}/{self.total}]"
 
+    @property
+    def progress(self) -> float:
+        """Return step completion ratio (0.0–1.0) for progress bars."""
+        return self.index / self.total if self.total else 0.0
+
 
 # ---------------------------------------------------------------------------
 # Pipeline context
@@ -136,10 +143,10 @@ class LessonContext:
     vocab: dict = field(default_factory=dict)
     nouns: list[dict] = field(default_factory=list)
     verbs: list[dict] = field(default_factory=list)
-    selected_grammar: list[dict] = field(default_factory=list)
-    sentences: list[dict] = field(default_factory=list)
-    noun_items: list[dict] = field(default_factory=list)
-    verb_items: list[dict] = field(default_factory=list)
+    selected_grammar: list[GrammarItem] = field(default_factory=list)
+    sentences: list[Sentence] = field(default_factory=list)
+    noun_items: list[GeneralItem] = field(default_factory=list)
+    verb_items: list[GeneralItem] = field(default_factory=list)
     compiled_items: list[CompiledItem] = field(default_factory=list)
     touches: list[Touch] = field(default_factory=list)
     lesson_id: int = 0
@@ -258,14 +265,16 @@ def _build_video_items(noun_items: list[dict], sentences: list[dict]) -> list[di
 
 def _build_content(ctx: LessonContext) -> LessonContent:
     """Construct a LessonContent model from the current pipeline context."""
+    words = []
+    words.extend(ctx.noun_items)
+    words.extend(ctx.verb_items)
     return LessonContent(
         lesson_id=ctx.lesson_id,
         theme=ctx.config.theme,
         language=ctx.config.language,
-        grammar_ids=[g["id"] for g in ctx.selected_grammar],
-        noun_items=[NounItem.model_validate(n) for n in ctx.noun_items],
-        verb_items=[VerbItem.model_validate(v) for v in ctx.verb_items],
-        sentences=[Sentence.model_validate(s) for s in ctx.sentences],
+        grammar_ids=[g.id for g in ctx.selected_grammar],
+        words=words,
+        sentences=ctx.sentences,
         created_at=ctx.created_at
         or (
             datetime.now(timezone.utc)
@@ -277,103 +286,11 @@ def _build_content(ctx: LessonContext) -> LessonContent:
 
 def _build_items_by_phase(ctx: LessonContext) -> dict[Phase, list]:
     """Convert pipeline context dicts into typed items grouped by phase."""
-    nouns = [NounItem.model_validate(n) for n in ctx.noun_items]
-    verbs = [VerbItem.model_validate(v) for v in ctx.verb_items]
-    sentences = [Sentence.model_validate(s) for s in ctx.sentences]
     return {
-        Phase.NOUNS: nouns,
-        Phase.VERBS: verbs,
-        Phase.GRAMMAR: sentences,
+        Phase.NOUNS: ctx.noun_items,
+        Phase.VERBS: ctx.verb_items,
+        Phase.GRAMMAR: ctx.sentences,
     }
-
-
-async def _render_async(
-    items: list[dict],
-    video_path: Path,
-    cards_dir: Path,
-    audio_dir: Path,
-    report: ReportBuilder | None = None,
-) -> None:
-    """Async TTS + card + video assembly."""
-    from .video.builder import VideoBuilder
-    from .video.cards import CardRenderer
-    from .video.tts_engine import create_engine
-
-    cards_dir.mkdir(parents=True, exist_ok=True)
-    audio_dir.mkdir(parents=True, exist_ok=True)
-
-    card_renderer = CardRenderer()
-    video_builder = VideoBuilder()
-    total = len(items)
-
-    # TTS audio — rate-limited to avoid overwhelming Edge TTS
-    audio_paths: list[Path] = []
-    for i, item in enumerate(items):
-        voice_key = "japanese_female"
-        tts_voice = item.get("tts_voice", "")
-        if "Aria" in tts_voice:
-            voice_key = "english_female"
-        if "Keita" in tts_voice:
-            voice_key = "japanese_male"
-        engine = create_engine(voice_key, rate="-20%")
-        audio_path = audio_dir / f"audio_{i + 1:03d}.mp3"
-        for attempt in range(3):
-            try:
-                await engine.generate_audio(item["tts_text"], audio_path)
-                break
-            except Exception as exc:
-                if attempt < 2:
-                    print(f"    TTS retry {attempt + 1}: {exc}")
-                    await asyncio.sleep(2**attempt)
-                else:
-                    raise
-        audio_paths.append(audio_path)
-        await asyncio.sleep(1.0)
-
-    if report:
-        report.add(
-            "render_details",
-            "\n".join(
-                ["## Render Details", "", f"- **TTS audio:** {len(audio_paths)} files"]
-            ),
-        )
-
-    # Card images
-    for i, item in enumerate(items):
-        progress = (i + 1) / total
-        if item["step"] == "INTRODUCE":
-            card = card_renderer.render_introduce_card(
-                english=item["prompt"],
-                japanese=item["reveal"],
-                kana="",
-                romaji="",
-                step_label=item["counter"],
-                progress=progress,
-            )
-        else:
-            card = card_renderer.render_translate_card(
-                english=item["prompt"],
-                japanese=item["reveal"],
-                romaji="",
-                context=item["phase"].lower(),
-                step_label=item["counter"],
-                progress=progress,
-            )
-        card_renderer.save_card(card, cards_dir / f"{i + 1:03d}.png")
-
-    if report:
-        report.add("render_details", f"- **Card images:** {total}")
-
-    # Assemble MP4
-    clips = [
-        video_builder.create_clip(cards_dir / f"{i + 1:03d}.png", audio_paths[i])
-        for i in range(total)
-    ]
-    video_builder.build_video(clips, video_path, method="ffmpeg")
-
-    if report:
-        report.add("render_details", f"- **Video:** {video_path.name}")
-        report.add("render_details", "")
 
 
 # ---------------------------------------------------------------------------
@@ -415,27 +332,20 @@ class GrammarSelectStep(PipelineStep):
         progression = list(lang_cfg.grammar_progression)
         covered = ctx.curriculum.get("covered_grammar_ids", [])
         unlocked = get_next_grammar_from(progression, covered)
-        grammar_map = {g["id"]: g for g in progression}
+        grammar_map = {g.id: g for g in progression}
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
-        if lang_cfg.code == "hun-eng":
-            prompt = hungarian_build_grammar_select_prompt(
-                unlocked,
-                ctx.nouns,
-                ctx.verbs,
-                lesson_number,
-                covered_grammar_ids=covered,
-            )
-        else:
-            prompt = build_grammar_select_prompt(
-                unlocked,
-                ctx.nouns,
-                ctx.verbs,
-                lesson_number,
-                covered_grammar_ids=covered,
-            )
+        noun_items = [lang_cfg.generator.convert_raw_noun(n) for n in ctx.nouns]
+        verb_items = [lang_cfg.generator.convert_raw_verb(v) for v in ctx.verbs]
+        prompt = lang_cfg.prompts.build_grammar_select_prompt(
+            unlocked,
+            noun_items,
+            verb_items,
+            lesson_number,
+            covered_grammar_ids=covered,
+        )
         result = _ask_llm(ctx, prompt)
         selected_ids: list[str] = result.get("selected_ids") or [
-            g["id"] for g in unlocked[:2]
+            g.id for g in unlocked[:2]
         ]
         ctx.selected_grammar = []
         for gid in selected_ids:
@@ -446,7 +356,7 @@ class GrammarSelectStep(PipelineStep):
                     ctx, f"       Warning: unknown grammar id {gid!r}, skipping"
                 )
         self._log(
-            ctx, f"       selected : {[g['id'] for g in ctx.selected_grammar]}"
+            ctx, f"       selected : {[g.id for g in ctx.selected_grammar]}"
         )
         return ctx
 
@@ -458,53 +368,50 @@ class GenerateSentencesStep(PipelineStep):
     description = "LLM: produce practice sentences"
 
     def execute(self, ctx: LessonContext) -> LessonContext:
-        if ctx.language_config.code == "hun-eng":
-            prompt = hungarian_build_grammar_generate_prompt(
-                ctx.selected_grammar,
-                ctx.nouns,
-                ctx.verbs,
-                sentences_per_grammar=ctx.config.sentences_per_grammar,
-            )
-        else:
-            prompt = build_grammar_generate_prompt(
-                ctx.selected_grammar,
-                ctx.nouns,
-                ctx.verbs,
-                sentences_per_grammar=ctx.config.sentences_per_grammar,
-            )
+        noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
+        verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
+        prompt = ctx.language_config.prompts.build_grammar_generate_prompt(
+            ctx.selected_grammar,
+            noun_items,
+            verb_items,
+            sentences_per_grammar=ctx.config.sentences_per_grammar,
+        )
         result = _ask_llm(ctx, prompt)
-        ctx.sentences = result.get("sentences", [])
+        sentences = result.get("sentences", [])
+        ctx.sentences = []
+        for s_src in sentences:
+            ctx.sentences.append(ctx.language_config.generator.convert_sentence(s_src))
         self._log(ctx, f"       {len(ctx.sentences)} sentences")
         if ctx.sentences:
+            if ctx.language_config.code == "hun-eng":
+                src_lbl, tgt_lbl, ph_lbl, has_phonetic = "Magyar", "English", "Pronunciation", True
+            else:
+                src_lbl, tgt_lbl, ph_lbl, has_phonetic = "English", "Japanese", "Romaji", True
             ctx.report.add(
                 "grammar_practice",
-                self._grammar_section(ctx.sentences, ctx.language_config.field_map),
+                self._grammar_section(ctx.sentences, src_lbl, tgt_lbl, ph_lbl, has_phonetic),
             )
         return ctx
 
     @staticmethod
-    def _grammar_section(sentences: list[dict], fm) -> str:
-        src_lbl = fm.source_label or "Source"
-        tgt_lbl = fm.target_label or "Target"
-        ph_lbl = fm.phonetic_label or "Phonetic"
+    def _grammar_section(sentences: list[Sentence], src_lbl: str, tgt_lbl: str, ph_lbl: str, has_phonetic: bool) -> str:
         header = f"| # | Person | {src_lbl} | {tgt_lbl} |"
         sep = "|---|--------|---------|----------|"
-        if fm.target_phonetic:
+        if has_phonetic:
             header += f" {ph_lbl} |"
             sep += "--------|"
         lines: list[str] = ["## Phase 3 \u2014 Grammar Practice", ""]
-        by_grammar: dict[str, list[dict]] = {}
+        by_grammar: dict[str, list[Sentence]] = {}
         for s in sentences:
-            by_grammar.setdefault(s.get("grammar_id", ""), []).append(s)
+            by_grammar.setdefault(s.grammar_id, []).append(s)
         for gid, sents in by_grammar.items():
             lines.extend([f"### {gid}", "", header, sep])
             for i, s in enumerate(sents, 1):
-                v = fm.view(s)
                 row = (
-                    f"| {i} | {s.get('person', '')} | {v['source']} | {v['target']} |"
+                    f"| {i} | {s.grammar_parameters.get('person', '')} | {s.source.display_text} | {s.target.display_text} |"
                 )
-                if fm.target_phonetic:
-                    row += f" {v['target_phonetic']} |"
+                if has_phonetic and s.target.pronunciation:
+                    row += f" {s.target.pronunciation} |"
                 lines.append(row)
             lines.append("")
         return "\n".join(lines)
@@ -523,20 +430,20 @@ class ReviewSentencesStep(PipelineStep):
             self._log(ctx, "       (no sentences to review)")
             return ctx
 
-        if ctx.language_config.code == "hun-eng":
-            prompt = hungarian_build_sentence_review_prompt(
-                ctx.sentences,
-                ctx.nouns,
-                ctx.verbs,
-                ctx.selected_grammar,
-            )
-        else:
-            prompt = build_sentence_review_prompt(
-                ctx.sentences,
-                ctx.nouns,
-                ctx.verbs,
-                ctx.selected_grammar,
-            )
+        # Ensure all sentences are Sentence objects
+        for i, s in enumerate(ctx.sentences):
+            if isinstance(s, dict):
+                ctx.sentences[i] = ctx.language_config.generator.convert_sentence(s)
+
+        noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
+        verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
+
+        prompt = ctx.language_config.prompts.build_sentence_review_prompt(
+            ctx.sentences,
+            noun_items,
+            verb_items,
+            ctx.selected_grammar,
+        )
         result = _ask_llm(ctx, prompt)
         reviews = result.get("reviews", [])
         revised_count = 0
@@ -550,8 +457,8 @@ class ReviewSentencesStep(PipelineStep):
                 and isinstance(revised, dict)
                 and 0 <= idx < len(ctx.sentences)
             ):
-                original_en = ctx.sentences[idx].get("english", "")
-                ctx.sentences[idx] = revised
+                original_en = ctx.sentences[idx].source.display_text
+                ctx.sentences[idx] = ctx.language_config.generator.convert_sentence(revised)
                 revised_count += 1
                 self._log(
                     ctx,
@@ -597,65 +504,62 @@ class NounPracticeStep(PipelineStep):
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
-        if ctx.language_config.code == "hun-eng":
-            result = _ask_llm(ctx, hungarian_build_noun_practice_prompt(ctx.nouns, lesson_number))
-        else:
-            result = _ask_llm(ctx, build_noun_practice_prompt(ctx.nouns, lesson_number))
-        ctx.noun_items = result.get("noun_items", [])
-        for n_item, n_src in zip(ctx.noun_items, ctx.nouns):
-            n_item.setdefault("english", n_src["english"])
-            if ctx.language_config.code == "hun-eng":
-                n_item.setdefault("hungarian", n_src.get("hungarian", ""))
-                n_item.setdefault("pronunciation", n_src.get("pronunciation", ""))
+        noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
+        result = _ask_llm(ctx, ctx.language_config.prompts.build_noun_practice_prompt(noun_items, lesson_number))
+        raw_items = result.get("noun_items", [])
+        ctx.noun_items = []
+        for n_item in raw_items:
+            # Find corresponding source item and merge
+            v_src = next((n for n in ctx.nouns if n["english"] == n_item["english"]), None)
+            if v_src:
+                ctx.noun_items.append(ctx.language_config.generator.convert_noun(n_item, v_src))
             else:
-                n_item.setdefault("japanese", n_src["japanese"])
-                n_item.setdefault("kanji", n_src.get("kanji", n_src["japanese"]))
-                n_item.setdefault("romaji", n_src["romaji"])
+                ctx.noun_items.append(ctx.language_config.generator.convert_noun(n_item, {}))
         if not ctx.noun_items:
-            ctx.noun_items = [dict(n) for n in ctx.nouns]
+            # Fallback: convert ctx.nouns to new format
+            for n_src in ctx.nouns:
+                ctx.noun_items.append(ctx.language_config.generator.convert_raw_noun(n_src))
+        for item in ctx.noun_items:
+            item.item_type = "noun"
         self._log(ctx, f"       {len(ctx.noun_items)} noun items")
-        fm = ctx.language_config.field_map
-        ctx.report.add("vocabulary", self._vocab_table(ctx.noun_items, fm))
-        ctx.report.add("noun_practice", self._practice_section(ctx.noun_items, fm))
+        if ctx.language_config.code == "hun-eng":
+            src_lbl, tgt_lbl, ph_lbl, has_phonetic = "Magyar", "English", "Pronunciation", True
+        else:
+            src_lbl, tgt_lbl, ph_lbl, has_phonetic = "English", "Japanese", "Romaji", True
+        ctx.report.add("vocabulary", self._vocab_table(ctx.noun_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic))
+        ctx.report.add("noun_practice", self._practice_section(ctx.noun_items, src_lbl, tgt_lbl, ph_lbl))
         return ctx
 
     @staticmethod
-    def _vocab_table(items: list[dict], fm) -> str:
-        tgt_lbl = fm.target_label or "Target"
-        src_lbl = fm.source_label or "Source"
-        ph_lbl = fm.phonetic_label or "Phonetic"
+    def _vocab_table(items: list[GeneralItem], src_lbl: str, tgt_lbl: str, ph_lbl: str, has_phonetic: bool) -> str:
         header = f"| # | {src_lbl} | {tgt_lbl} |"
         sep = "|---|---------|----------|"
-        if fm.target_phonetic:
+        if has_phonetic:
             header += f" {ph_lbl} |"
             sep += "--------|"
         lines = ["## Vocabulary", "", "### Nouns", "", header, sep]
         for i, n in enumerate(items, 1):
-            v = fm.view(n)
-            row = f"| {i} | {v['source']} | {v['target']} |"
-            if fm.target_phonetic:
-                row += f" {v['target_phonetic']} |"
+            row = f"| {i} | {n.source.display_text} | {n.target.display_text} |"
+            if has_phonetic and n.target.pronunciation:
+                row += f" {n.target.pronunciation} |"
             lines.append(row)
         lines.append("")
         return "\n".join(lines)
 
     @staticmethod
-    def _practice_section(items: list[dict], fm) -> str:
-        tgt_lbl = fm.target_label or "Target"
-        ph_lbl = fm.phonetic_label or "Phonetic"
+    def _practice_section(items: list[GeneralItem], src_lbl: str, tgt_lbl: str, ph_lbl: str) -> str:
         lines: list[str] = ["## Phase 1 \u2014 Noun Practice", ""]
         for i, n in enumerate(items, 1):
-            v = fm.view(n)
-            lines.extend([f"### {i}. {v['source']}", ""])
-            lines.append(f"- **{tgt_lbl}:** {v['target']}")
-            if v["target_phonetic"]:
-                lines.append(f"- **{ph_lbl}:** {v['target_phonetic']}")
-            if v["example_sentence_target"]:
-                lines.append(f"- **Example:** {v['example_sentence_target']}")
-            if v["example_sentence_source"]:
-                lines.append(f"  *{v['example_sentence_source']}*")
-            if n.get("memory_tip"):
-                lines.append(f"- **Memory tip:** {n['memory_tip']}")
+            lines.extend([f"### {i}. {n.source.display_text}", ""])
+            lines.append(f"- **{tgt_lbl}:** {n.target.display_text}")
+            if n.target.pronunciation:
+                lines.append(f"- **{ph_lbl}:** {n.target.pronunciation}")
+            if n.target.extra.get("example_sentence_target"):
+                lines.append(f"- **Example:** {n.target.extra['example_sentence_target']}")
+            if n.target.extra.get("example_sentence_source"):
+                lines.append(f"  *{n.target.extra['example_sentence_source']}*")
+            if n.target.extra.get("memory_tip"):
+                lines.append(f"- **Memory tip:** {n.target.extra['memory_tip']}")
             lines.append("")
         return "\n".join(lines)
 
@@ -668,40 +572,38 @@ class VerbPracticeStep(PipelineStep):
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
-        if ctx.language_config.code == "hun-eng":
-            result = _ask_llm(ctx, hungarian_build_verb_practice_prompt(ctx.verbs, lesson_number))
-        else:
-            result = _ask_llm(ctx, build_verb_practice_prompt(ctx.verbs, lesson_number))
-        ctx.verb_items = result.get("verb_items", [])
-        for v_item, v_src in zip(ctx.verb_items, ctx.verbs):
-            v_item.setdefault("english", v_src["english"])
-            if ctx.language_config.code == "hun-eng":
-                v_item.setdefault("hungarian", v_src.get("hungarian", ""))
-                v_item.setdefault("pronunciation", v_src.get("pronunciation", ""))
-                v_item.setdefault("past_tense", v_src.get("past_tense", ""))
+        verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
+        result = _ask_llm(ctx, ctx.language_config.prompts.build_verb_practice_prompt(verb_items, lesson_number))
+        verb_items = result.get("verb_items", [])
+        ctx.verb_items = []
+        for v_item in verb_items:
+            # Find corresponding source item and merge
+            v_src = next((v for v in ctx.verbs if v["english"] == v_item["english"]), None)
+            if v_src:
+                ctx.verb_items.append(ctx.language_config.generator.convert_verb(v_item, v_src))
             else:
-                v_item.setdefault("japanese", v_src["japanese"])
-                v_item.setdefault("kanji", v_src.get("kanji", v_src["japanese"]))
-                v_item.setdefault("romaji", v_src["romaji"])
-                v_item.setdefault("masu_form", v_src["masu_form"])
+                ctx.verb_items.append(ctx.language_config.generator.convert_verb(v_item, {}))
         if not ctx.verb_items:
-            ctx.verb_items = [dict(v) for v in ctx.verbs]
+            # Fallback: convert raw verbs to new format
+            for v_src in ctx.verbs:
+                ctx.verb_items.append(ctx.language_config.generator.convert_raw_verb(v_src))
+        for item in ctx.verb_items:
+            item.item_type = "verb"
         self._log(ctx, f"       {len(ctx.verb_items)} verb items")
-        fm = ctx.language_config.field_map
-        ctx.report.add("vocabulary", self._vocab_table(ctx.verb_items, fm))
-        ctx.report.add("verb_practice", self._practice_section(ctx.verb_items, fm))
+        if ctx.language_config.code == "hun-eng":
+            src_lbl, tgt_lbl, ph_lbl, has_phonetic, has_masu = "Magyar", "English", "Pronunciation", True, False
+        else:
+            src_lbl, tgt_lbl, ph_lbl, has_phonetic, has_masu = "English", "Japanese", "Romaji", True, True
+        ctx.report.add("vocabulary", self._vocab_table(ctx.verb_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic, has_masu))
+        ctx.report.add("verb_practice", self._practice_section(ctx.verb_items, src_lbl, tgt_lbl, ph_lbl, has_masu))
         return ctx
 
     @staticmethod
-    def _vocab_table(items: list[dict], fm) -> str:
-        tgt_lbl = fm.target_label or "Target"
-        src_lbl = fm.source_label or "Source"
-        ph_lbl = fm.phonetic_label or "Phonetic"
+    def _vocab_table(items: list[GeneralItem], src_lbl: str, tgt_lbl: str, ph_lbl: str, has_phonetic: bool, has_masu: bool) -> str:
         masu_lbl = "Polite form"
-        has_masu = "masu_form" in fm.target_special
         header = f"| # | {src_lbl} | {tgt_lbl} |"
         sep = "|---|---------|----------|"
-        if fm.target_phonetic:
+        if has_phonetic:
             header += f" {ph_lbl} |"
             sep += "--------|"
         if has_masu:
@@ -709,40 +611,35 @@ class VerbPracticeStep(PipelineStep):
             sep += "-------------|"
         lines = ["### Verbs", "", header, sep]
         for i, v in enumerate(items, 1):
-            view = fm.view(v)
-            row = f"| {i} | {view['source']} | {view['target']} |"
-            if fm.target_phonetic:
-                row += f" {view['target_phonetic']} |"
-            if has_masu:
-                row += f" {view['target_special'].get('masu_form', '')} |"
+            row = f"| {i} | {v.source.display_text} | {v.target.display_text} |"
+            if has_phonetic and v.target.pronunciation:
+                row += f" {v.target.pronunciation} |"
+            if has_masu and v.target.extra.get("masu_form"):
+                row += f" {v.target.extra['masu_form']} |"
             lines.append(row)
         lines.append("")
         return "\n".join(lines)
 
     @staticmethod
-    def _practice_section(items: list[dict], fm) -> str:
-        tgt_lbl = fm.target_label or "Target"
-        ph_lbl = fm.phonetic_label or "Phonetic"
-        has_masu = "masu_form" in fm.target_special
+    def _practice_section(items: list[GeneralItem], src_lbl: str, tgt_lbl: str, ph_lbl: str, has_masu: bool) -> str:
         lines: list[str] = ["## Phase 2 \u2014 Verb Practice", ""]
         for i, v in enumerate(items, 1):
-            view = fm.view(v)
-            lines.extend([f"### {i}. {view['source']}", ""])
-            lines.append(f"- **{tgt_lbl}:** {view['target']}")
-            if view["target_phonetic"]:
-                lines.append(f"- **{ph_lbl}:** {view['target_phonetic']}")
-            if has_masu and view["target_special"].get("masu_form"):
-                lines.append(f"- **Polite form:** {view['target_special']['masu_form']}")
-            polite = v.get("polite_forms", {})
+            lines.extend([f"### {i}. {v.source.display_text}", ""])
+            lines.append(f"- **{tgt_lbl}:** {v.target.display_text}")
+            if v.target.pronunciation:
+                lines.append(f"- **{ph_lbl}:** {v.target.pronunciation}")
+            if has_masu and v.target.extra.get("masu_form"):
+                lines.append(f"- **Polite form:** {v.target.extra['masu_form']}")
+            polite = v.target.extra.get("polite_forms", {})
             if polite:
                 for form_name, form_val in polite.items():
                     lines.append(f"  - {form_name}: {form_val}")
-            if view["example_sentence_target"]:
-                lines.append(f"- **Example:** {view['example_sentence_target']}")
-            if view["example_sentence_source"]:
-                lines.append(f"  *{view['example_sentence_source']}*")
-            if v.get("memory_tip"):
-                lines.append(f"- **Memory tip:** {v['memory_tip']}")
+            if v.target.extra.get("example_sentence_target"):
+                lines.append(f"- **Example:** {v.target.extra['example_sentence_target']}")
+            if v.target.extra.get("example_sentence_source"):
+                lines.append(f"  *{v.target.extra['example_sentence_source']}*")
+            if v.target.extra.get("memory_tip"):
+                lines.append(f"- **Memory tip:** {v.target.extra['memory_tip']}")
             lines.append("")
         return "\n".join(lines)
 
@@ -761,7 +658,7 @@ class RegisterLessonStep(PipelineStep):
             theme=ctx.config.theme,
             nouns=ctx.nouns,
             verbs=ctx.verbs,
-            grammar_ids=[g["id"] for g in ctx.selected_grammar],
+            grammar_ids=[g.id for g in ctx.selected_grammar],
             items_count=len(ctx.noun_items) + len(ctx.sentences),
         )
         complete_lesson(ctx.curriculum, lesson["id"])
@@ -772,7 +669,7 @@ class RegisterLessonStep(PipelineStep):
             .isoformat(timespec="seconds")
             .replace("+00:00", "Z")
         )
-        grammar_ids = [g["id"] for g in ctx.selected_grammar]
+        grammar_ids = [g.id for g in ctx.selected_grammar]
         ctx.report.add(
             "header",
             "\n".join(
@@ -817,6 +714,7 @@ class CompileAssetsStep(PipelineStep):
 
         items_by_phase = _build_items_by_phase(ctx)
         profile = get_profile(ctx.config.profile)
+        step_info = ctx.step_info
         output_dir = _resolve_output_dir(ctx.config)
         lesson_dir = output_dir / f"lesson_{ctx.lesson_id:03d}"
 
@@ -825,13 +723,14 @@ class CompileAssetsStep(PipelineStep):
         if ctx.config.dry_run:
             self._log(ctx, f"       (dry-run) {total_items} items — cards only")
             ctx.compiled_items = compile_assets_sync(
-                items_by_phase, profile, lesson_dir,
+                items_by_phase, profile, step_info,
+                lesson_dir,
                 lang_cfg=ctx.language_config,
             )
         else:
             self._log(ctx, f"       {total_items} items → cards + TTS")
             ctx.compiled_items = asyncio.run(
-                compile_assets(items_by_phase, profile, lesson_dir,
+                compile_assets(items_by_phase, profile, ctx.step_info, lesson_dir,
                                lang_cfg=ctx.language_config)
             )
 
@@ -880,11 +779,12 @@ class RenderVideoStep(PipelineStep):
         video_builder = VideoBuilder()
         clips = []
         for touch in ctx.touches:
-            card_path = touch.card_path
+            card_path = touch.artifacts.get("card")
             if card_path is None or not card_path.exists():
                 continue
+            audio_paths = touch.artifacts.get("audio") or []
             clip = video_builder.create_multi_audio_clip(
-                card_path, touch.audio_paths,
+                card_path, audio_paths,
             )
             clips.append(clip)
 

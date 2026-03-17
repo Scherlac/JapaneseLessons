@@ -18,8 +18,12 @@ Usage:
 
 from __future__ import annotations
 
+from typing import Any
+
 from dataclasses import dataclass, field
 from typing import Any
+
+from jlesson.video import tts_engine
 
 
 @dataclass
@@ -60,6 +64,10 @@ class FieldMap:
     source_label: str = ""
     target_label: str = ""
     phonetic_label: str = ""
+    # Voice key names (must match keys in LanguageConfig.voices)
+    source_voice: str = "english_female"      # audio_src asset
+    target_voice_female: str = "japanese_female"  # audio_tar_f asset
+    target_voice_male: str = "japanese_male"      # audio_tar_m asset
 
     def view(self, item: Any) -> dict[str, Any]:
         """Return a generic-keyed dict extracted from *item*.
@@ -72,14 +80,19 @@ class FieldMap:
         def _get(field_name: str) -> str:
             if not field_name:
                 return ""
-            if isinstance(item, dict):
-                return item.get(field_name) or ""
-            val = getattr(item, field_name, None)
-            if val is None:
-                extra = getattr(item, "model_extra", None)
-                if extra is not None:
-                    val = extra.get(field_name)
-            return val or ""
+            # Handle dotted paths for both dict and objects
+            parts = field_name.split(".")
+            obj = item
+            for part in parts:
+                if isinstance(obj, dict):
+                    obj = obj.get(part)
+                elif hasattr(obj, part):
+                    obj = getattr(obj, part)
+                else:
+                    return ""
+                if obj is None:
+                    return ""
+            return obj or ""
 
         return {
             "source": _get(self.source),
@@ -119,7 +132,7 @@ class LanguageConfig:
     native_font_path: str
 
     # ── Grammar & persons (may be populated later) ────────────────────────
-    grammar_progression: tuple[dict, ...] = ()
+    grammar_progression: tuple[GrammarItem, ...] = ()
     persons: tuple[tuple[str, str, str], ...] = ()
 
     # ── File-system layout ────────────────────────────────────────────────
@@ -128,6 +141,12 @@ class LanguageConfig:
 
     # ── Field role mapping ────────────────────────────────────────────────
     field_map: FieldMap = field(default_factory=lambda: FieldMap(source="", target=""))
+
+    # ── Item generator ────────────────────────────────────────────────────
+    generator: Any = None  # ItemGenerator instance
+
+    # ── Prompt builders ────────────────────────────────────────────────────
+    prompts: PromptInterface = None
 
 
 # ── Pre-built configs ─────────────────────────────────────────────────────────
@@ -140,8 +159,9 @@ from .curriculum import (  # noqa: E402
     ENG_TO_JAP_GRAMMAR_PROGRESSION,
     HUN_TO_ENG_GRAMMAR_PROGRESSION,
 )
-from .prompt_template import PERSONS_BEGINNER  # noqa: E402
-from .prompt_template import HUNGARIAN_PERSONS  # noqa: E402
+from .models import GrammarItem  # noqa: E402
+from .prompt_template import EngJapPrompts, HunEngPrompts, PromptInterface, PERSONS_BEGINNER, HUNGARIAN_PERSONS
+from .item_generator import EngJapItemGenerator, HunEngItemGenerator  # noqa: E402
 
 ENG_JAP_CONFIG = LanguageConfig(
     code="eng-jap",
@@ -153,12 +173,7 @@ ENG_JAP_CONFIG = LanguageConfig(
     vocab_verb_fields=frozenset({"english", "japanese", "kanji", "romaji", "type", "masu_form"}),
     vocab_verb_types=frozenset({"る-verb", "う-verb", "irregular", "な-adj"}),
 
-    voices={
-        "japanese_female": "ja-JP-NanamiNeural",
-        "japanese_male": "ja-JP-KeitaNeural",
-        "english_female": "en-US-AriaNeural",
-        "english_male": "en-US-ZiraNeural",
-    },
+    voices=tts_engine.VOICES,
 
     target_font_path="C:/Windows/Fonts/YuGothB.ttc",
     native_font_path="C:/Windows/Fonts/segoeui.ttf",
@@ -170,16 +185,23 @@ ENG_JAP_CONFIG = LanguageConfig(
     curriculum_file="curriculum/curriculum.json",
 
     field_map=FieldMap(
-        source="english",
-        target="japanese",
-        target_phonetic="romaji",
-        target_special={"kanji": "kanji", "masu_form": "masu_form"},
-        example_sentence_source="example_sentence_en",
-        example_sentence_target="example_sentence_jp",
+        source="source.display_text",
+        target="target.display_text",
+        target_phonetic="target.pronunciation",
+        target_special={"kanji": "target.kanji", "masu_form": "target.masu_form"},
+        example_sentence_source="source.extra.example_sentence_en",
+        example_sentence_target="target.extra.example_sentence_jp",
         source_label="English",
         target_label="Japanese",
         phonetic_label="Romaji",
+        source_voice="english_female",
+        target_voice_female="japanese_female",
+        target_voice_male="japanese_male",
     ),
+
+    generator=EngJapItemGenerator(),
+
+    prompts=EngJapPrompts(),
 )
 
 HUN_ENG_CONFIG = LanguageConfig(
@@ -192,12 +214,7 @@ HUN_ENG_CONFIG = LanguageConfig(
     vocab_verb_fields=frozenset({"english", "hungarian", "pronunciation", "past_tense"}),
     vocab_verb_types=frozenset(),  # English verbs don't use Japanese-style type classes
 
-    voices={
-        "hungarian_female": "hu-HU-NoemiNeural",
-        "hungarian_male": "hu-HU-TamasNeural",
-        "english_female": "en-US-AriaNeural",
-        "english_male": "en-US-ZiraNeural",
-    },
+    voices=tts_engine.VOICES,
 
     target_font_path="C:/Windows/Fonts/segoeui.ttf",
     native_font_path="C:/Windows/Fonts/segoeui.ttf",
@@ -209,16 +226,23 @@ HUN_ENG_CONFIG = LanguageConfig(
     curriculum_file="curriculum/curriculum_hungarian.json",
 
     field_map=FieldMap(
-        source="hungarian",
-        target="english",
-        target_phonetic="pronunciation",
+        source="source.display_text",
+        target="target.display_text",
+        target_phonetic="target.pronunciation",
         target_special={},
-        example_sentence_source="example_sentence_hu",
-        example_sentence_target="example_sentence_en",
+        example_sentence_source="source.extra.example_sentence_hu",
+        example_sentence_target="target.extra.example_sentence_en",
         source_label="Magyar",
         target_label="English",
         phonetic_label="Pronunciation",
+        source_voice="hungarian_female",
+        target_voice_female="english_female",
+        target_voice_male="english_male",
     ),
+
+    generator=HunEngItemGenerator(),
+
+    prompts=HunEngPrompts(),
 )
 
 # ── Registry ──────────────────────────────────────────────────────────────────

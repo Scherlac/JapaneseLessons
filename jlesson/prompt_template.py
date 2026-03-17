@@ -5,22 +5,30 @@ Each function returns a plain-text prompt string that can be sent to an LLM.
 Templates are kept as simple f-strings — no templating engine needed (KISS).
 """
 
+from .models import GeneralItem, GrammarItem, Sentence
 
-def _format_noun_list(nouns: list[dict]) -> str:
+
+def _format_noun_list(nouns: list[GeneralItem]) -> str:
     """Format noun list into a readable block for the prompt."""
     lines = []
     for i, n in enumerate(nouns, 1):
-        lines.append(f"  {i}. {n['english']} — {n['kanji']} ({n['japanese']}, {n['romaji']})")
+        kanji = n.target.extra.get("kanji", "")
+        romaji = n.target.pronunciation or ""
+        lines.append(f"  {i}. {n.source.display_text} — {kanji} ({n.target.display_text}, {romaji})")
     return "\n".join(lines)
 
 
-def _format_verb_list(verbs: list[dict]) -> str:
+def _format_verb_list(verbs: list[GeneralItem]) -> str:
     """Format verb list into a readable block for the prompt."""
     lines = []
     for i, v in enumerate(verbs, 1):
+        kanji = v.target.extra.get("kanji", "")
+        romaji = v.target.pronunciation or ""
+        verb_type = v.target.extra.get("type", "")
+        masu_form = v.target.extra.get("masu_form", "")
         lines.append(
-            f"  {i}. {v['english']} — {v['kanji']} ({v['japanese']}, {v['romaji']}) "
-            f"[{v['type']}] → polite: {v['masu_form']}"
+            f"  {i}. {v.source.display_text} — {kanji} ({v.target.display_text}, {romaji}) "
+            f"[{verb_type}] → polite: {masu_form}"
         )
     return "\n".join(lines)
 
@@ -241,7 +249,7 @@ Now generate the complete JSON for theme "{theme}" with {num_nouns} nouns and {n
 # These prompts are designed for the curriculum pipeline.
 # Each returns a JSON object — feed to ask_llm_json_free(), not ask_llm_json().
 
-def build_noun_practice_prompt(nouns: list[dict], lesson_number: int = 1) -> str:
+def build_noun_practice_prompt(nouns: list[GeneralItem], lesson_number: int = 1) -> str:
     """Build a prompt for an LLM to generate focused noun introduction content.
 
     Returns JSON: {"noun_items": [{"english", "japanese", "kanji", "romaji",
@@ -280,7 +288,7 @@ Return ONLY a raw JSON object — no markdown fences, no commentary:
 """.strip()
 
 
-def build_verb_practice_prompt(verbs: list[dict], lesson_number: int = 1) -> str:
+def build_verb_practice_prompt(verbs: list[GeneralItem], lesson_number: int = 1) -> str:
     """Build a prompt for an LLM to generate focused verb introduction content.
 
     Returns JSON: {"verb_items": [{"english", "japanese", "kanji", "romaji",
@@ -330,9 +338,9 @@ Return ONLY a raw JSON object — no markdown fences, no commentary:
 
 
 def build_grammar_select_prompt(
-    unlocked_grammar: list[dict],
-    available_nouns: list[dict],
-    available_verbs: list[dict],
+    unlocked_grammar: list[GrammarItem],
+    available_nouns: list[GeneralItem],
+    available_verbs: list[GeneralItem],
     lesson_number: int,
     covered_grammar_ids: list[str],
 ) -> str:
@@ -347,16 +355,16 @@ def build_grammar_select_prompt(
     Use with ask_llm_json_free().
     """
     grammar_lines = "\n".join(
-        f"  - id: {g['id']}\n"
-        f"    structure: {g['structure']}\n"
-        f"    description: {g['description']}\n"
-        f"    example: {g['example_en']} → {g['example_jp']}\n"
-        f"    level: {g['level']}"
+        f"  - id: {g.id}\n"
+        f"    structure: {g.pattern}\n"
+        f"    description: {g.description}\n"
+        f"    example: {g.example_source} → {g.example_target}\n"
+        f"    level: {g.level}"
         for g in unlocked_grammar
     )
 
-    noun_names = ", ".join(n["english"] for n in available_nouns)
-    verb_names = ", ".join(v["english"] for v in available_verbs)
+    noun_names = ", ".join(n.source.display_text for n in available_nouns)
+    verb_names = ", ".join(v.source.display_text for v in available_verbs)
     covered_str = ", ".join(covered_grammar_ids) if covered_grammar_ids else "(none)"
 
     return f"""\
@@ -387,9 +395,9 @@ Return ONLY a raw JSON object — no markdown fences, no commentary:
 
 
 def build_grammar_generate_prompt(
-    grammar_specs: list[dict],
-    nouns: list[dict],
-    verbs: list[dict],
+    grammar_specs: list[GrammarItem],
+    nouns: list[GeneralItem],
+    verbs: list[GeneralItem],
     persons: list[tuple[str, str, str]] | None = None,
     sentences_per_grammar: int = 3,
 ) -> str:
@@ -407,8 +415,8 @@ def build_grammar_generate_prompt(
     persons = persons or _default_persons
 
     grammar_block = "\n".join(
-        f"  [{g['id']}] {g['structure']} — {g['description']}\n"
-        f"  Example: {g['example_en']} → {g['example_jp']}"
+        f"  [{g.id}] {g.pattern} — {g.description}\n"
+        f"  Example: {g.example_source} → {g.example_target}"
         for g in grammar_specs
     )
 
@@ -522,10 +530,10 @@ Return ONLY a raw JSON object — no markdown fences, no commentary:
 
 
 def build_sentence_review_prompt(
-    sentences: list[dict],
-    nouns: list[dict],
-    verbs: list[dict],
-    grammar_specs: list[dict],
+    sentences: list[Sentence],
+    nouns: list[GeneralItem],
+    verbs: list[GeneralItem],
+    grammar_specs: list[GrammarItem],
 ) -> str:
     """Review prompt: ask the LLM to rate sentences for naturalness and rewrite poor ones.
 
@@ -540,24 +548,24 @@ def build_sentence_review_prompt(
     Use with ask_llm_json_free().
     """
     sentence_lines = "\n".join(
-        f"  [{i}] grammar: {s.get('grammar_id', '?')}\n"
-        f"       EN: {s.get('english', '')}\n"
-        f"       JP: {s.get('japanese', '')}\n"
-        f"       RM: {s.get('romaji', '')}\n"
-        f"       Person: {s.get('person', '')}"
+        f"  [{i}] grammar: {s.grammar_id}\n"
+        f"       EN: {s.source.display_text}\n"
+        f"       JP: {s.target.display_text}\n"
+        f"       RM: {s.target.pronunciation}\n"
+        f"       Person: {s.grammar_parameters.get('person', '')}"
         for i, s in enumerate(sentences)
     )
 
     grammar_block = "\n".join(
-        f"  [{g['id']}] {g['structure']} — {g['description']}"
+        f"  [{g.id}] {g.pattern} — {g.description}"
         for g in grammar_specs
     )
 
     noun_names = ", ".join(
-        f"{n['english']} ({n.get('kanji', n['japanese'])})" for n in nouns
+        f"{n.source.display_text} ({n.target.extra.get('kanji', n.target.display_text)})" for n in nouns
     )
     verb_names = ", ".join(
-        f"{v['english']} ({v.get('kanji', v['japanese'])})" for v in verbs
+        f"{v.source.display_text} ({v.target.extra.get('kanji', v.target.display_text)})" for v in verbs
     )
 
     return f"""\
@@ -662,25 +670,25 @@ HUNGARIAN_GRAMMAR_PATTERNS: list[dict] = [
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _format_hungarian_noun_list(nouns: list[dict]) -> str:
+def _format_hungarian_noun_list(nouns: list[GeneralItem]) -> str:
     """Format Hungarian noun list into a readable block for the prompt."""
     lines = []
     for i, n in enumerate(nouns, 1):
         lines.append(
-            f"  {i}. {n['english']} — {n['hungarian']} "
-            f"(pronunciation: {n['pronunciation']})"
+            f"  {i}. {n.target.display_text} — {n.source.display_text} "
+            f"(pronunciation: {n.target.pronunciation})"
         )
     return "\n".join(lines)
 
 
-def _format_hungarian_verb_list(verbs: list[dict]) -> str:
+def _format_hungarian_verb_list(verbs: list[GeneralItem]) -> str:
     """Format Hungarian verb list into a readable block for the prompt."""
     lines = []
     for i, v in enumerate(verbs, 1):
-        past = v.get("past_tense", "?")
+        past = v.target.extra.get("past_tense", "?")
         lines.append(
-            f"  {i}. {v['english']} — {v['hungarian']} "
-            f"(pronunciation: {v['pronunciation']}) → past tense: {past}"
+            f"  {i}. {v.target.display_text} — {v.source.display_text} "
+            f"(pronunciation: {v.target.pronunciation}) → past tense: {past}"
         )
     return "\n".join(lines)
 
@@ -824,7 +832,7 @@ Now generate the complete JSON for theme "{theme}" with {num_nouns} nouns and {n
 
 
 def hungarian_build_noun_practice_prompt(
-    nouns: list[dict],
+    nouns: list[GeneralItem],
     lesson_number: int = 1,
 ) -> str:
     """Build a prompt for an LLM to generate focused noun introduction content.
@@ -870,7 +878,7 @@ Return ONLY a raw JSON object — no markdown fences, no commentary:
 
 
 def hungarian_build_verb_practice_prompt(
-    verbs: list[dict],
+    verbs: list[GeneralItem],
     lesson_number: int = 1,
 ) -> str:
     """Build a prompt for an LLM to generate focused verb introduction content.
@@ -922,9 +930,9 @@ Return ONLY a raw JSON object — no markdown fences, no commentary:
 
 
 def hungarian_build_grammar_select_prompt(
-    unlocked_grammar: list[dict],
-    available_nouns: list[dict],
-    available_verbs: list[dict],
+    unlocked_grammar: list[GrammarItem],
+    available_nouns: list[GeneralItem],
+    available_verbs: list[GeneralItem],
     lesson_number: int,
     covered_grammar_ids: list[str],
 ) -> str:
@@ -935,16 +943,16 @@ def hungarian_build_grammar_select_prompt(
     Use with ask_llm_json_free().
     """
     grammar_lines = "\n".join(
-        f"  - id: {g['id']}\n"
-        f"    pattern: {g['pattern']}\n"
-        f"    description: {g['description']}\n"
-        f"    example: {g['example_en']} → {g['example_hu']}\n"
-        f"    level: {g['level']}"
+        f"  - id: {g.id}\n"
+        f"    pattern: {g.pattern}\n"
+        f"    description: {g.description}\n"
+        f"    example: {g.example_source} → {g.example_target}\n"
+        f"    level: {g.level}"
         for g in unlocked_grammar
     )
 
-    noun_names = ", ".join(n["english"] for n in available_nouns)
-    verb_names = ", ".join(v["english"] for v in available_verbs)
+    noun_names = ", ".join(n.source.display_text for n in available_nouns)
+    verb_names = ", ".join(v.source.display_text for v in available_verbs)
     covered_str = ", ".join(covered_grammar_ids) if covered_grammar_ids else "(none)"
 
     return f"""\
@@ -976,9 +984,9 @@ Return ONLY a raw JSON object — no markdown fences, no commentary:
 
 
 def hungarian_build_grammar_generate_prompt(
-    grammar_specs: list[dict],
-    nouns: list[dict],
-    verbs: list[dict],
+    grammar_specs: list[GrammarItem],
+    nouns: list[GeneralItem],
+    verbs: list[GeneralItem],
     persons: list[tuple[str, str, str]] | None = None,
     sentences_per_grammar: int = 3,
 ) -> str:
@@ -992,8 +1000,8 @@ def hungarian_build_grammar_generate_prompt(
     persons = persons or HUNGARIAN_PERSONS
 
     grammar_block = "\n".join(
-        f"  [{g['id']}] {g['pattern']} — {g['description']}\n"
-        f"  Example: {g['example_en']} → {g['example_hu']}"
+        f"  [{g.id}] {g.pattern} — {g.description}\n"
+        f"  Example: {g.example_source} → {g.example_target}"
         for g in grammar_specs
     )
 
@@ -1050,10 +1058,10 @@ Return ONLY a raw JSON object — no markdown fences, no commentary:
 
 
 def hungarian_build_sentence_review_prompt(
-    sentences: list[dict],
-    nouns: list[dict],
-    verbs: list[dict],
-    grammar_specs: list[dict],
+    sentences: list[Sentence],
+    nouns: list[GeneralItem],
+    verbs: list[GeneralItem],
+    grammar_specs: list[GrammarItem],
 ) -> str:
     """Review English sentences for correctness and age-appropriateness.
 
@@ -1064,23 +1072,23 @@ def hungarian_build_sentence_review_prompt(
     Use with ask_llm_json_free().
     """
     sentence_lines = "\n".join(
-        f"  [{i}] grammar: {s.get('grammar_id', '?')}\n"
-        f"       EN: {s.get('english', '')}\n"
-        f"       HU: {s.get('hungarian', '')}\n"
-        f"       Person: {s.get('person', '')}"
+        f"  [{i}] grammar: {s.grammar_id}\n"
+        f"       EN: {s.source.display_text}\n"
+        f"       HU: {s.target.display_text}\n"
+        f"       Person: {s.grammar_parameters.get('person', '')}"
         for i, s in enumerate(sentences)
     )
 
     grammar_block = "\n".join(
-        f"  [{g['id']}] {g['pattern']} — {g['description']}"
+        f"  [{g.id}] {g.pattern} — {g.description}"
         for g in grammar_specs
     )
 
     noun_names = ", ".join(
-        f"{n['english']} ({n['hungarian']})" for n in nouns
+        f"{n.target.display_text} ({n.source.display_text})" for n in nouns
     )
     verb_names = ", ".join(
-        f"{v['english']} ({v['hungarian']})" for v in verbs
+        f"{v.target.display_text} ({v.source.display_text})" for v in verbs
     )
 
     return f"""\
@@ -1147,3 +1155,171 @@ Return ONLY a raw JSON object — no markdown fences, no commentary:
   "overall_naturalness": <1-5 average>
 }}
 """.strip()
+
+
+# ------------------------------------------------------------------------------
+# Prompt Interface
+# ------------------------------------------------------------------------------
+
+
+from abc import ABC, abstractmethod
+from typing import Any
+
+
+class PromptInterface(ABC):
+    """Abstract interface for language-specific prompt builders."""
+
+    @abstractmethod
+    def build_grammar_select_prompt(
+        self,
+        unlocked_grammar: list[GrammarItem],
+        available_nouns: list[GeneralItem],
+        available_verbs: list[GeneralItem],
+        lesson_number: int,
+        covered_grammar_ids: list[str],
+    ) -> str:
+        """Build prompt for selecting grammar points."""
+        ...
+
+    @abstractmethod
+    def build_grammar_generate_prompt(
+        self,
+        grammar_specs: list[GrammarItem],
+        nouns: list[GeneralItem],
+        verbs: list[GeneralItem],
+        persons: list[tuple[str, str, str]] | None = None,
+        sentences_per_grammar: int = 3,
+    ) -> str:
+        """Build prompt for generating grammar sentences."""
+        ...
+
+    @abstractmethod
+    def build_sentence_review_prompt(
+        self,
+        sentences: list[Sentence],
+        nouns: list[GeneralItem],
+        verbs: list[GeneralItem],
+        grammar_specs: list[GrammarItem],
+    ) -> str:
+        """Build prompt for reviewing sentences."""
+        ...
+
+    @abstractmethod
+    def build_noun_practice_prompt(
+        self,
+        noun_items: list[GeneralItem],
+        lesson_number: int,
+    ) -> str:
+        """Build prompt for noun practice."""
+        ...
+
+    @abstractmethod
+    def build_verb_practice_prompt(
+        self,
+        verb_items: list[GeneralItem],
+        lesson_number: int,
+    ) -> str:
+        """Build prompt for verb practice."""
+        ...
+
+
+class EngJapPrompts(PromptInterface):
+    """Prompt builders for English-Japanese lessons."""
+
+    def build_grammar_select_prompt(
+        self,
+        unlocked_grammar: list[GrammarItem],
+        available_nouns: list[GeneralItem],
+        available_verbs: list[GeneralItem],
+        lesson_number: int,
+        covered_grammar_ids: list[str],
+    ) -> str:
+        return build_grammar_select_prompt(
+            unlocked_grammar, available_nouns, available_verbs, lesson_number, covered_grammar_ids
+        )
+
+    def build_grammar_generate_prompt(
+        self,
+        grammar_specs: list[GrammarItem],
+        nouns: list[GeneralItem],
+        verbs: list[GeneralItem],
+        persons: list[tuple[str, str, str]] | None = None,
+        sentences_per_grammar: int = 3,
+    ) -> str:
+        return build_grammar_generate_prompt(
+            grammar_specs, nouns, verbs, persons, sentences_per_grammar
+        )
+
+    def build_sentence_review_prompt(
+        self,
+        sentences: list[Sentence],
+        nouns: list[GeneralItem],
+        verbs: list[GeneralItem],
+        grammar_specs: list[GrammarItem],
+    ) -> str:
+        return build_sentence_review_prompt(sentences, nouns, verbs, grammar_specs)
+
+    def build_noun_practice_prompt(
+        self,
+        noun_items: list[GeneralItem],
+        lesson_number: int,
+    ) -> str:
+        return build_noun_practice_prompt(noun_items, lesson_number)
+
+    def build_verb_practice_prompt(
+        self,
+        verb_items: list[GeneralItem],
+        lesson_number: int,
+    ) -> str:
+        return build_verb_practice_prompt(verb_items, lesson_number)
+
+
+class HunEngPrompts(PromptInterface):
+    """Prompt builders for Hungarian-English lessons."""
+
+    def build_grammar_select_prompt(
+        self,
+        unlocked_grammar: list[GrammarItem],
+        available_nouns: list[GeneralItem],
+        available_verbs: list[GeneralItem],
+        lesson_number: int,
+        covered_grammar_ids: list[str],
+    ) -> str:
+        return hungarian_build_grammar_select_prompt(
+            unlocked_grammar, available_nouns, available_verbs, lesson_number, covered_grammar_ids
+        )
+
+    def build_grammar_generate_prompt(
+        self,
+        grammar_specs: list[GrammarItem],
+        nouns: list[GeneralItem],
+        verbs: list[GeneralItem],
+        persons: list[tuple[str, str, str]] | None = None,
+        sentences_per_grammar: int = 3,
+    ) -> str:
+        return hungarian_build_grammar_generate_prompt(
+            grammar_specs, nouns, verbs, persons, sentences_per_grammar
+        )
+
+    def build_sentence_review_prompt(
+        self,
+        sentences: list[Sentence],
+        nouns: list[GeneralItem],
+        verbs: list[GeneralItem],
+        grammar_specs: list[GrammarItem],
+    ) -> str:
+        return hungarian_build_sentence_review_prompt(sentences, nouns, verbs, grammar_specs)
+
+    def build_noun_practice_prompt(
+        self,
+        noun_items: list[GeneralItem],
+        lesson_number: int,
+    ) -> str:
+        return hungarian_build_noun_practice_prompt(noun_items, lesson_number)
+
+    def build_verb_practice_prompt(
+        self,
+        verb_items: list[GeneralItem],
+        lesson_number: int,
+    ) -> str:
+        return hungarian_build_verb_practice_prompt(verb_items, lesson_number)

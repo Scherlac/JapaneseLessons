@@ -52,34 +52,44 @@ class Profile:
 # ---------------------------------------------------------------------------
 
 TOUCH_TYPE_ASSETS: dict[TouchType, set[str]] = {
-    # Card-based
-    TouchType.EN_JP: {"card_en", "card_jp", "audio_jp_f"},
-    TouchType.JP_EN: {"card_jp", "card_en", "audio_jp_f"},
-    TouchType.JP_JP: {"card_jp", "audio_jp_f"},
-    # Listen-first
-    TouchType.LISTEN_EN_JPM_JPF: {"card_en_jp", "audio_en", "audio_jp_m", "audio_jp_f"},
-    TouchType.LISTEN_JPF_JPM: {"card_jp", "audio_jp_f", "audio_jp_m"},
-    TouchType.LISTEN_EN_JPF: {"card_en_jp", "audio_en", "audio_jp_f"},
+    TouchType.SOURCE_TARGET: {"card_src", "card_tar", "audio_tar_f"},
+    TouchType.TARGET_SOURCE: {"card_tar", "card_src", "audio_tar_f"},
+    TouchType.SOURCE_ONLY: {"card_src", "audio_tar_f"},
+    TouchType.TARGET_ONLY: {"card_tar", "audio_tar_f"},
+    TouchType.LISTEN_DUAL_M: {"card_src_tar", "audio_src", "audio_tar_m", "audio_tar_f"},
+    TouchType.LISTEN_DUAL_F: {"card_src_tar", "audio_src", "audio_tar_f"},
+    TouchType.LISTEN_REVERSE_M: {"card_tar", "audio_tar_m", "audio_src"},
+    TouchType.LISTEN_REVERSE_F: {"card_tar", "audio_tar_f", "audio_tar_m"},
+    TouchType.LISTEN_TARGET_M: {"card_tar", "audio_tar_m"},
+    TouchType.LISTEN_TARGET_F: {"card_tar", "audio_tar_f"},
 }
 
 # Resolve card path for each touch type: prompt card shown during the touch.
 TOUCH_TYPE_CARD: dict[TouchType, str] = {
-    TouchType.EN_JP: "card_en",
-    TouchType.JP_EN: "card_jp",
-    TouchType.JP_JP: "card_jp",
-    TouchType.LISTEN_EN_JPM_JPF: "card_en_jp",
-    TouchType.LISTEN_JPF_JPM: "card_jp",
-    TouchType.LISTEN_EN_JPF: "card_en_jp",
+    TouchType.SOURCE_TARGET: "card_src",
+    TouchType.TARGET_SOURCE: "card_tar",
+    TouchType.SOURCE_ONLY: "card_src",
+    TouchType.TARGET_ONLY: "card_tar",
+    TouchType.LISTEN_DUAL_M: "card_src_tar",
+    TouchType.LISTEN_DUAL_F: "card_src_tar",
+    TouchType.LISTEN_REVERSE_M: "card_tar",
+    TouchType.LISTEN_REVERSE_F: "card_tar",
+    TouchType.LISTEN_TARGET_M: "card_tar",
+    TouchType.LISTEN_TARGET_F: "card_tar",
 }
 
 # Resolve ordered audio sequence for each touch type.
 TOUCH_TYPE_AUDIO: dict[TouchType, list[str]] = {
-    TouchType.EN_JP: ["audio_jp_f"],
-    TouchType.JP_EN: ["audio_jp_f"],
-    TouchType.JP_JP: ["audio_jp_f"],
-    TouchType.LISTEN_EN_JPM_JPF: ["audio_en", "audio_jp_m", "audio_jp_f"],
-    TouchType.LISTEN_JPF_JPM: ["audio_jp_f", "audio_jp_m"],
-    TouchType.LISTEN_EN_JPF: ["audio_en", "audio_jp_f"],
+    TouchType.SOURCE_TARGET: ["audio_tar_f"],
+    TouchType.TARGET_SOURCE: ["audio_tar_f"],
+    TouchType.SOURCE_ONLY: ["audio_tar_f"],
+    TouchType.TARGET_ONLY: ["audio_tar_f"],
+    TouchType.LISTEN_DUAL_M: ["audio_src", "audio_tar_m", "audio_tar_f"],
+    TouchType.LISTEN_DUAL_F: ["audio_src", "audio_tar_f"],
+    TouchType.LISTEN_REVERSE_M: ["audio_tar_m", "audio_src"],
+    TouchType.LISTEN_REVERSE_F: ["audio_tar_f", "audio_tar_m"],
+    TouchType.LISTEN_TARGET_M: ["audio_tar_m"],
+    TouchType.LISTEN_TARGET_F: ["audio_tar_f"],
 }
 
 
@@ -88,14 +98,14 @@ TOUCH_TYPE_AUDIO: dict[TouchType, list[str]] = {
 # ---------------------------------------------------------------------------
 
 _PASSIVE_NOUN_VERB_CYCLE = [
-    RepetitionStep(touch_type=TouchType.LISTEN_EN_JPM_JPF, intent=TouchIntent.INTRODUCE),
-    RepetitionStep(touch_type=TouchType.LISTEN_JPF_JPM, intent=TouchIntent.REINFORCE),
-    RepetitionStep(touch_type=TouchType.LISTEN_EN_JPM_JPF, intent=TouchIntent.LOCK_IN),
+    RepetitionStep(touch_type=TouchType.LISTEN_DUAL_M, intent=TouchIntent.INTRODUCE),
+    RepetitionStep(touch_type=TouchType.LISTEN_REVERSE_F, intent=TouchIntent.REINFORCE),
+    RepetitionStep(touch_type=TouchType.LISTEN_DUAL_M, intent=TouchIntent.LOCK_IN),
 ]
 
 _PASSIVE_GRAMMAR_CYCLE = [
-    RepetitionStep(touch_type=TouchType.LISTEN_EN_JPM_JPF, intent=TouchIntent.TRANSLATE),
-    RepetitionStep(touch_type=TouchType.LISTEN_EN_JPF, intent=TouchIntent.REINFORCE),
+    RepetitionStep(touch_type=TouchType.LISTEN_DUAL_M, intent=TouchIntent.TRANSLATE),
+    RepetitionStep(touch_type=TouchType.LISTEN_DUAL_F, intent=TouchIntent.REINFORCE),
 ]
 
 PASSIVE_VIDEO = Profile(
@@ -113,17 +123,17 @@ PASSIVE_VIDEO = Profile(
 # ---------------------------------------------------------------------------
 
 _ACTIVE_NOUN_VERB_CYCLE = [
-    RepetitionStep(touch_type=TouchType.EN_JP, intent=TouchIntent.INTRODUCE),
-    RepetitionStep(touch_type=TouchType.JP_EN, intent=TouchIntent.RECALL),
-    RepetitionStep(touch_type=TouchType.EN_JP, intent=TouchIntent.REINFORCE),
-    RepetitionStep(touch_type=TouchType.JP_JP, intent=TouchIntent.CONFIRM),
-    RepetitionStep(touch_type=TouchType.EN_JP, intent=TouchIntent.LOCK_IN),
+    RepetitionStep(touch_type=TouchType.SOURCE_TARGET, intent=TouchIntent.INTRODUCE),
+    RepetitionStep(touch_type=TouchType.TARGET_SOURCE, intent=TouchIntent.RECALL),
+    RepetitionStep(touch_type=TouchType.SOURCE_TARGET, intent=TouchIntent.REINFORCE),
+    RepetitionStep(touch_type=TouchType.TARGET_ONLY, intent=TouchIntent.CONFIRM),
+    RepetitionStep(touch_type=TouchType.SOURCE_TARGET, intent=TouchIntent.LOCK_IN),
 ]
 
 _ACTIVE_GRAMMAR_CYCLE = [
-    RepetitionStep(touch_type=TouchType.EN_JP, intent=TouchIntent.TRANSLATE),
-    RepetitionStep(touch_type=TouchType.JP_EN, intent=TouchIntent.COMPREHEND),
-    RepetitionStep(touch_type=TouchType.EN_JP, intent=TouchIntent.REINFORCE),
+    RepetitionStep(touch_type=TouchType.SOURCE_TARGET, intent=TouchIntent.TRANSLATE),
+    RepetitionStep(touch_type=TouchType.TARGET_SOURCE, intent=TouchIntent.COMPREHEND),
+    RepetitionStep(touch_type=TouchType.SOURCE_TARGET, intent=TouchIntent.REINFORCE),
 ]
 
 ACTIVE_FLASH_CARDS = Profile(
