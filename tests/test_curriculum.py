@@ -57,51 +57,51 @@ def food_verbs():
 # ─── Grammar Progression table integrity ─────────────────────────────────────
 
 class TestGrammarProgressionTable:
-    _REQUIRED = {"id", "structure", "pattern", "description", "example_jp",
-                 "example_en", "tenses", "polarities", "requires", "level"}
+    _REQUIRED = {"id", "pattern", "description", "example_source",
+                 "example_target", "requires", "level"}
 
     def test_all_required_fields_present(self):
         for g in GRAMMAR_PROGRESSION:
-            missing = self._REQUIRED - g.keys()
-            assert not missing, f"{g['id']!r} missing fields: {missing}"
+            missing = self._REQUIRED - g.model_fields.keys()
+            assert not missing, f"{g.id!r} missing fields: {missing}"
 
     def test_ids_are_unique(self):
-        ids = [g["id"] for g in GRAMMAR_PROGRESSION]
+        ids = [g.id for g in GRAMMAR_PROGRESSION]
         assert len(ids) == len(set(ids)), "Duplicate grammar IDs found"
 
     def test_all_prerequisite_ids_exist(self):
-        valid_ids = {g["id"] for g in GRAMMAR_PROGRESSION}
+        valid_ids = {g.id for g in GRAMMAR_PROGRESSION}
         for g in GRAMMAR_PROGRESSION:
-            for req in g["requires"]:
+            for req in g.requires:
                 assert req in valid_ids, (
-                    f"{g['id']!r} has unknown prerequisite {req!r}"
+                    f"{g.id!r} has unknown prerequisite {req!r}"
                 )
 
     def test_no_self_referential_prerequisites(self):
         for g in GRAMMAR_PROGRESSION:
-            assert g["id"] not in g["requires"], (
-                f"{g['id']!r} lists itself as a prerequisite"
+            assert g.id not in g.requires, (
+                f"{g.id!r} lists itself as a prerequisite"
             )
 
     def test_level_1_steps_have_no_prerequisites(self):
-        level1 = [g for g in GRAMMAR_PROGRESSION if g["level"] == 1]
+        level1 = [g for g in GRAMMAR_PROGRESSION if g.level == 1]
         assert level1, "No level-1 grammar steps found"
         for g in level1:
-            assert g["requires"] == [], (
-                f"Level-1 step {g['id']!r} has prerequisites: {g['requires']}"
+            assert g.requires == [], (
+                f"Level-1 step {g.id!r} has prerequisites: {g.requires}"
             )
 
     def test_at_least_one_step_per_level(self):
-        levels = {g["level"] for g in GRAMMAR_PROGRESSION}
+        levels = {g.level for g in GRAMMAR_PROGRESSION}
         for lvl in range(1, max(levels) + 1):
-            assert any(g["level"] == lvl for g in GRAMMAR_PROGRESSION), (
+            assert any(g.level == lvl for g in GRAMMAR_PROGRESSION), (
                 f"No grammar steps for level {lvl}"
             )
 
     def test_get_grammar_by_id_returns_correct_entry(self):
         g = get_grammar_by_id("action_present_affirmative")
         assert g["level"] == 1
-        assert g["structure"] == "を-ます"
+        assert g["pattern"] == "Subject + object + verb (polite)"
 
     def test_get_grammar_by_id_raises_on_unknown(self):
         with pytest.raises(KeyError):
@@ -146,7 +146,7 @@ class TestGetNextGrammar:
         assert "action_past_negative" in ids_both
 
     def test_all_covered_returns_empty(self):
-        all_ids = [g["id"] for g in GRAMMAR_PROGRESSION]
+        all_ids = [g.id for g in GRAMMAR_PROGRESSION]
         assert get_next_grammar(all_ids) == []
 
 
@@ -394,7 +394,7 @@ class TestSummary:
         assert "unlocked" in result.lower() or "available" in result.lower()
 
     def test_completed_curriculum_says_complete(self):
-        all_ids = [g["id"] for g in GRAMMAR_PROGRESSION]
+        all_ids = [g.id for g in GRAMMAR_PROGRESSION]
         cur = create_curriculum()
         cur["covered_grammar_ids"] = all_ids
         result = summary(cur)

@@ -26,7 +26,7 @@ from jlesson.lesson_pipeline import (
     _build_video_items,
     run_pipeline,
 )
-from jlesson.models import CompiledItem, ItemAssets, NounItem, Phase, Touch, TouchIntent, TouchType, VerbItem, Sentence
+from jlesson.models import CompiledItem, ItemAssets, NounItem, Phase, Touch, TouchIntent, TouchType, VerbItem, Sentence, GeneralItem, PartialItem
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ def test_generate_sentences_stores_sentences(ctx):
     with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
         ctx = GenerateSentencesStep().execute(ctx)
     assert len(ctx.sentences) == 1
-    assert ctx.sentences[0]["english"] == "I eat bread."
+    assert ctx.sentences[0].source.display_text == "I eat bread."
 
 
 def test_generate_sentences_adds_grammar_to_report(ctx):
@@ -283,9 +283,9 @@ def test_review_sentences_applies_revisions(ctx):
     }
     with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
-    assert ctx.sentences[0]["english"] == "I eat bread."
-    assert ctx.sentences[1]["english"] == "There is water in the kitchen."
-    assert ctx.sentences[1]["romaji"] == "daidokoro ni mizu ga arimasu"
+    assert ctx.sentences[0].source.display_text == "I eat bread."
+    assert ctx.sentences[1].source.display_text == "There is water in the kitchen."
+    assert ctx.sentences[1].target.pronunciation == "daidokoro ni mizu ga arimasu"
 
 
 def test_review_sentences_no_revisions_needed(ctx):
@@ -301,7 +301,7 @@ def test_review_sentences_no_revisions_needed(ctx):
     }
     with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
-    assert ctx.sentences[0]["english"] == "I eat bread."
+    assert ctx.sentences[0].source.display_text == "I eat bread."
 
 
 def test_review_sentences_empty_sentences(ctx):
@@ -318,7 +318,7 @@ def test_review_sentences_empty_llm_response(ctx):
     with patch("jlesson.lesson_pipeline._ask_llm", return_value={}):
         ctx = ReviewSentencesStep().execute(ctx)
     assert len(ctx.sentences) == 2
-    assert ctx.sentences[0]["english"] == "I eat bread."
+    assert ctx.sentences[0].source.display_text == "I eat bread."
 
 
 def test_review_sentences_ignores_high_score_with_revision(ctx):
@@ -348,7 +348,7 @@ def test_review_sentences_ignores_high_score_with_revision(ctx):
     }
     with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
-    assert ctx.sentences[0]["english"] == "I eat bread."
+    assert ctx.sentences[0].source.display_text == "I eat bread."
 
 
 def test_review_sentences_ignores_out_of_bounds_index(ctx):
@@ -370,7 +370,7 @@ def test_review_sentences_ignores_out_of_bounds_index(ctx):
     }
     with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
-    assert ctx.sentences[0]["english"] == "I eat bread."
+    assert ctx.sentences[0].source.display_text == "I eat bread."
 
 
 def test_review_sentences_ignores_null_revised_sentence(ctx):
@@ -387,7 +387,7 @@ def test_review_sentences_ignores_null_revised_sentence(ctx):
     }
     with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
-    assert ctx.sentences[0]["english"] == "I eat bread."
+    assert ctx.sentences[0].source.display_text == "I eat bread."
 
 
 def test_review_sentences_adds_report_on_revisions(ctx):
@@ -472,7 +472,7 @@ def test_noun_practice_stores_items(ctx):
     with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
         ctx = NounPracticeStep().execute(ctx)
     assert len(ctx.noun_items) == 2
-    assert ctx.noun_items[0]["english"] == "water"
+    assert ctx.noun_items[0].source.display_text == "water"
 
 
 def test_noun_practice_adds_to_report(ctx):
@@ -491,9 +491,9 @@ def test_noun_practice_fills_missing_fields_from_source(ctx):
     mock = {"noun_items": [{"english": "water"}, {"english": "bread"}]}
     with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
         ctx = NounPracticeStep().execute(ctx)
-    assert ctx.noun_items[0]["japanese"] == "\u307f\u305a"
-    assert ctx.noun_items[0]["romaji"] == "mizu"
-    assert ctx.noun_items[1]["kanji"] == "\u30d1\u30f3"
+    assert ctx.noun_items[0].target.display_text == "\u307f\u305a"
+    assert ctx.noun_items[0].target.pronunciation == "mizu"
+    assert ctx.noun_items[1].target.extra["kanji"] == "\u30d1\u30f3"
 
 
 def test_noun_practice_fallback_on_empty_llm(ctx):
@@ -539,7 +539,7 @@ def test_verb_practice_stores_items(ctx):
     with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
         ctx = VerbPracticeStep().execute(ctx)
     assert len(ctx.verb_items) == 2
-    assert ctx.verb_items[0]["masu_form"] == "\u98df\u3079\u307e\u3059"
+    assert ctx.verb_items[0].target.extra["masu_form"] == "\u98df\u3079\u307e\u3059"
 
 
 def test_verb_practice_adds_to_report(ctx):
@@ -557,8 +557,8 @@ def test_verb_practice_fills_missing_fields_from_source(ctx):
     mock = {"verb_items": [{"english": "to eat"}, {"english": "to drink"}]}
     with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
         ctx = VerbPracticeStep().execute(ctx)
-    assert ctx.verb_items[0]["masu_form"] == "\u98df\u3079\u307e\u3059"
-    assert ctx.verb_items[1]["romaji"] == "nomu"
+    assert ctx.verb_items[0].target.extra["masu_form"] == "\u98df\u3079\u307e\u3059"
+    assert ctx.verb_items[1].target.pronunciation == "nomu"
 
 
 def test_verb_practice_fallback_on_empty_llm(ctx):
@@ -940,32 +940,26 @@ def test_run_pipeline_report_contains_all_sections(config):
 
 def test_build_items_by_phase_groups_correctly(ctx):
     ctx.noun_items = [
-        {"english": "water", "japanese": "みず", "kanji": "水", "romaji": "mizu"},
+        GeneralItem(source=PartialItem(display_text="water"), target=PartialItem(display_text="みず", extra={"kanji": "水", "romaji": "mizu"})),
     ]
     ctx.verb_items = [
-        {
-            "english": "to eat",
-            "japanese": "たべる",
-            "kanji": "食べる",
-            "romaji": "taberu",
-            "masu_form": "食べます",
-        },
+        GeneralItem(source=PartialItem(display_text="to eat"), target=PartialItem(display_text="たべる", extra={"kanji": "食べる", "romaji": "taberu", "masu_form": "食べます"})),
     ]
     ctx.sentences = [
-        {
-            "grammar_id": "action_present_affirmative",
-            "english": "I eat bread.",
-            "japanese": "パンを食べます。",
-            "romaji": "pan wo tabemasu",
-            "person": "I",
-        },
+        Sentence(
+            grammar_id="action_present_affirmative",
+            english="I eat bread.",
+            japanese="パンを食べます。",
+            romaji="pan wo tabemasu",
+            person="I",
+        ),
     ]
     result = _build_items_by_phase(ctx)
     assert len(result[Phase.NOUNS]) == 1
     assert len(result[Phase.VERBS]) == 1
     assert len(result[Phase.GRAMMAR]) == 1
-    assert isinstance(result[Phase.NOUNS][0], NounItem)
-    assert isinstance(result[Phase.VERBS][0], VerbItem)
+    assert isinstance(result[Phase.NOUNS][0], GeneralItem)
+    assert isinstance(result[Phase.VERBS][0], GeneralItem)
     assert isinstance(result[Phase.GRAMMAR][0], Sentence)
 
 
@@ -1064,22 +1058,24 @@ def test_compile_touches_step_produces_touches(ctx):
     ctx.compiled_items = _make_compiled_items(2, Phase.NOUNS)
     mock_touches = [
         Touch(
-            compiled_item_index=0,
             touch_index=1,
-            touch_type=TouchType.EN_JP,
+            phase=Phase.NOUNS,
+            item=GeneralItem(),
+            touch_type=TouchType.SOURCE_TARGET,
             intent=TouchIntent.INTRODUCE,
         ),
         Touch(
-            compiled_item_index=1,
             touch_index=1,
-            touch_type=TouchType.EN_JP,
+            phase=Phase.NOUNS,
+            item=GeneralItem(),
+            touch_type=TouchType.SOURCE_TARGET,
             intent=TouchIntent.INTRODUCE,
         ),
     ]
     with patch("jlesson.touch_compiler.compile_touches", return_value=mock_touches):
         ctx = CompileTouchesStep().execute(ctx)
     assert len(ctx.touches) == 2
-    assert ctx.touches[0].touch_type == TouchType.EN_JP
+    assert ctx.touches[0].touch_type == TouchType.SOURCE_TARGET
 
 
 def test_compile_touches_step_uses_config_profile(ctx):
@@ -1127,12 +1123,12 @@ def test_render_video_step_uses_touches(ctx, tmp_path):
     card_path.write_bytes(b"fakepng")
     ctx.touches = [
         Touch(
-            compiled_item_index=0,
             touch_index=1,
-            touch_type=TouchType.EN_JP,
+            phase=Phase.NOUNS,
+            item=GeneralItem(),
+            touch_type=TouchType.SOURCE_TARGET,
             intent=TouchIntent.INTRODUCE,
-            card_path=card_path,
-            audio_paths=[],
+            artifacts={"card": card_path, "audio": []},
         ),
     ]
     mock_builder = MagicMock()
@@ -1156,12 +1152,12 @@ def test_render_video_step_skips_missing_card(ctx, tmp_path):
     ctx.lesson_id = 1
     ctx.touches = [
         Touch(
-            compiled_item_index=0,
             touch_index=1,
-            touch_type=TouchType.EN_JP,
+            phase=Phase.NOUNS,
+            item=GeneralItem(),
+            touch_type=TouchType.SOURCE_TARGET,
             intent=TouchIntent.INTRODUCE,
-            card_path=tmp_path / "nonexistent.png",
-            audio_paths=[],
+            artifacts={"card": tmp_path / "nonexistent.png", "audio": []},
         ),
     ]
     mock_builder = MagicMock()

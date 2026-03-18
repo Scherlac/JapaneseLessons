@@ -92,7 +92,11 @@ VOICES = {
     "japanese_female": "ja-JP-NanamiNeural",
     "japanese_male": "ja-JP-KeitaNeural",
     "english_female": "en-US-AriaNeural",
-    "english_male": "en-US-ZiraNeural",
+    "english_male": "en-US-GuyNeural",
+    "english_uk_male": "en-GB-RyanNeural",
+    "english_uk_female": "en-GB-SoniaNeural",
+    "hungarian_female": "hu-HU-NoemiNeural",
+    "hungarian_male": "hu-HU-TamasNeural",
 }
 
 
@@ -101,11 +105,13 @@ def create_engine(voice_key: str = "japanese_female", rate: str = "-20%") -> TTS
     Create a TTS engine with pre-configured voice.
 
     Args:
-        voice_key: Key from VOICES dict
+        voice_key: Either a key from VOICES dict (e.g. "japanese_female") or a
+                   raw Edge-TTS voice name (e.g. "hu-HU-NoemiNeural").
         rate: Speech rate adjustment
 
     Returns:
         Configured TTSEngine instance
     """
-    voice = VOICES.get(voice_key, VOICES["japanese_female"])
+    # Accept both a symbolic key and a raw voice name.
+    voice = VOICES.get(voice_key, voice_key)
     return TTSEngine(voice=voice, rate=rate)

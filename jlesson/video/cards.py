@@ -10,6 +10,10 @@ from typing import Dict, Optional, Tuple
 
 from PIL import Image, ImageDraw, ImageFont
 
+from jlesson.language_config import LanguageConfig
+from jlesson.lesson_pipeline import StepInfo
+from jlesson.models import GeneralItem, Touch, TouchIntent
+
 
 class CardRenderer:
     """Renders video cards for Japanese lessons."""
@@ -22,7 +26,10 @@ class CardRenderer:
         accent_color: str = "#4fc3f7",
         text_color: str = "#ffffff",
         dim_color: str = "#888888",
-        label_color: str = "#e0e0e0"
+        label_color: str = "#e0e0e0",
+        display_lang: Optional[str] = "en",
+        source_lang: Optional[str] = "en",
+        target_lang: Optional[str] = "jp",
     ):
         """
         Initialize card renderer.
@@ -35,6 +42,9 @@ class CardRenderer:
             text_color: Primary text color
             dim_color: Secondary text color
             label_color: Label text color
+            display_lang: Display language
+            source_lang: Source language
+            target_lang: Target language
         """
         self.width = width
         self.height = height
@@ -43,8 +53,34 @@ class CardRenderer:
         self.text_color = text_color
         self.dim_color = dim_color
         self.label_color = label_color
+        self.display_lang = display_lang
+        self.source_lang = source_lang
+        self.target_lang = target_lang
 
         self.fonts = self._load_fonts()
+
+        self.source_fonts = {
+            x[3:] :y 
+            for x, y in self.fonts.items()
+            if x.startswith(f"{self.source_lang}_")
+        }
+
+        self.target_fonts = {
+            x[3:] :y 
+            for x, y in self.fonts.items()
+            if x.startswith(f"{self.target_lang}_")
+        }
+
+        self.intent_mapping = {
+            TouchIntent.INTRODUCE: "Introduce",
+            TouchIntent.RECALL: "Recall",
+            TouchIntent.REINFORCE: "Reinforce",
+            TouchIntent.CONFIRM: "Confirm",
+            TouchIntent.LOCK_IN: "Lock-in",
+            TouchIntent.TRANSLATE: "Translate",
+            TouchIntent.COMPREHEND: "Comprehend",
+            TouchIntent.UNKNOWN: "",
+        }
 
     def _load_fonts(self) -> Dict[str, ImageFont.FreeTypeFont]:
         """Load system fonts for Japanese and English text."""
@@ -64,6 +100,11 @@ class CardRenderer:
             "en_medium": ImageFont.truetype(en_font_path, 40),
             "en_small": ImageFont.truetype(en_font_path, 28),
             "label": ImageFont.truetype(en_bold_font_path, 24),
+            "jp_small": ImageFont.truetype(jp_font_path, 40),
+            # Hungarian-English cards — Segoe UI for both (Latin script)
+            "hun_target_large": ImageFont.truetype(en_bold_font_path, 80),
+            "hun_native_medium": ImageFont.truetype(en_font_path, 48),
+            "hun_pron": ImageFont.truetype(en_font_path, 32),
         }
 
     def _draw_progress_bar(
@@ -91,23 +132,20 @@ class CardRenderer:
                 radius=3, fill=self.accent_color
             )
 
-    def render_introduce_card(
+    def render_card(
         self,
-        english: str,
-        japanese: str,
-        kana: str,
-        romaji: str,
-        step_label: str,
-        progress: float = 0.0
+        item: GeneralItem,
+        touch: Touch | None,
+        step: StepInfo,
+        lang_cfg: LanguageConfig | None =None,
     ) -> Image.Image:
         """
-        Render an [INTRODUCE] card: English → Japanese reveal.
+        Render a card based on the touch intent.
 
         Args:
-            english: English word/text
-            japanese: Japanese kanji
-            kana: Japanese kana reading
-            romaji: Romaji transcription
+            item: GeneralItem object containing card data
+            touch: Touch object containing intent information
+            step: StepInfo object containing step details
             step_label: Step counter (e.g., "1/30")
             progress: Progress bar fill (0.0 to 1.0)
 
@@ -118,259 +156,113 @@ class CardRenderer:
         draw = ImageDraw.Draw(img)
         cx = self.width // 2
 
+        intent = touch.intent if touch else TouchIntent.UNKNOWN
+        intent_label = self.intent_mapping.get(intent, "")
+
         # Step label
-        draw.text((cx, 60), f"[INTRODUCE]  {step_label}", font=self.fonts["label"],
+        draw.text((cx, 60), f"{intent_label}  {step.label}", font=self.fonts["label"],
                  anchor="mm", fill=self.dim_color)
 
-        # English word (prompt)
-        draw.text((cx, 300), english, font=self.fonts["en_large"],
-                 anchor="mm", fill=self.accent_color)
+        if intent.show_source():
+            # English word (prompt)
+            draw.text((cx, 300), item.source.display_text, font=self.source_fonts["large"],
+                    anchor="mm", fill=self.accent_color)
 
         # Divider
         draw.line([(cx - 200, 400), (cx + 200, 400)], fill="#333333", width=2)
 
-        # Japanese (reveal)
-        draw.text((cx, 520), japanese, font=self.fonts["jp_large"],
-                 anchor="mm", fill=self.text_color)
-
-        # Kana + romaji annotation
-        annotation = f"{kana}  ·  {romaji}"
-        draw.text((cx, 640), annotation, font=self.fonts["en_medium"],
-                 anchor="mm", fill=self.dim_color)
+        if intent.show_target():
+            extra_keys = (
+                lang_cfg.field_map.extra_display_keys if lang_cfg else []
+            )
+            extra_font_keys = (
+                lang_cfg.field_map.card_extra_font_keys if lang_cfg else {}
+            )
+            self._draw_target_block(
+                draw, cx, 440, item,
+                self.target_fonts, self.fonts,
+                extra_font_keys, extra_keys,
+                self.text_color, self.dim_color,
+            )
 
         # Progress bar
-        self._draw_progress_bar(draw, self.height - 80, progress)
+        self._draw_progress_bar(draw, self.height - 80, step.progress)
 
         return img
 
-    def render_recall_card(
-        self,
-        japanese: str,
-        kana: str,
-        romaji: str,
-        english: str,
-        step_label: str,
-        progress: float = 0.0
-    ) -> Image.Image:
+    @staticmethod
+    def _draw_target_block(
+        draw: ImageDraw.Draw,
+        cx: int,
+        y_top: int,
+        item: GeneralItem,
+        target_fonts: dict,
+        all_fonts: dict,
+        extra_font_keys: dict,
+        extra_display_keys: list,
+        text_color: str,
+        dim_color: str,
+        gap_after_main: int = 20,
+        gap_after_line: int = 12,
+    ) -> None:
+        """Draw the target reveal block: display text, pronunciation, then extra fields.
+
+        All elements are stacked vertically and sized dynamically using getbbox()
+        so no text overflows into the progress bar.
+
+        Parameters
+        ----------
+        extra_font_keys
+            Per-extra-key font mapping ``{extra_key: font_key}``.
+            ``font_key`` must be a key in ``all_fonts``.
+            Unrecognised or absent keys fall back to ``"en_small"``.
         """
-        Render a [RECALL] card: Japanese → English reveal.
 
-        Args:
-            japanese: Japanese kanji
-            kana: Japanese kana reading
-            romaji: Romaji transcription
-            english: English word/text
-            step_label: Step counter
-            progress: Progress bar fill
+        def _draw_line(y: int, text: str, font, fill: str) -> int:
+            """Draw *text* centred at *cx*, top-aligned to *y*. Returns new y."""
+            if not text or font is None:
+                return y
+            bbox = font.getbbox(text)
+            h = bbox[3] - bbox[1]
+            draw.text((cx, y + h // 2), text, font=font, anchor="mm", fill=fill)
+            return y + h
 
-        Returns:
-            PIL Image object
+        y = y_top
+
+        # 1. Main target display text (large)
+        font_main = target_fonts.get("large")
+        if font_main and item.target.display_text:
+            y = _draw_line(y, item.target.display_text, font_main, text_color)
+            y += gap_after_main
+
+        # 2. Pronunciation / romaji
+        font_pron = target_fonts.get("medium", font_main)
+        if font_pron and item.target.pronunciation:
+            y = _draw_line(y, item.target.pronunciation, font_pron, dim_color)
+            y += gap_after_line
+
+        # 3. Extra fields — each may have its own font
+        _fallback = all_fonts.get("en_small")
+        keys = extra_display_keys if extra_display_keys else list(item.target.extra.keys())
+        for key in keys:
+            val = item.target.extra.get(key) or ""
+            if val:
+                fk = extra_font_keys.get(key, "en_small")
+                font_extra = all_fonts.get(fk, _fallback)
+                y = _draw_line(y, str(val), font_extra, dim_color)
+                y += gap_after_line
+
+    def save_card(self, img: Image.Image, path: Path) -> None:
+        """Save a rendered card image to disk.
+
+        Ensures parent directories exist and writes PNG data.
         """
-        img = Image.new("RGB", (self.width, self.height), self.bg_color)
-        draw = ImageDraw.Draw(img)
-        cx = self.width // 2
-
-        # Step label
-        draw.text((cx, 60), f"[RECALL]  {step_label}", font=self.fonts["label"],
-                 anchor="mm", fill=self.dim_color)
-
-        # Japanese (prompt)
-        draw.text((cx, 320), japanese, font=self.fonts["jp_large"],
-                 anchor="mm", fill=self.text_color)
-        annotation = f"{kana}  ·  {romaji}"
-        draw.text((cx, 440), annotation, font=self.fonts["en_medium"],
-                 anchor="mm", fill=self.dim_color)
-
-        # Divider
-        draw.line([(cx - 200, 520), (cx + 200, 520)], fill="#333333", width=2)
-
-        # English (reveal)
-        draw.text((cx, 620), english, font=self.fonts["en_large"],
-                 anchor="mm", fill=self.accent_color)
-
-        # Progress bar
-        self._draw_progress_bar(draw, self.height - 80, progress)
-
-        return img
-
-    def render_translate_card(
-        self,
-        english: str,
-        japanese: str,
-        romaji: str,
-        context: str,
-        step_label: str,
-        progress: float = 0.0
-    ) -> Image.Image:
-        """
-        Render a [TRANSLATE] grammar card.
-
-        Args:
-            english: English sentence
-            japanese: Japanese sentence
-            romaji: Romaji transcription
-            context: Grammar context (e.g., "I / present / affirmative")
-            step_label: Step counter
-            progress: Progress bar fill
-
-        Returns:
-            PIL Image object
-        """
-        img = Image.new("RGB", (self.width, self.height), self.bg_color)
-        draw = ImageDraw.Draw(img)
-        cx = self.width // 2
-
-        # Step label
-        draw.text((cx, 60), f"[TRANSLATE]  {step_label}", font=self.fonts["label"],
-                 anchor="mm", fill=self.dim_color)
-
-        # Grammar context
-        draw.text((cx, 160), context, font=self.fonts["en_small"],
-                 anchor="mm", fill="#666666")
-
-        # English sentence (prompt)
-        draw.text((cx, 300), english, font=self.fonts["en_large"],
-                 anchor="mm", fill=self.accent_color)
-
-        # Divider
-        draw.line([(cx - 300, 400), (cx + 300, 400)], fill="#333333", width=2)
-
-        # Japanese sentence (reveal)
-        draw.text((cx, 520), japanese, font=self.fonts["jp_medium"],
-                 anchor="mm", fill=self.text_color)
-
-        # Romaji
-        draw.text((cx, 620), romaji, font=self.fonts["en_medium"],
-                 anchor="mm", fill=self.dim_color)
-
-        # Progress bar
-        self._draw_progress_bar(draw, self.height - 80, progress)
-
-        return img
-
-    def save_card(self, card: Image.Image, output_path: Path) -> None:
-        """
-        Save a card image to file.
-
-        Args:
-            card: PIL Image object
-            output_path: Output file path (.png)
-        """
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        card.save(output_path, "PNG")
-
-    # ------------------------------------------------------------------
-    # Touch-system card renderers
-    # ------------------------------------------------------------------
-
-    def render_en_card(
-        self,
-        english: str,
-        label: str = "",
-        progress: float = 0.0,
-    ) -> Image.Image:
-        """Render an English-only card (prompt side of en→jp touches)."""
-        img = Image.new("RGB", (self.width, self.height), self.bg_color)
-        draw = ImageDraw.Draw(img)
-        cx = self.width // 2
-
-        if label:
-            draw.text(
-                (cx, 60), label, font=self.fonts["label"],
-                anchor="mm", fill=self.dim_color,
-            )
-
-        draw.text(
-            (cx, self.height // 2 - 40), english,
-            font=self.fonts["en_large"], anchor="mm", fill=self.accent_color,
-        )
-
-        self._draw_progress_bar(draw, self.height - 80, progress)
-        return img
-
-    def render_jp_card(
-        self,
-        japanese: str,
-        kana: str = "",
-        romaji: str = "",
-        label: str = "",
-        progress: float = 0.0,
-    ) -> Image.Image:
-        """Render a Japanese-only card (prompt side of jp→en / jp→jp touches)."""
-        img = Image.new("RGB", (self.width, self.height), self.bg_color)
-        draw = ImageDraw.Draw(img)
-        cx = self.width // 2
-
-        if label:
-            draw.text(
-                (cx, 60), label, font=self.fonts["label"],
-                anchor="mm", fill=self.dim_color,
-            )
-
-        draw.text(
-            (cx, self.height // 2 - 80), japanese,
-            font=self.fonts["jp_large"], anchor="mm", fill=self.text_color,
-        )
-
-        parts = [p for p in (kana, romaji) if p]
-        if parts:
-            annotation = "  ·  ".join(parts)
-            draw.text(
-                (cx, self.height // 2 + 60), annotation,
-                font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color,
-            )
-
-        self._draw_progress_bar(draw, self.height - 80, progress)
-        return img
-
-    def render_bilingual_card(
-        self,
-        english: str,
-        japanese: str,
-        kana: str = "",
-        romaji: str = "",
-        label: str = "",
-        progress: float = 0.0,
-    ) -> Image.Image:
-        """Render an EN+JP bilingual card (listen-first touches)."""
-        img = Image.new("RGB", (self.width, self.height), self.bg_color)
-        draw = ImageDraw.Draw(img)
-        cx = self.width // 2
-
-        if label:
-            draw.text(
-                (cx, 60), label, font=self.fonts["label"],
-                anchor="mm", fill=self.dim_color,
-            )
-
-        # English — upper portion
-        draw.text(
-            (cx, 300), english,
-            font=self.fonts["en_large"], anchor="mm", fill=self.accent_color,
-        )
-
-        # Divider
-        draw.line([(cx - 200, 400), (cx + 200, 400)], fill="#333333", width=2)
-
-        # Japanese — lower portion
-        draw.text(
-            (cx, 520), japanese,
-            font=self.fonts["jp_large"], anchor="mm", fill=self.text_color,
-        )
-
-        parts = [p for p in (kana, romaji) if p]
-        if parts:
-            annotation = "  ·  ".join(parts)
-            draw.text(
-                (cx, 640), annotation,
-                font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color,
-            )
-
-        self._draw_progress_bar(draw, self.height - 80, progress)
-        return img
+        path.parent.mkdir(parents=True, exist_ok=True)
+        img.save(path, format="PNG")
 
 
 # Convenience function
 def create_renderer(**kwargs) -> CardRenderer:
     """Create a CardRenderer with custom settings."""
     return CardRenderer(**kwargs)
+

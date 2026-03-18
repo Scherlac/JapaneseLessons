@@ -24,67 +24,65 @@ Usage:
 
 from __future__ import annotations
 
-from .models import CompiledItem, Phase, Touch, TouchType
+from .models import GeneralItem, Phase, Touch, TouchType
 from .profiles import TOUCH_TYPE_AUDIO, TOUCH_TYPE_CARD, Profile
 
 
-def _resolve_card(compiled: CompiledItem, touch_type: TouchType):
-    """Return the card Path for *touch_type* from the compiled item's assets."""
+def _resolve_card(item: GeneralItem, touch_type: TouchType):
+    """Return the card Path for *touch_type* from the item's assets."""
     asset_key = TOUCH_TYPE_CARD[touch_type]
-    return getattr(compiled.assets, asset_key, None)
+    if asset_key in item.source.assets:
+        return item.source.assets[asset_key]
+    elif asset_key in item.target.assets:
+        return item.target.assets[asset_key]
+    return None
 
 
-def _resolve_audio(compiled: CompiledItem, touch_type: TouchType) -> list:
-    """Return ordered audio Paths for *touch_type* from the compiled item's assets."""
+def _resolve_audio(item: GeneralItem, touch_type: TouchType) -> list:
+    """Return ordered audio Paths for *touch_type* from the item's assets."""
     keys = TOUCH_TYPE_AUDIO[touch_type]
     paths = []
     for key in keys:
-        path = getattr(compiled.assets, key, None)
-        if path is not None:
-            paths.append(path)
+        if key in item.source.assets:
+            paths.append(item.source.assets[key])
+        elif key in item.target.assets:
+            paths.append(item.target.assets[key])
     return paths
 
 
 def compile_touches(
-    compiled_items: list[CompiledItem],
+    compiled_items: list[GeneralItem],
     profile: Profile,
 ) -> list[Touch]:
-    """Compile a flat, round-interleaved touch sequence.
+    """Compile a flat, ordered touch sequence.
 
     Parameters
     ----------
-    compiled_items : list of CompiledItem objects (output of Stage 2)
+    compiled_items : list of GeneralItem objects (output of Stage 2)
     profile : Profile rulebook with repetition cycles per phase
 
     Returns
     -------
     list[Touch] — ordered sequence ready for rendering
     """
-    # Build a global index for each compiled item
-    index_map: dict[int, int] = {id(ci): i for i, ci in enumerate(compiled_items)}
-
     touches: list[Touch] = []
 
-    for phase in (Phase.NOUNS, Phase.VERBS, Phase.GRAMMAR):
-        phase_items = [ci for ci in compiled_items if ci.phase == phase]
+    for ci in compiled_items:
+        phase = ci.phase
         cycle = profile.cycle_for(phase)
 
-        if not phase_items or not cycle:
-            continue
-
-        # Round-robin: for each touch index in the cycle, iterate all items
         for touch_idx, step in enumerate(cycle, 1):
-            for ci in phase_items:
-                touches.append(
-                    Touch(
-                        compiled_item_index=index_map[id(ci)],
-                        touch_index=touch_idx,
-                        touch_type=step.touch_type,
-                        intent=step.intent,
-                        card_path=_resolve_card(ci, step.touch_type),
-                        audio_paths=_resolve_audio(ci, step.touch_type),
-                    )
-                )
+            touch = Touch(
+                touch_index=touch_idx,
+                phase=phase,
+                item=ci,
+                touch_type=step.touch_type,
+                intent=step.intent,
+                artifacts={},
+            )
+            touch.artifacts["card"] = _resolve_card(ci, step.touch_type)
+            touch.artifacts["audio"] = _resolve_audio(ci, step.touch_type)
+            touches.append(touch)
 
     return touches
 

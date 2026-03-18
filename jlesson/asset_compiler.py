@@ -9,7 +9,7 @@ Produces a list of CompiledItem objects with populated asset paths.
 
 Usage:
     from jlesson.asset_compiler import compile_assets
-    compiled = await compile_assets(items_by_phase, profile, output_dir)
+    compiled = await compile_assets(items_by_phase, profile, step_info, output_dir)
 """
 
 from __future__ import annotations
@@ -17,39 +17,16 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from jlesson.language_config import LanguageConfig
+from jlesson.lesson_pipeline import StepInfo
+from jlesson.video.cards import CardRenderer
+
 from .models import (
     CompiledItem,
-    ItemAssets,
-    LessonItem,
-    NounItem,
+    GeneralItem,
     Phase,
-    Sentence,
-    VerbItem,
 )
 from .profiles import Profile
-
-
-# ---------------------------------------------------------------------------
-# Text extraction helpers
-# ---------------------------------------------------------------------------
-
-
-def _english_text(item: LessonItem) -> str:
-    return item.english
-
-
-def _japanese_text(item: LessonItem) -> str:
-    return item.japanese
-
-
-def _kana_text(item: LessonItem) -> str:
-    if isinstance(item, (NounItem, VerbItem)):
-        return item.japanese
-    return ""
-
-
-def _romaji_text(item: LessonItem) -> str:
-    return item.romaji
 
 
 # ---------------------------------------------------------------------------
@@ -58,40 +35,36 @@ def _romaji_text(item: LessonItem) -> str:
 
 
 def _render_item_cards(
-    item: LessonItem,
+    item: GeneralItem,
     required: set[str],
+    step_info: StepInfo,
     cards_dir: Path,
     item_index: int,
-    renderer,
-) -> dict[str, Path]:
-    """Render the card images needed for *item* and return asset-key → path."""
-    paths: dict[str, Path] = {}
-    en = _english_text(item)
-    jp = _japanese_text(item)
-    kana = _kana_text(item)
-    romaji = _romaji_text(item)
+    renderer : CardRenderer,
+    lang_cfg: LanguageConfig | None =None,
+) -> None:
+    """Render the card images needed for *item* and update item's assets.
 
-    if "card_en" in required:
-        path = cards_dir / f"{item_index:03d}_en.png"
-        card = renderer.render_en_card(english=en)
-        renderer.save_card(card, path)
-        paths["card_en"] = path
+    When *lang_cfg* is provided its :class:`~jlesson.language_config.FieldMap`
+    is used for language-agnostic text extraction and the correct card renderer
+    method is selected for the language.  Falls back to the Japanese-specific
+    renderer methods when *lang_cfg* is ``None``.
+    """
 
-    if "card_jp" in required:
-        path = cards_dir / f"{item_index:03d}_jp.png"
-        card = renderer.render_jp_card(japanese=jp, kana=kana, romaji=romaji)
-        renderer.save_card(card, path)
-        paths["card_jp"] = path
-
-    if "card_en_jp" in required:
-        path = cards_dir / f"{item_index:03d}_en_jp.png"
-        card = renderer.render_bilingual_card(
-            english=en, japanese=jp, kana=kana, romaji=romaji,
+    for asset_key in required:
+        suffix = asset_key.split('_', 1)[1]  # src, tar, src_tar
+        path = cards_dir / f"{item_index:03d}_{suffix}.png"
+        card = renderer.render_card(
+            item=item,
+            touch=None,  # Touch-specific details are not needed for static card rendering
+            step=step_info, 
+            lang_cfg=lang_cfg,
         )
         renderer.save_card(card, path)
-        paths["card_en_jp"] = path
-
-    return paths
+        if "src" in asset_key and asset_key != "card_src_tar":
+            item.source.assets[asset_key] = path
+        else:
+            item.target.assets[asset_key] = path
 
 
 # ---------------------------------------------------------------------------
@@ -100,25 +73,38 @@ def _render_item_cards(
 
 
 async def _render_item_audio(
-    item: LessonItem,
+    item: GeneralItem,
     required: set[str],
     audio_dir: Path,
     item_index: int,
     create_engine_fn,
-) -> dict[str, Path]:
-    """Generate TTS audio files needed for *item* and return asset-key → path."""
-    paths: dict[str, Path] = {}
-    en = _english_text(item)
-    jp = _japanese_text(item)
+    lang_cfg: LanguageConfig | None =None,
+) -> None:
+    """Generate TTS audio files needed for *item* and update item's assets.
+
+    When *lang_cfg* is provided, audio_tar_f / audio_tar_m asset keys are routed
+    to the correct target-language voices for the language pair.  For eng-jap
+    this means Japanese voices; for hun-eng this means English voices.
+    """
+
+    # Map asset keys to (voice_key, text) tuples.  We compute it here instead
+    # of relying on a global variable to keep the function self-contained.
+    if lang_cfg is None:
+        from .language_config import get_language_config
+        
+        lang_cfg = get_language_config("eng-jap")
+
+    source_text = item.source.tts_text or item.source.display_text
+    target_text = item.target.tts_text or item.target.display_text
 
     voice_map = {
-        "audio_en": ("english_female", en),
-        "audio_jp_f": ("japanese_female", jp),
-        "audio_jp_m": ("japanese_male", jp),
+        "audio_src": (lang_cfg.field_map.source_voice, source_text),
+        "audio_tar_f": (lang_cfg.field_map.target_voice_female, target_text),
+        "audio_tar_m": (lang_cfg.field_map.target_voice_male, target_text),
     }
 
     for asset_key, (voice_key, text) in voice_map.items():
-        if asset_key not in required or not text:
+        if asset_key not in required or not text or not voice_key:
             continue
         engine = create_engine_fn(voice_key, rate="-20%")
         path = audio_dir / f"{item_index:03d}_{asset_key}.mp3"
@@ -130,11 +116,18 @@ async def _render_item_audio(
                 if attempt < 2:
                     await asyncio.sleep(2**attempt)
                 else:
-                    raise
-        paths[asset_key] = path
+                    raise RuntimeError(
+                        f"TTS failed for asset '{asset_key}' after 3 attempts.\n"
+                        f"  voice_key : {voice_key!r}\n"
+                        f"  resolved  : {getattr(engine, 'voice', '?')!r}\n"
+                        f"  text      : {text!r}\n"
+                        f"  cause     : {exc}"
+                    ) from exc
+        if asset_key == "audio_src":
+            item.source.assets[asset_key] = path
+        else:
+            item.target.assets[asset_key] = path
         await asyncio.sleep(0.5)
-
-    return paths
 
 
 # ---------------------------------------------------------------------------
@@ -143,15 +136,21 @@ async def _render_item_audio(
 
 
 def compile_assets_sync(
-    items_by_phase: dict[Phase, list[LessonItem]],
+    items_by_phase: dict[Phase, list[GeneralItem]],
     profile: Profile,
+    step_info: StepInfo,
     output_dir: Path,
     renderer=None,
+    lang_cfg=None,
 ) -> list[CompiledItem]:
     """Compile card assets only (synchronous). TTS audio paths are left as None.
 
     Useful for dry-run or report-only modes. For full compilation with TTS,
     use ``compile_assets()``.
+
+    *lang_cfg* is an optional :class:`~jlesson.language_config.LanguageConfig`
+    that enables language-aware card dispatch.  When ``None``, falls back to
+    the legacy Japanese-specific renderers.
     """
     if renderer is None:
         from .video.cards import CardRenderer
@@ -169,21 +168,24 @@ def compile_assets_sync(
 
         for item in items:
             item_index += 1
-            card_paths = _render_item_cards(
-                item, required, cards_dir, item_index, renderer,
+            _render_item_cards(
+                item, required, step_info, cards_dir, item_index, renderer, lang_cfg=lang_cfg,
             )
-            assets = ItemAssets(**card_paths)
-            compiled.append(CompiledItem(item=item, phase=phase, assets=assets))
+            compiled_item = item.model_copy()
+            compiled_item.phase = phase
+            compiled.append(compiled_item)
 
     return compiled
 
 
 async def compile_assets(
-    items_by_phase: dict[Phase, list[LessonItem]],
+    items_by_phase: dict[Phase, list[GeneralItem]],
     profile: Profile,
+    step_info: StepInfo,
     output_dir: Path,
     renderer=None,
     create_engine_fn=None,
+    lang_cfg: LanguageConfig | None =None,
 ) -> list[CompiledItem]:
     """Full asset compilation: card images + TTS audio.
 
@@ -191,9 +193,11 @@ async def compile_assets(
     ----------
     items_by_phase : dict mapping Phase → list of items
     profile : Profile rulebook determining which assets to render
+    step_info : StepInfo for logging / card rendering context
     output_dir : base directory for cards/ and audio/ subdirectories
     renderer : optional CardRenderer instance (created if None)
     create_engine_fn : optional factory ``(voice_key, rate) → TTSEngine``
+    lang_cfg : optional LanguageConfig for language-aware rendering dispatch
     """
     if renderer is None:
         from .video.cards import CardRenderer
@@ -218,16 +222,17 @@ async def compile_assets(
         for item in items:
             item_index += 1
 
-            card_paths = _render_item_cards(
-                item, required, cards_dir, item_index, renderer,
+            _render_item_cards(
+                item, required, step_info, cards_dir, item_index, renderer, lang_cfg=lang_cfg,
             )
 
-            audio_paths = await _render_item_audio(
+            await _render_item_audio(
                 item, required, audio_dir, item_index, create_engine_fn,
+                lang_cfg=lang_cfg,
             )
 
-            all_paths = {**card_paths, **audio_paths}
-            assets = ItemAssets(**all_paths)
-            compiled.append(CompiledItem(item=item, phase=phase, assets=assets))
+            compiled_item = item.model_copy()
+            compiled_item.phase = phase
+            compiled.append(compiled_item)
 
     return compiled

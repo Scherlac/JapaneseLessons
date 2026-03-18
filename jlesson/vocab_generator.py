@@ -32,6 +32,9 @@ _REQUIRED_NOUN_FIELDS = {"english", "japanese", "kanji", "romaji"}
 _REQUIRED_VERB_FIELDS = {"english", "japanese", "kanji", "romaji", "type", "masu_form"}
 _VALID_VERB_TYPES = {"る-verb", "う-verb", "irregular", "な-adj"}
 
+_REQUIRED_HUN_NOUN_FIELDS = {"english", "hungarian", "pronunciation"}
+_REQUIRED_HUN_VERB_FIELDS = {"english", "hungarian", "pronunciation", "past_tense"}
+
 
 # ── Schema validation ─────────────────────────────────────────────────────────
 
@@ -80,6 +83,44 @@ def validate_vocab_schema(vocab: dict) -> list[str]:
     return errors
 
 
+def validate_hungarian_vocab_schema(vocab: dict) -> list[str]:
+    """Validate a Hungarian vocab dict against the required schema.
+
+    Returns a list of human-readable error strings.
+    An empty list means the vocab is valid.
+    """
+    errors: list[str] = []
+
+    if "theme" not in vocab:
+        errors.append("Missing top-level 'theme' field")
+
+    nouns = vocab.get("nouns")
+    if not isinstance(nouns, list) or len(nouns) == 0:
+        errors.append("'nouns' must be a non-empty list")
+    else:
+        for i, noun in enumerate(nouns):
+            missing = _REQUIRED_HUN_NOUN_FIELDS - set(noun.keys())
+            if missing:
+                errors.append(
+                    f"nouns[{i}] ({noun.get('english', '?')!r}): "
+                    f"missing fields {sorted(missing)}"
+                )
+
+    verbs = vocab.get("verbs")
+    if not isinstance(verbs, list) or len(verbs) == 0:
+        errors.append("'verbs' must be a non-empty list")
+    else:
+        for i, verb in enumerate(verbs):
+            missing = _REQUIRED_HUN_VERB_FIELDS - set(verb.keys())
+            if missing:
+                errors.append(
+                    f"verbs[{i}] ({verb.get('english', '?')!r}): "
+                    f"missing fields {sorted(missing)}"
+                )
+
+    return errors
+
+
 # ── Main generator ────────────────────────────────────────────────────────────
 
 def generate_vocab(
@@ -89,6 +130,7 @@ def generate_vocab(
     level: str = "beginner",
     save: bool = True,
     output_dir: Optional[Path] = None,
+    language: str = "eng-jap",
 ) -> dict:
     """Generate vocabulary JSON for a theme using the LLM.
 
@@ -102,6 +144,7 @@ def generate_vocab(
         level: Difficulty — "beginner", "intermediate", "advanced".
         save: If True (default), write the result to vocab/<theme>.json.
         output_dir: Directory to write the file (defaults to vocab/).
+        language: Language pair code — "eng-jap" (default) or "hun-eng".
 
     Returns:
         The validated vocab dict (always has 'theme', 'nouns', 'verbs').
@@ -110,12 +153,18 @@ def generate_vocab(
         ValueError: If the LLM response fails schema validation.
         Exception: Re-raises LLM connection/timeout errors.
     """
-    prompt = build_vocab_prompt(
-        theme=theme,
-        num_nouns=num_nouns,
-        num_verbs=num_verbs,
-        level=level,
-    )
+    if language == "hun-eng":
+        from .prompt_template import hungarian_build_vocab_prompt
+        prompt = hungarian_build_vocab_prompt(
+            theme=theme, num_nouns=num_nouns, num_verbs=num_verbs, level=level
+        )
+    else:
+        prompt = build_vocab_prompt(
+            theme=theme,
+            num_nouns=num_nouns,
+            num_verbs=num_verbs,
+            level=level,
+        )
 
     print(f"Generating vocab for '{theme}' ({num_nouns} nouns, {num_verbs} verbs, {level})…")
     raw = ask_llm_json_free(prompt)
@@ -132,7 +181,7 @@ def generate_vocab(
                     if isinstance(v, str):
                         item[k] = v.strip()
 
-    errors = validate_vocab_schema(raw)
+    errors = validate_hungarian_vocab_schema(raw) if language == "hun-eng" else validate_vocab_schema(raw)
     if errors:
         raise ValueError(
             f"LLM-generated vocab for '{theme}' failed schema validation:\n"
