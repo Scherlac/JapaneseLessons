@@ -30,7 +30,10 @@ from jlesson.llm_client import (
     _NO_SYSTEM_ROLE_PATTERNS,
     _TRANSLATION_SCHEMA,
     _extract_json,
+    _is_openai_endpoint,
+    _is_unsupported_max_tokens_error,
     _strip_think,
+    _uses_max_completion_tokens,
 )
 
 
@@ -197,6 +200,37 @@ class TestBuildMessages:
             msgs = client._build_messages("Hi.")
             assert msgs[0]["role"] == "system", f"Expected system role for {model_id}"
             assert msgs[1]["role"] == "user"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Unit — token parameter compatibility helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestTokenParameterSelection:
+    def test_openai_endpoint_detected(self):
+        assert _is_openai_endpoint("https://api.openai.com/v1") is True
+
+    def test_non_openai_endpoint_not_detected(self):
+        assert _is_openai_endpoint("http://localhost:1234/v1") is False
+
+    def test_gpt5_uses_max_completion_tokens(self):
+        assert _uses_max_completion_tokens("gpt-5.4", "http://localhost:1234/v1") is True
+
+    def test_openai_endpoint_uses_max_completion_tokens(self):
+        assert _uses_max_completion_tokens("gpt-4o", "https://api.openai.com/v1") is True
+
+    def test_local_qwen_keeps_max_tokens(self):
+        assert _uses_max_completion_tokens("qwen/qwen3-14b", "http://localhost:1234/v1") is False
+
+    def test_detects_unsupported_max_tokens_error(self):
+        msg = (
+            "Unsupported parameter: 'max_tokens' is not supported with this model. "
+            "Use 'max_completion_tokens' instead."
+        )
+        assert _is_unsupported_max_tokens_error(Exception(msg)) is True
+
+    def test_non_matching_error_returns_false(self):
+        assert _is_unsupported_max_tokens_error(Exception("timeout")) is False
 
 
 # ─────────────────────────────────────────────────────────────────────────────

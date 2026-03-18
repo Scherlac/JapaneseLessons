@@ -116,6 +116,32 @@ _TRANSLATION_SCHEMA = {
 _NO_SYSTEM_ROLE_PATTERNS = ("mistral-7b-instruct",)
 
 
+def _is_openai_endpoint(base_url: str) -> bool:
+    """Return True when the configured endpoint is OpenAI's hosted API."""
+    return "api.openai.com" in base_url.lower()
+
+
+def _uses_max_completion_tokens(model: str, base_url: str) -> bool:
+    """Decide which token-limit parameter to send for chat completions.
+
+    OpenAI's newer GPT-5 family expects max_completion_tokens instead of
+    max_tokens. Keep max_tokens for local OpenAI-compatible backends
+    (LM Studio, Ollama, etc.) to preserve compatibility.
+    """
+    model_lower = model.lower()
+    return _is_openai_endpoint(base_url) or model_lower.startswith("gpt-5")
+
+
+def _is_unsupported_max_tokens_error(err: Exception) -> bool:
+    """Detect provider errors asking for max_completion_tokens."""
+    message = str(err).lower()
+    return (
+        "unsupported parameter" in message
+        and "max_tokens" in message
+        and "max_completion_tokens" in message
+    )
+
+
 class LLMClient:
     """Universal LLM client using OpenAI-compatible interface."""
 
@@ -179,8 +205,11 @@ class LLMClient:
             "model": self.model,
             "messages": self._build_messages(prompt),
             "temperature": temperature,
-            "max_tokens": max_tokens,
         }
+        if _uses_max_completion_tokens(self.model, LLM_BASE_URL):
+            kwargs["max_completion_tokens"] = max_tokens
+        else:
+            kwargs["max_tokens"] = max_tokens
 
         if json_mode:
             # LM Studio requires json_schema (grammar-sampled by llama.cpp).
@@ -213,6 +242,14 @@ class LLMClient:
             logger.error(f"Rate limit exceeded: {e}")
             raise
         except APIError as e:
+            if _is_unsupported_max_tokens_error(e) and "max_tokens" in kwargs:
+                logger.warning(
+                    "Provider rejected max_tokens; retrying with max_completion_tokens"
+                )
+                kwargs["max_completion_tokens"] = kwargs.pop("max_tokens")
+                response = self.client.chat.completions.create(**kwargs)
+                content = response.choices[0].message.content
+                return _strip_think(content)
             # Fall back to plain text mode if the provider doesn't support json_schema.
             if json_mode and e.status_code == 400:
                 logger.warning("json_schema response_format not supported, retrying in text mode")
@@ -365,4 +402,7 @@ def ask_llm_json_free(
     parsed = _extract_json(response_text)
     if parsed is not None:
         return parsed
-    raise ValueError(f"LLM returned invalid JSON: {response_text[:200]}")
+    preview = (response_text or "").strip()
+    if not preview:
+        preview = "<empty response from model>"
+    raise ValueError(f"LLM returned invalid JSON: {preview[:200]}")

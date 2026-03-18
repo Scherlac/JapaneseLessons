@@ -53,6 +53,18 @@ jlesson lesson prompt food -o prompt.md
 # Generate a vocab file for a new theme via LLM (saves to vocab/<theme>.json)
 jlesson vocab create animals
 jlesson vocab create school --nouns 15 --verbs 12 --level intermediate
+# Generate a total count while guaranteeing minimum nouns/verbs
+jlesson vocab create school --count 120 --nouns 40 --verbs 20
+# Include adjectives too (exact if no --count, minimum if --count is set)
+jlesson vocab create school --count 120 --nouns 35 --verbs 20 --adjectives 15
+# If theme exists, create is blocked by default (to prevent overwrite)
+jlesson vocab create school --force
+
+# Extend an existing theme by adding unique items (merge + dedup)
+jlesson vocab extend animals --nouns 20 --verbs 8
+# Extend by total count with minimum guarantees
+jlesson vocab extend animals --count 60 --nouns 20 --verbs 10
+jlesson vocab extend animals --count 60 --nouns 15 --verbs 10 --adjectives 10
 
 # Print a vocab-generation prompt without calling the LLM
 jlesson vocab generate-prompt shopping

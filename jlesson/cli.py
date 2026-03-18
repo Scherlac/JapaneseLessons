@@ -126,8 +126,11 @@ def vocab_list(language: str) -> None:
 
 @vocab.command("create")
 @click.argument("theme")
-@click.option("--nouns", default=12, show_default=True, help="Number of nouns to generate.")
-@click.option("--verbs", default=10, show_default=True, help="Number of verbs to generate.")
+@click.option("--count", type=int, default=None, help="Total words to generate (nouns + verbs + adjectives).")
+@click.option("--nouns", type=int, default=None, help="Noun count (exact if no --count, minimum if --count is set).")
+@click.option("--verbs", type=int, default=None, help="Verb count (exact if no --count, minimum if --count is set).")
+@click.option("--adjectives", type=int, default=None, help="Adjective count (exact if no --count, minimum if --count is set).")
+@click.option("--force", is_flag=True, default=False, help="Overwrite existing theme file if it already exists.")
 @click.option(
     "--level",
     default="beginner",
@@ -136,15 +139,72 @@ def vocab_list(language: str) -> None:
     help="Difficulty level.",
 )
 @LANGUAGE_OPTION
-def vocab_create(theme: str, nouns: int, verbs: int, level: str, language: str) -> None:
+def vocab_create(
+    theme: str,
+    count: int | None,
+    nouns: int | None,
+    verbs: int | None,
+    adjectives: int | None,
+    force: bool,
+    level: str,
+    language: str,
+) -> None:
     """Generate vocabulary for THEME via LLM and save to vocab/<THEME>.json."""
     from .vocab_generator import generate_vocab
     lang_cfg = get_language_config(language)
     output_dir = Path(__file__).parent.parent / lang_cfg.vocab_dir
     try:
         generate_vocab(
-            theme=theme, num_nouns=nouns, num_verbs=verbs, level=level,
-            output_dir=output_dir, language=language,
+            theme=theme,
+            num_nouns=nouns,
+            num_verbs=verbs,
+            num_adjectives=adjectives,
+            total_count=count,
+            level=level,
+            output_dir=output_dir, language=language, allow_overwrite=force,
+        )
+    except Exception as exc:
+        raise click.ClickException(_friendly_error(exc)) from exc
+
+
+@vocab.command("extend")
+@click.argument("theme")
+@click.option("--count", type=int, default=None, help="Total additional words to generate (nouns + verbs + adjectives).")
+@click.option("--nouns", type=int, default=None, help="Additional noun count (exact if no --count, minimum if --count is set).")
+@click.option("--verbs", type=int, default=None, help="Additional verb count (exact if no --count, minimum if --count is set).")
+@click.option("--adjectives", type=int, default=None, help="Additional adjective count (exact if no --count, minimum if --count is set).")
+@click.option(
+    "--level",
+    default="beginner",
+    show_default=True,
+    type=click.Choice(["beginner", "intermediate", "advanced"]),
+    help="Difficulty level for newly generated items.",
+)
+@LANGUAGE_OPTION
+def vocab_extend(
+    theme: str,
+    count: int | None,
+    nouns: int | None,
+    verbs: int | None,
+    adjectives: int | None,
+    level: str,
+    language: str,
+) -> None:
+    """Extend an existing theme by generating and merging additional vocab."""
+    from .vocab_generator import extend_vocab
+
+    lang_cfg = get_language_config(language)
+    output_dir = Path(__file__).parent.parent / lang_cfg.vocab_dir
+    try:
+        extend_vocab(
+            theme=theme,
+            add_nouns=nouns,
+            add_verbs=verbs,
+            add_adjectives=adjectives,
+            total_count=count,
+            level=level,
+            output_dir=output_dir,
+            language=language,
         )
     except Exception as exc:
         raise click.ClickException(_friendly_error(exc)) from exc

@@ -5,6 +5,8 @@ Each function returns a plain-text prompt string that can be sent to an LLM.
 Templates are kept as simple f-strings — no templating engine needed (KISS).
 """
 
+from typing import Optional
+
 from .models import GeneralItem, GrammarItem, Sentence
 
 
@@ -203,6 +205,12 @@ _VOCAB_EXAMPLE = """{
   ],
   "verbs": [
     {"english": "to eat", "japanese": "たべる", "kanji": "食べる", "romaji": "taberu", "type": "る-verb", "masu_form": "食べます"}
+  ],
+  "adjectives": [
+    {"english": "small", "japanese": "ちいさい", "kanji": "小さい", "romaji": "chiisai", "type": "い-adj"}
+  ],
+  "others": [
+    {"english": "hello", "japanese": "こんにちは", "kanji": "今日は", "romaji": "konnichiwa", "category": "expression"}
   ]
 }"""
 
@@ -211,6 +219,14 @@ def build_vocab_prompt(
     theme: str,
     num_nouns: int = 12,
     num_verbs: int = 10,
+    num_adjectives: int = 0,
+    total_words: Optional[int] = None,
+    min_nouns: int = 0,
+    min_verbs: int = 0,
+    min_adjectives: int = 0,
+  avoid_source_words: Optional[list[str]] = None,
+  avoid_target_words: Optional[list[str]] = None,
+  high_repeat_words: Optional[list[str]] = None,
     level: str = "beginner",
 ) -> str:
     """
@@ -224,12 +240,20 @@ You are a Japanese language expert building vocabulary lists for {level}-level l
 Generate a JSON vocabulary file for the theme: **{theme}**
 
 Requirements:
-- Exactly {num_nouns} nouns and {num_verbs} verbs.
+- Target output size: {num_nouns + num_verbs + num_adjectives} words total.
+- Target mix:  {num_nouns} nouns, {num_verbs} verbs, {num_adjectives} adjectives.
 - All words should be common, practical, {level}-appropriate.
 - Include a mix of verb types: る-verbs (ichidan), う-verbs (godan), and irregulars (する/来る compounds) where natural.
 - Each noun must have: english, japanese (kana), kanji, romaji.
 - Each verb must have: english, japanese (kana), kanji, romaji, type ("る-verb", "う-verb", "irregular", or "な-adj"), masu_form.
 - The "type" field must be exactly one of: "る-verb", "う-verb", "irregular", "な-adj".
+- Each adjective must have: english, japanese (kana), kanji, romaji, type ("い-adj" or "な-adj").
+- Minimum guarantees to satisfy:
+  - nouns >= {min_nouns}
+  - verbs >= {min_verbs}
+  - adjectives >= {min_adjectives}
+- You may include an optional "others" array for useful words that do not fit noun/verb/adjective cleanly.
+- If "others" is present, each item should include: english, japanese (kana), kanji, romaji, and optional category.
 - Output ONLY valid JSON, no commentary before or after.
 - Use the exact schema below.
 
@@ -238,8 +262,33 @@ Schema example:
 {_VOCAB_EXAMPLE}
 ```
 
-Now generate the complete JSON for theme "{theme}" with {num_nouns} nouns and {num_verbs} verbs.
+Now generate the complete JSON for theme "{theme}".
 """
+    if avoid_source_words:
+        src_list = "\n".join(f"  - {w}" for w in avoid_source_words[:200])
+        prompt += (
+            "\nAvoid reusing these existing source-language words "
+            "(already in this theme):\n"
+            f"{src_list}\n"
+        )
+    if avoid_target_words:
+        tar_list = "\n".join(f"  - {w}" for w in avoid_target_words[:200])
+        prompt += (
+            "\nAvoid reusing these existing target-language words/translations:\n"
+            f"{tar_list}\n"
+        )
+    if high_repeat_words:
+        rep_list = "\n".join(f"  - {w}" for w in high_repeat_words[:100])
+        prompt += (
+            "\nThese words were repeated too often in previous attempts. "
+            "Prefer fresh alternatives:\n"
+            f"{rep_list}\n"
+        )
+    if total_words is not None:
+        prompt += (
+            f"\nRequested overall total: {total_words} words. "
+            "Respect the minimum guarantees while aiming for the target mix.\n"
+        )
     return prompt
 
 

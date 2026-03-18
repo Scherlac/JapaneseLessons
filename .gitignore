@@ -21,5 +21,6 @@ Thumbs.db
 .DS_Store
 .coverage
 .vscode/settings.json
-curriculum/curriculum.json
+curriculum
 memories/repo
+vocab
