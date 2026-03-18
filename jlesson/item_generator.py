@@ -7,6 +7,11 @@ class ItemGenerator(ABC):
     """Interface for converting LLM responses to GeneralItem/Sentence models."""
 
     @abstractmethod
+    def build_default_narrative(self, theme: str, lesson_number: int) -> str:
+        """Build a default story context for sentence generation."""
+        pass
+
+    @abstractmethod
     def convert_noun(self, llm_item: dict, source_item: dict) -> GeneralItem:
         """Convert LLM noun response to GeneralItem."""
         pass
@@ -34,6 +39,15 @@ class ItemGenerator(ABC):
 
 class EngJapItemGenerator(ItemGenerator):
     """Item generator for English-Japanese lessons."""
+
+    def build_default_narrative(self, theme: str, lesson_number: int) -> str:
+        return (
+            f"Lesson {lesson_number} begins in the world of '{theme}'. "
+            "Introduce Kiki, her broom, her cat Jiji, and her new town. "
+            "Start with simple observation and identity sentences, then add "
+            "small daily actions in her environment. Keep the tone warm, clear, "
+            "and beginner friendly."
+        )
 
     def convert_noun(self, llm_item: dict, source_item: dict) -> GeneralItem:
         n_item = {**source_item, **llm_item}  # Merge source with LLM overrides
@@ -90,6 +104,14 @@ class EngJapItemGenerator(ItemGenerator):
 
 class HunEngItemGenerator(ItemGenerator):
     """Item generator for Hungarian-English lessons."""
+
+    def build_default_narrative(self, theme: str, lesson_number: int) -> str:
+        return (
+            f"Lesson {lesson_number} story context for theme '{theme}': "
+            "start with who the main character is and where they are, then "
+            "describe simple daily actions in that setting. Keep it suitable "
+            "for beginner learners."
+        )
 
     def convert_noun(self, llm_item: dict, source_item: dict) -> GeneralItem:
         n_item = {**source_item, **llm_item}

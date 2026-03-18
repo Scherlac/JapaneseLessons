@@ -154,6 +154,47 @@ class TestCompileTouchesInterleaving:
         assert touches[3].item.source.display_text == "run"  # verb
         assert touches[6].item.source.display_text == "I run"  # grammar
 
+    def test_multi_phase_items_are_batch_interleaved(self):
+        items = [
+            _compiled(_noun("n1"), Phase.NOUNS),
+            _compiled(_noun("n2"), Phase.NOUNS),
+            _compiled(_verb("v1"), Phase.VERBS),
+            _compiled(_verb("v2"), Phase.VERBS),
+            _compiled(_sentence("g1"), Phase.GRAMMAR),
+            _compiled(_sentence("g2"), Phase.GRAMMAR),
+        ]
+        touches = compile_touches(items, PASSIVE_VIDEO)
+
+        # With batch size 1 per phase: n1 -> v1 -> g1 -> n2 -> v2 -> g2
+        block_starts = [0, 3, 6, 8, 11, 14]
+        expected_items = ["n1", "v1", "g1", "n2", "v2", "g2"]
+        for idx, expected in zip(block_starts, expected_items):
+            assert touches[idx].item.source.display_text == expected
+
+    def test_profile_batch_size_controls_phase_chunks(self):
+        custom = Profile(
+            name="custom",
+            cycles=PASSIVE_VIDEO.cycles,
+            batch_sizes={
+                Phase.NOUNS: 2,
+                Phase.VERBS: 1,
+                Phase.GRAMMAR: 1,
+            },
+        )
+        items = [
+            _compiled(_noun("n1"), Phase.NOUNS),
+            _compiled(_noun("n2"), Phase.NOUNS),
+            _compiled(_verb("v1"), Phase.VERBS),
+            _compiled(_sentence("g1"), Phase.GRAMMAR),
+        ]
+        touches = compile_touches(items, custom)
+
+        # First round should emit 2 nouns first, then verb, then grammar.
+        assert touches[0].item.source.display_text == "n1"
+        assert touches[3].item.source.display_text == "n2"
+        assert touches[6].item.source.display_text == "v1"
+        assert touches[9].item.source.display_text == "g1"
+
 
 # ---------------------------------------------------------------------------
 # compile_touches — touch types and intents
@@ -251,8 +292,8 @@ class TestCompileTouchAssetResolution:
     def test_missing_assets_resolve_to_none(self):
         ci = _compiled(_noun("cat"), Phase.NOUNS)
         touches = compile_touches([ci], ACTIVE_FLASH_CARDS)
-        assert touches[0].card_path is None
-        assert touches[0].audio_paths == []
+        assert touches[0].artifacts["card"] is None
+        assert touches[0].artifacts["audio"] == []
 
 
 # ---------------------------------------------------------------------------

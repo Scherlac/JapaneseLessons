@@ -101,6 +101,7 @@ class LessonConfig:
     verbose: bool = True
     profile: str = "passive_video"
     language: str = "eng-jap"
+    narrative: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -370,11 +371,19 @@ class GenerateSentencesStep(PipelineStep):
     def execute(self, ctx: LessonContext) -> LessonContext:
         noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
         verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
+        lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
+        narrative = (ctx.config.narrative or "").strip()
+        if not narrative:
+            narrative = ctx.language_config.generator.build_default_narrative(
+                theme=ctx.config.theme,
+                lesson_number=lesson_number,
+            )
         prompt = ctx.language_config.prompts.build_grammar_generate_prompt(
             ctx.selected_grammar,
             noun_items,
             verb_items,
             sentences_per_grammar=ctx.config.sentences_per_grammar,
+            narrative=narrative,
         )
         result = _ask_llm(ctx, prompt)
         sentences = result.get("sentences", [])
@@ -382,6 +391,19 @@ class GenerateSentencesStep(PipelineStep):
         for s_src in sentences:
             ctx.sentences.append(ctx.language_config.generator.convert_sentence(s_src))
         self._log(ctx, f"       {len(ctx.sentences)} sentences")
+        if narrative:
+            self._log(ctx, f"       narrative : {narrative[:96]}{'...' if len(narrative) > 96 else ''}")
+            ctx.report.add(
+                "grammar_context",
+                "\n".join(
+                    [
+                        "## Narrative Context",
+                        "",
+                        narrative,
+                        "",
+                    ]
+                ),
+            )
         if ctx.sentences:
             if ctx.language_config.code == "hun-eng":
                 src_lbl, tgt_lbl, ph_lbl, has_phonetic = "Magyar", "English", "Pronunciation", True

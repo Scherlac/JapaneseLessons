@@ -449,6 +449,7 @@ def build_grammar_generate_prompt(
     verbs: list[GeneralItem],
     persons: list[tuple[str, str, str]] | None = None,
     sentences_per_grammar: int = 3,
+    narrative: str = "",
 ) -> str:
     """Level-2 grammar prompt: generate example sentences for selected grammar.
 
@@ -477,6 +478,11 @@ def build_grammar_generate_prompt(
     )
 
     total = len(grammar_specs) * sentences_per_grammar
+    narrative_block = (
+        f"\nNARRATIVE CONTEXT:\n{narrative.strip()}\n"
+        if narrative and narrative.strip()
+        else ""
+    )
 
     return f"""\
 You are a Japanese language teacher generating practice sentences.
@@ -493,11 +499,13 @@ Verbs:
 
 PERSONS:
 {person_lines}
+{narrative_block}
 
 TASK:
 For each grammar point, generate {sentences_per_grammar} natural sentences using the
 vocabulary above. Cover different persons across the sentences.
 Use polite (ます/です) form throughout. Total: {total} sentences.
+If narrative context is provided, keep the sentence set consistent with that story arc.
 
 Each sentence must include:
 - grammar_id  — which grammar point this sentence demonstrates
@@ -1038,6 +1046,7 @@ def hungarian_build_grammar_generate_prompt(
     verbs: list[GeneralItem],
     persons: list[tuple[str, str, str]] | None = None,
     sentences_per_grammar: int = 3,
+    narrative: str = "",
 ) -> str:
     """Generate English practice sentences with Hungarian translations.
 
@@ -1062,6 +1071,11 @@ def hungarian_build_grammar_generate_prompt(
     )
 
     total = len(grammar_specs) * sentences_per_grammar
+    narrative_block = (
+        f"\nNARRATIVE CONTEXT:\n{narrative.strip()}\n"
+        if narrative and narrative.strip()
+        else ""
+    )
 
     return f"""\
 You are an English teacher writing practice sentences for Hungarian children aged 8-12.
@@ -1078,11 +1092,13 @@ Verbs:
 
 PERSONS:
 {person_lines}
+{narrative_block}
 
 TASK:
 For each grammar point, generate {sentences_per_grammar} natural English sentences \
 using the vocabulary above. Cover different persons across the sentences.
 Total: {total} sentences.
+If narrative context is provided, keep the sentence set consistent with that story arc.
 
 Each sentence must include:
 - grammar_id  — which grammar point this sentence practises
@@ -1238,6 +1254,7 @@ class PromptInterface(ABC):
         verbs: list[GeneralItem],
         persons: list[tuple[str, str, str]] | None = None,
         sentences_per_grammar: int = 3,
+        narrative: str = "",
     ) -> str:
         """Build prompt for generating grammar sentences."""
         ...
@@ -1294,9 +1311,15 @@ class EngJapPrompts(PromptInterface):
         verbs: list[GeneralItem],
         persons: list[tuple[str, str, str]] | None = None,
         sentences_per_grammar: int = 3,
+        narrative: str = "",
     ) -> str:
         return build_grammar_generate_prompt(
-            grammar_specs, nouns, verbs, persons, sentences_per_grammar
+            grammar_specs,
+            nouns,
+            verbs,
+            persons,
+            sentences_per_grammar,
+            narrative,
         )
 
     def build_sentence_review_prompt(
@@ -1345,9 +1368,15 @@ class HunEngPrompts(PromptInterface):
         verbs: list[GeneralItem],
         persons: list[tuple[str, str, str]] | None = None,
         sentences_per_grammar: int = 3,
+        narrative: str = "",
     ) -> str:
         return hungarian_build_grammar_generate_prompt(
-            grammar_specs, nouns, verbs, persons, sentences_per_grammar
+            grammar_specs,
+            nouns,
+            verbs,
+            persons,
+            sentences_per_grammar,
+            narrative,
         )
 
     def build_sentence_review_prompt(

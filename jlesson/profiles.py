@@ -30,10 +30,15 @@ class Profile:
 
     name: str
     cycles: dict[Phase, list[RepetitionStep]] = field(default_factory=dict)
+    batch_sizes: dict[Phase, int] = field(default_factory=dict)
 
     def cycle_for(self, phase: Phase) -> list[RepetitionStep]:
         """Return the repetition cycle for *phase*."""
         return self.cycles.get(phase, [])
+
+    def batch_size_for(self, phase: Phase) -> int:
+        """Return the interleaving batch size for *phase* (minimum 1)."""
+        return max(1, self.batch_sizes.get(phase, 1))
 
     def required_assets(self, phase: Phase) -> set[str]:
         """Return the set of asset keys needed by all touches in *phase*.
@@ -115,6 +120,11 @@ PASSIVE_VIDEO = Profile(
         Phase.VERBS: _PASSIVE_NOUN_VERB_CYCLE,
         Phase.GRAMMAR: _PASSIVE_GRAMMAR_CYCLE,
     },
+    batch_sizes={
+        Phase.NOUNS: 4,
+        Phase.VERBS: 4,
+        Phase.GRAMMAR: 6,
+    },
 )
 
 
@@ -142,6 +152,11 @@ ACTIVE_FLASH_CARDS = Profile(
         Phase.NOUNS: _ACTIVE_NOUN_VERB_CYCLE,
         Phase.VERBS: _ACTIVE_NOUN_VERB_CYCLE,
         Phase.GRAMMAR: _ACTIVE_GRAMMAR_CYCLE,
+    },
+    batch_sizes={
+        Phase.NOUNS: 4,
+        Phase.VERBS: 4,
+        Phase.GRAMMAR: 6,
     },
 )
 

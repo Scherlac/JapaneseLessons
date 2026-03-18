@@ -14,8 +14,9 @@ in docs/structure.md:
     item₂ touch 2
     ...
 
-Each phase (nouns, verbs, grammar) is compiled independently and the
-results are concatenated in phase order.
+Items are interleaved in phase batches (nouns → verbs → grammar) based on
+profile batch sizes. This avoids large uninterrupted phase blocks and yields
+a more balanced learning flow.
 
 Usage:
     from jlesson.touch_compiler import compile_touches
@@ -67,22 +68,37 @@ def compile_touches(
     """
     touches: list[Touch] = []
 
-    for ci in compiled_items:
-        phase = ci.phase
-        cycle = profile.cycle_for(phase)
+    phase_queues: dict[Phase, list[GeneralItem]] = {
+        Phase.NOUNS: [ci for ci in compiled_items if ci.phase == Phase.NOUNS],
+        Phase.VERBS: [ci for ci in compiled_items if ci.phase == Phase.VERBS],
+        Phase.GRAMMAR: [ci for ci in compiled_items if ci.phase == Phase.GRAMMAR],
+    }
+    phase_order = [Phase.NOUNS, Phase.VERBS, Phase.GRAMMAR]
 
-        for touch_idx, step in enumerate(cycle, 1):
-            touch = Touch(
-                touch_index=touch_idx,
-                phase=phase,
-                item=ci,
-                touch_type=step.touch_type,
-                intent=step.intent,
-                artifacts={},
-            )
-            touch.artifacts["card"] = _resolve_card(ci, step.touch_type)
-            touch.artifacts["audio"] = _resolve_audio(ci, step.touch_type)
-            touches.append(touch)
+    while any(phase_queues[p] for p in phase_order):
+        for phase in phase_order:
+            queue = phase_queues[phase]
+            if not queue:
+                continue
+            batch_size = profile.batch_size_for(phase)
+            batch = queue[:batch_size]
+            del queue[:batch_size]
+
+            for ci in batch:
+                cycle = profile.cycle_for(phase)
+
+                for touch_idx, step in enumerate(cycle, 1):
+                    touch = Touch(
+                        touch_index=touch_idx,
+                        phase=phase,
+                        item=ci,
+                        touch_type=step.touch_type,
+                        intent=step.intent,
+                        artifacts={},
+                    )
+                    touch.artifacts["card"] = _resolve_card(ci, step.touch_type)
+                    touch.artifacts["audio"] = _resolve_audio(ci, step.touch_type)
+                    touches.append(touch)
 
     return touches
 

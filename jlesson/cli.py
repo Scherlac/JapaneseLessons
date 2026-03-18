@@ -275,6 +275,17 @@ def lesson() -> None:
     type=click.Choice(["passive_video", "active_flash_cards"]),
     help="Touch profile for asset compilation and video rendering.",
 )
+@click.option(
+    "--narrative",
+    default="",
+    help="Optional story context to guide sentence generation.",
+)
+@click.option(
+    "--narrative-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to a text file with story context for sentence generation.",
+)
 @LANGUAGE_OPTION
 def lesson_next(
     theme: str,
@@ -288,6 +299,8 @@ def lesson_next(
     no_cache: bool,
     dry_run: bool,
     profile: str,
+    narrative: str,
+    narrative_file: Path | None,
     language: str,
 ) -> None:
     """Run the full pipeline for the next lesson.
@@ -302,6 +315,10 @@ def lesson_next(
         Path(curriculum_path) if curriculum_path
         else Path(__file__).parent.parent / lang_cfg.curriculum_file
     )
+    narrative_text = narrative.strip()
+    if narrative_file is not None:
+        file_text = narrative_file.read_text(encoding="utf-8").strip()
+        narrative_text = f"{narrative_text}\n\n{file_text}".strip() if narrative_text else file_text
     config = LessonConfig(
         theme=theme,
         curriculum_path=resolved_curriculum,
@@ -315,6 +332,7 @@ def lesson_next(
         dry_run=dry_run,
         profile=profile,
         language=language,
+        narrative=narrative_text,
     )
     try:
         run_pipeline(config)
