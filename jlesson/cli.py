@@ -340,6 +340,44 @@ def lesson_next(
         raise click.ClickException(_friendly_error(exc)) from exc
 
 
+@lesson.command("render")
+@click.argument("lesson_id", type=int)
+@click.option(
+    "--output-dir",
+    default=None,
+    type=click.Path(),
+    help="Output directory (default: output/).",
+)
+@click.option(
+    "--profile",
+    default="passive_video",
+    show_default=True,
+    type=click.Choice(["passive_video", "active_flash_cards"]),
+    help="Touch profile used to compile assets and render video.",
+)
+@LANGUAGE_OPTION
+def lesson_render(
+    lesson_id: int,
+    output_dir: str | None,
+    profile: str,
+    language: str,
+) -> None:
+    """Render video for an existing lesson ID from saved content."""
+    from .lesson_pipeline import render_existing_lesson
+
+    try:
+        video_path = render_existing_lesson(
+            lesson_id=lesson_id,
+            output_dir=Path(output_dir) if output_dir else None,
+            profile=profile,
+            language=language,
+            verbose=True,
+        )
+        click.echo(f"Video rendered: {video_path}")
+    except Exception as exc:
+        raise click.ClickException(_friendly_error(exc)) from exc
+
+
 @lesson.command("prompt")
 @click.argument("theme")
 @click.option("--nouns", "-n", default=6, show_default=True, help="Number of nouns.")
