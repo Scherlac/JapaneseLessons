@@ -1,0 +1,11 @@
+{
+  "spike": "spike_02_vector_metadata_filtering",
+  "status": "scaffold_ready",
+  "timestamp_utc": "2026-03-19T20:24:16Z",
+  "notes": [
+    "Reuse embeddings/index from spike 1",
+    "Apply metadata filters in retrieval",
+    "Compare no-filter vs filtered precision@k",
+    "Measure off-topic reduction"
+  ]
+}
