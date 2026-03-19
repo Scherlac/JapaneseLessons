@@ -2,12 +2,12 @@
   "spike": "spike_02_vector_metadata_filtering",
   "embedding_model": "text-embedding-3-small",
   "vector_store": "chroma_local_persistent",
-  "timestamp_utc": "2026-03-19T20:56:33Z",
+  "timestamp_utc": "2026-03-19T20:58:55Z",
   "corpus_size": 300,
   "query_count": 40,
   "latency_ms": {
-    "p50": 1.633,
-    "p95": 2.523
+    "p50": 1.606,
+    "p95": 2.351
   },
   "precision_at_k": {
     "p3": 0.3833,
@@ -15,8 +15,8 @@
     "p10": 0.1675
   },
   "timing": {
-    "total_duration_s": 3.826,
-    "throughput_qps": 62.73,
+    "total_duration_s": 3.327,
+    "throughput_qps": 72.13,
     "repeats": 3.0,
     "filtered_query_share": 0.075
   },
@@ -24,8 +24,8 @@
     {
       "mode": "baseline_no_filter",
       "latency_ms": {
-        "p50": 1.668,
-        "p95": 2.42
+        "p50": 1.608,
+        "p95": 2.26
       },
       "precision_at_k": {
         "p3": 0.3833,
@@ -33,13 +33,15 @@
         "p10": 0.1675
       },
       "off_topic_rate": 0.8325,
-      "filter_pass_rate": 0.0
+      "off_topic_rate_metadata_scope": 0.0,
+      "filter_pass_rate": 0.0,
+      "precision_at_5_metadata_scope": 1.0
     },
     {
       "mode": "metadata_filtered",
       "latency_ms": {
-        "p50": 1.633,
-        "p95": 2.523
+        "p50": 1.606,
+        "p95": 2.351
       },
       "precision_at_k": {
         "p3": 0.3833,
@@ -47,12 +49,16 @@
         "p10": 0.1675
       },
       "off_topic_rate": 0.8325,
-      "filter_pass_rate": 1.0
+      "off_topic_rate_metadata_scope": 0.0,
+      "filter_pass_rate": 1.0,
+      "precision_at_5_metadata_scope": 1.0
     },
     {
       "mode": "delta_filtered_minus_baseline",
       "precision_p5_delta": 0.0,
-      "off_topic_reduction": 0.0
+      "precision_p5_delta_metadata_scope": 0.0,
+      "off_topic_reduction": 0.0,
+      "off_topic_reduction_metadata_scope": 0.0
     }
   ],
   "notes": "Spike 2 compares no-filter and metadata-filtered retrieval on the same corpus/query set. Primary gates: off-topic reduction and stable precision@5."
