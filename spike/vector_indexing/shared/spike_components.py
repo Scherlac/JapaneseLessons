@@ -84,12 +84,13 @@ def build_benchmark_queries(nodes: list[CanonicalNodeRecord], query_count: int, 
     for node in nodes:
         by_theme.setdefault(node.metadata.theme, []).append(node)
 
-    queries: list[RetrievalQuery] = []
+    lexical_queries: list[RetrievalQuery] = []
+    theme_queries: list[RetrievalQuery] = []
 
     sample_nodes = nodes[: min(20, len(nodes))]
     for idx, node in enumerate(sample_nodes):
         term = node.canonical_text_en.split("English:", 1)[-1].strip(" .")
-        queries.append(
+        lexical_queries.append(
             RetrievalQuery(
                 query_id=f"q_direct_{idx}",
                 query_text=f"Find concept for the English term {term}",
@@ -97,7 +98,7 @@ def build_benchmark_queries(nodes: list[CanonicalNodeRecord], query_count: int, 
                 expected_ids=[node.node_id],
             )
         )
-        queries.append(
+        lexical_queries.append(
             RetrievalQuery(
                 query_id=f"q_para_{idx}",
                 query_text=f"I need lesson material related to {term}",
@@ -110,7 +111,7 @@ def build_benchmark_queries(nodes: list[CanonicalNodeRecord], query_count: int, 
     rng.shuffle(themes)
     for idx, theme in enumerate(themes[:10]):
         expected = [n.node_id for n in by_theme[theme]]
-        queries.append(
+        theme_queries.append(
             RetrievalQuery(
                 query_id=f"q_theme_{idx}",
                 query_text=f"Beginner lesson concepts in theme {theme}",
@@ -120,7 +121,20 @@ def build_benchmark_queries(nodes: list[CanonicalNodeRecord], query_count: int, 
             )
         )
 
-    return queries[:query_count]
+    # Keep a stable mix so spike 2 always has metadata-filter-capable queries.
+    min_theme = min(len(theme_queries), max(1, query_count // 4))
+    min_lexical = min(len(lexical_queries), query_count - min_theme)
+
+    selected: list[RetrievalQuery] = []
+    selected.extend(theme_queries[:min_theme])
+    selected.extend(lexical_queries[:min_lexical])
+
+    if len(selected) < query_count:
+        remaining = [q for q in theme_queries[min_theme:] + lexical_queries[min_lexical:] if q.query_id not in {s.query_id for s in selected}]
+        selected.extend(remaining[: query_count - len(selected)])
+
+    rng.shuffle(selected)
+    return selected[:query_count]
 
 
 def precision_at_k(retrieved_ids: list[str], expected_ids: set[str], k: int) -> float:
