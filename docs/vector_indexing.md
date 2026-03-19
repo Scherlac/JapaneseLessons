@@ -200,6 +200,7 @@ Decision approach:
 3. As a language maintainer, I want to attach new language branches to existing canonical nodes, so I can expand language coverage without duplicating concept IDs.
 4. As an evaluator, I want retrieval quality metrics per language branch, so I can detect semantic drift and branch quality regressions early.
 5. As a platform engineer, I want embedding versioning and reindex tooling, so model upgrades do not break retrieval consistency.
+6. As a lesson pipeline operator, I want a lean retrieval integration in `jlesson` with safe fallback to the current generation flow, so we can collect real usage telemetry and validate vector-index value in production-like runs before full platform rollout.
 
 ## Spike Implementations
 
@@ -275,13 +276,18 @@ Success Criteria:
 - Clear boundary guidelines for when to keep narrative as continuous body/metadata.
 - Decision documented as an implementation outcome in this file.
 
-## Spike Execution Plan
+## Implementation and Evaluation Order
 
-1. Run spikes sequentially in the listed order.
-2. Use one fixed benchmark query set across all spikes.
-3. Record model name, version, and indexing parameters for reproducibility.
-4. Store results in docs/development_history.md and promote final choices into this document.
-5. Treat narrative representation (node/branch vs continuous body) as a required decision output from spikes.
+1. Complete Spike 2 hardening first:
+- increase metadata-constrained query share
+- add ambiguity-heavy cross-theme queries
+- report per-query-class metrics
+2. Implement a lean retrieval integration in `jlesson` with safe fallback to the current generation flow (User Story 6) to collect real usage telemetry.
+3. Run Spike 3 (multilingual branch projection) using lessons and retrieval traces from the lean integration path.
+4. Run Spike 4 (embedding payload strategy) against the same benchmark/query set and selected real usage traces.
+5. Run Spike 5 (narrative representation strategy) after retrieval and branch behavior are validated.
+6. Record model name, version, and indexing parameters for every run and integration experiment.
+7. Store outcomes in `docs/development_history.md` and promote final decisions back into this specification.
 
 ## Complexity Note
 
