@@ -89,7 +89,7 @@ def run_spike() -> SpikeResult:
             p10_scores.append(precision_at_k(got_ids, expected, 10))
 
     duration_s = time.perf_counter() - start_ts
-    throughput_qps = round((len(queries) * REPEATS) / max(0.001, sum(latencies_ms) / 1000), 2)
+    throughput_qps = round((len(queries) * REPEATS) / max(0.001, duration_s), 2)
 
     return SpikeResult(
         spike=SPIKE_ID,

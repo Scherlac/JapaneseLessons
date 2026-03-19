@@ -2,12 +2,12 @@
   "spike": "spike_02_vector_metadata_filtering",
   "embedding_model": "text-embedding-3-small",
   "vector_store": "chroma_local_persistent",
-  "timestamp_utc": "2026-03-19T20:58:55Z",
+  "timestamp_utc": "2026-03-19T21:10:04Z",
   "corpus_size": 300,
   "query_count": 40,
   "latency_ms": {
-    "p50": 1.606,
-    "p95": 2.351
+    "p50": 1.846,
+    "p95": 2.835
   },
   "precision_at_k": {
     "p3": 0.3833,
@@ -15,8 +15,8 @@
     "p10": 0.1675
   },
   "timing": {
-    "total_duration_s": 3.327,
-    "throughput_qps": 72.13,
+    "total_duration_s": 3.607,
+    "throughput_qps": 66.54,
     "repeats": 3.0,
     "filtered_query_share": 0.075
   },
@@ -24,8 +24,8 @@
     {
       "mode": "baseline_no_filter",
       "latency_ms": {
-        "p50": 1.608,
-        "p95": 2.26
+        "p50": 2.182,
+        "p95": 3.469
       },
       "precision_at_k": {
         "p3": 0.3833,
@@ -40,8 +40,8 @@
     {
       "mode": "metadata_filtered",
       "latency_ms": {
-        "p50": 1.606,
-        "p95": 2.351
+        "p50": 1.846,
+        "p95": 2.835
       },
       "precision_at_k": {
         "p3": 0.3833,
