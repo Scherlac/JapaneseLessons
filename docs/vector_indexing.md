@@ -170,9 +170,26 @@ Current lesson material generation and retrieval are content-centric but not yet
 ## Open Questions
 
 1. Should embeddings be generated from canonical text only, or canonical plus selected metadata?
-2. How strict should branch approval be before branch content becomes production-eligible?
-3. What is the minimum branch completeness threshold for enabling a new language in lesson generation?
-4. Should narrative fragments be first-class nodes or attached as metadata to concept nodes?
+2. Should narrative fragments be first-class nodes or attached as metadata to concept nodes?
+
+Decision approach:
+- Keep this as an implementation-time discovery question.
+- Resolve it from spike evidence, not upfront assumptions.
+
+## Provisional Policy: Branch Production Eligibility
+
+1. Tree and branch concepts are storage and retrieval structures, not quality gates.
+2. Branch content is production-eligible by default when it is structurally valid and linked to a canonical node.
+3. Quality is treated as an independent dimension and may be ranked later by AI scoring plus user feedback.
+4. Content should only be gated in the future if consistently low quality scores are observed over time.
+5. Scoring policy and thresholds are explicitly a backlog topic and are out of current implementation scope.
+
+## Provisional Policy: Language Enablement Threshold
+
+1. No minimum branch completeness threshold is required to enable a new language in lesson generation.
+2. If branch content is insufficient for a lesson request, the generation pipeline should create additional content automatically.
+3. Completeness is treated as an optimization metric, not as a launch gate.
+4. Structural validity remains required: branch records must be linked to canonical nodes and pass schema validation.
 
 
 
@@ -242,12 +259,29 @@ Success Criteria:
 - Clear recommendation for production default.
 - Decision captured with measurable trade-offs.
 
+### Spike 5: Narrative Representation Strategy
+
+Goal:
+- Determine where narrative should become node/branch structure vs where it should remain continuous text or metadata.
+
+Scope:
+- Implement two alternatives on the same sample lesson set:
+	- Narrative as first-class nodes with branchable language payload.
+	- Narrative attached as metadata/continuous body linked to concept nodes.
+- Evaluate retrieval quality, generation coherence, and authoring complexity.
+
+Success Criteria:
+- Clear boundary guidelines for when to model narrative as nodes and branches.
+- Clear boundary guidelines for when to keep narrative as continuous body/metadata.
+- Decision documented as an implementation outcome in this file.
+
 ## Spike Execution Plan
 
 1. Run spikes sequentially in the listed order.
 2. Use one fixed benchmark query set across all spikes.
 3. Record model name, version, and indexing parameters for reproducibility.
 4. Store results in docs/development_history.md and promote final choices into this document.
+5. Treat narrative representation (node/branch vs continuous body) as a required decision output from spikes.
 
 ## Complexity Note
 
