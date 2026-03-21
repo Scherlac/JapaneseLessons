@@ -2,7 +2,13 @@
 
 This document captures the **software engineering process, design principles, and development workflow** used by the Japanese Lesson Generator project.
 
-It is intended as a companion to the living progress report (progress_report.md), focusing on how we work (not what we built).
+It is intended as a companion to the reporting split:
+
+- [../progress_report.md](../progress_report.md) for active feature development
+- [project_scale.md](project_scale.md) for system-scale concerns
+- [development_history.md](development_history.md) for completed historical detail
+
+This file focuses on **how the project is built**, not on status reporting.
 
 ---
 
@@ -48,7 +54,9 @@ The project follows an iterative, research-driven cycle with heavy documentation
 
 ### 5) Documentation & Planning
 - Update progress_report.md regularly.
+- Keep docs/project_scale.md aligned with system-level concerns.
 - Capture completed work in docs/development_history.md.
+- Keep docs/architecture.md aligned with the current implementation shape.
 - Keep README and docs up to date.
 
 ### 6) Repository Management

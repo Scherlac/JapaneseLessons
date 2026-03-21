@@ -4,8 +4,8 @@
 **Date:** 2026-03-15  
 **Context:** The current CLI (`generate_lesson.py`) uses `argparse` with a flat flag structure.
 As features grow (lesson pipeline, export formats, curriculum management), flat flags become
-unmanageable and self-documenting help is poor. The architect review identified a CLI subcommand
-refactor as a near-term architectural need (see `progress_report.md` > Architectural Concepts).
+unmanageable and self-documenting help is poor. The architectural direction is now captured in
+`docs/architecture.md` and the system-growth rationale in `docs/project_scale.md`.
 
 ---
 

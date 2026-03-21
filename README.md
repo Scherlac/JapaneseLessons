@@ -135,6 +135,17 @@ spike/                # Proof-of-concept scripts
 output/               # Generated lessons and videos (gitignored)
 ```
 
+## Documentation Map
+
+Use the documentation set by intent:
+
+- `progress_report.md` — current feature development and near-term priorities
+- `docs/project_scale.md` — system-level scale topics and growth pressure
+- `docs/architecture.md` — compact arc42-style architecture reference
+- `docs/development_history.md` — completed work, spikes, and historical detail
+- `docs/software_engineering.md` — engineering process and working principles
+- `docs/structure.md` — touch-system and repetition model
+
 ## Installation
 
 ```bash

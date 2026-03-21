@@ -1,127 +1,187 @@
-# Japanese Lessons — Development History
+# Japanese Lessons — Project History
 
-> This document captures the chronological history of research findings, spike results,
-> bug encounters, and model evaluations. It is a record for reference, **not** a
-> statement of current architecture or status. See `progress_report.md` for the living
-> description of the project.
-
----
-
-## Phase 1 — Research & Foundation (Early March 2026)
-
-### Problem Statement
-- Existing Japanese study resources have low repetition counts and isolated focus.
-- Goal: build a CLI tool that generates structured lessons with high-repetition (5+
-  touches per item) across three phases: Nouns → Verbs → Grammar.
-
-### Technology Decisions Made
-
-All decisions documented in `docs/`:
-
-| Decision | Winner | Alternatives Considered |
-|----------|--------|------------------------|
-| TTS engine | **edge-tts** | gTTS, pyttsx3, Coqui TTS, Google Cloud TTS, Azure TTS |
-| Video pipeline | **Pillow + moviepy** | OpenCV, FFmpeg direct, manim, Remotion |
-| Japanese fonts | **Noto Sans JP** (Yu Gothic Bold fallback) | MS Gothic, IPAexGothic, Arial Unicode MS, system default |
-| LLM integration | **OpenAI SDK + LM Studio** | Ollama, OpenAI API, Anthropic, LangChain |
-
-### Core Data Schema Established
-- **Nouns**: `english`, `japanese` (kana), `kanji`, `romaji`
-- **Verbs**: + `type` (`る-verb` / `う-verb` / `irregular` / `な-adj`), `masu_form`
-- Initial vocab files: `vocab/food.json` (12 nouns, 10 verbs), `vocab/travel.json` (12 nouns, 10 verbs)
-- `food.json` also contains `grammar_pairs` (explicit pairings: eat+fish, drink+water, cook+meat)
+> This document captures completed work, spike results, bug encounters, and model
+> evaluations. It is organized by project-scale chapters rather than as a single
+> flat timeline so feature-level detail remains readable as the project grows.
+>
+> Current feature work: [../progress_report.md](../progress_report.md)  
+> System-scale view: [project_scale.md](project_scale.md)  
+> Current architecture: [architecture.md](architecture.md)
 
 ---
 
-## Phase 2 — Spike Implementations (Mid March 2026)
+## Chapter 1 — Foundation And Project Shape
 
-All spikes live in `spike/`. They were kept as-is after being extractedto production modules.
+### Early March 2026 — Problem framing
 
-### spike_01 — TTS Engine
-- Validated `edge-tts` with `ja-JP-NanamiNeural` voice at `-20%` rate
-- Discovered rate limiting from Microsoft Edge TTS service → added 1-second delays between requests + retry with exponential backoff
-- Full pipeline handles up to 87 audio items
+- Existing Japanese study resources had low repetition and isolated focus.
+- The project goal became: structured lessons with high repetition across vocabulary,
+  grammar, and narrated output.
 
-### spike_02 — Card Renderer
-- Validated Pillow at 1920×1080 with Yu Gothic Bold for Japanese text
-- Established card layout: label + counter, English (large), blank pause gap, Japanese reveal, progress bar
-- Font fallback chain: `YuGothB.ttc` → `msgothic.ttc`
+### Early March 2026 — Technology decisions established
 
-### spike_03 / spike_04 — Video Pipeline
-- `spike_03`: individual clip creation with moviepy
-- `spike_04`: full pipeline: cards + TTS audio → concatenated MP4
-- **Performance fix**: switched to FFmpeg stream copying → **12.5× faster** video generation
-- Confirmed timing model: 1.5s prompt + 2.0s pause + ~1.5s TTS + 1.5s hold ≈ 7.5s per item
+| Area | Decision | Notes |
+|------|----------|-------|
+| TTS | `edge-tts` | Best balance of quality and implementation simplicity |
+| Video pipeline | Pillow + moviepy | Kept composition code in Python while using FFmpeg underneath |
+| Japanese fonts | Noto Sans JP with Yu Gothic fallback | Cross-platform direction decided early; Windows fallback remained practical default |
+| LLM integration | OpenAI SDK + LM Studio | OpenAI-compatible endpoint preserved flexibility |
 
-### spike_05 — Performance
-- Profiling of the full pipeline; confirmed FFmpeg path as the bottleneck before stream-copy fix
+### Early March 2026 — Initial content schema
 
-### spike_06 — LLM Provider Benchmark
-- Multi-provider benchmark: Ollama (not running, skipped), LM Studio, OpenAI
-- Added host reachability pre-check; 15-second per-provider budget; 10-second per-request timeout
-- LM Studio hit 15s budget on first run (model was slow to load cold)
+- Nouns: english, japanese, kanji, romaji
+- Verbs: english, japanese, kanji, romaji, type, masu_form
+- Initial theme files: `food` and `travel`
+- Early grammar pairing experiments were stored in source vocab data during discovery
 
-### spike_07 — LM Studio Deep Evaluation (3 Runs)
+### 2026-03-15 — Package structure finalized
 
-**Run 1** — initial connectivity check:
-- Discovered: `json_object` response_format rejected with HTTP 400
-- Discovered: plain text works but verbose thinking output pollutes JSON
+- Production code moved into `jlesson/`
+- CLI entry point standardized to `jlesson`
+- Video modules moved under `jlesson/video/`
+- Exporters grouped under `jlesson/exporters/`
+- Tests updated to import from the package layout
 
-**Run 2** — switched to `json_schema`:
-- Added `qwen/qwen3.5-9b` (new locally available model)
-- `mistral-7b-instruct-v0.3` still failing (HTTP 400 on system message)
-- 6/8 models passing
+This created the current repository shape used by later pipeline work.
 
-**Run 3** — all models:
-- Added `build_messages()` helper to fold system content into user turn for old Mistral GGUFs
-- Added `extract_json()` to fish JSON out of verbose reasoning output
-- **Final result: 8/8 models pass `json_schema` structured output**
+---
 
-#### LM Studio Model Evaluation Table (2026-03-14)
+## Chapter 2 — LLM Generation And Validation
+
+### Mid March 2026 — LM Studio integration constraints discovered
+
+During spike work, several API realities became clear:
+
+- `json_object` was rejected by LM Studio with HTTP 400
+- `json_schema` worked reliably across tested models
+- verbose reasoning polluted plain-text JSON responses
+- older Mistral GGUF chat templates required folding system instructions into the user turn
+
+### 2026-03-14 — Model evaluation results
 
 | Model | JSON schema | Plain text | Japanese quality | Notes |
 |---|---|---|---|---|
-| `qwen/qwen3-14b` | ✅ 6.5s | ✅ 16s | ⭐⭐⭐ | Best Japanese; thinking model, verbose plain text |
-| `qwen/qwen3.5-9b` | ✅ 4.5s | ✅ 22s | ⭐⭐⭐ | Good Japanese; extremely verbose plain text |
-| `microsoft/phi-4-reasoning-plus` | ✅ 3.7s | ✅ 16s | ⭐⭐⭐ | Correct Japanese; `<think>` stripping needed |
+| `qwen/qwen3-14b` | ✅ 6.5s | ✅ 16s | ⭐⭐⭐ | Best Japanese; verbose outside schema mode |
+| `qwen/qwen3.5-9b` | ✅ 4.5s | ✅ 22s | ⭐⭐⭐ | Good quality, very verbose plain text |
+| `microsoft/phi-4-reasoning-plus` | ✅ 3.7s | ✅ 16s | ⭐⭐⭐ | `<think>` stripping required |
 | `mistralai/ministral-3-14b-reasoning` | ✅ 6.7s | ✅ 17s | ⭐⭐⭐ | Correct Japanese + romaji |
-| `mistral-7b-instruct-v0.3` | ✅ 5.5s | ✅ 9s | ⭐⭐ | No system role — merge into user turn |
-| `meta-llama-3.1-8b-instruct` | ✅ 2.8s | ✅ 5s | ⭐ | Fastest; Japanese field empty in schema mode |
-| `stable-code-instruct-3b` | ✅ 8.3s | ✅ 5s | ⭐ | Romaji field contains Japanese — code model |
-| `deepseek-math-7b-instruct` | ✅ 10.9s | ✅ 9s | ❌ | Japanese/romaji empty — math model |
+| `mistral-7b-instruct-v0.3` | ✅ 5.5s | ✅ 9s | ⭐⭐ | No native system-role support |
+| `meta-llama-3.1-8b-instruct` | ✅ 2.8s | ✅ 5s | ⭐ | Fast but weak Japanese payloads |
+| `stable-code-instruct-3b` | ✅ 8.3s | ✅ 5s | ⭐ | Wrong domain for language work |
+| `deepseek-math-7b-instruct` | ✅ 10.9s | ✅ 9s | ❌ | Japanese fields often empty |
 
-**Recommended**: `qwen/qwen3-14b` (best quality) or `qwen/qwen3.5-9b` (slightly faster JSON).  
-**Avoid**: `deepseek-math`, `stable-code` — wrong domain.
-**Key insight**: `json_schema` with llama.cpp grammar sampling works on **all** models regardless of thinking/verbose tendencies — token constraint enforces structure before reasoning can pollute output.
+Recommended outcome:
 
-### spike_08 — Curriculum Workflow Validation
-- Full end-to-end test: grammar select → grammar generate → content validate → noun practice
-- Model: `qwen/qwen3-14b`
-- Grammar select: 12.1s | Grammar generate: 21.4s | Validation: **10/10** in 2.6s | Noun practice: 11.5s
-- Output: `spike/output/spike_08_curriculum.json`, `curriculum/curriculum.json` (Lesson 1 created)
+- prefer `qwen/qwen3-14b` for quality
+- treat `json_schema` as the default structured-output mechanism on llama.cpp-backed systems
 
-### spike_09 — Two-Lesson Demo (2026-03-15)
+### March 2026 — Production hardening in LLM handling
 
-First fully integrated demo: LLM pipeline + TTS + video render.
+Feature-level fixes and additions:
 
-**Bugs encountered and fixed during first run:**
+1. Added think-block stripping.
+2. Replaced fragile flat-regex JSON extraction with brace-depth scanning.
+3. Added whitespace normalization for noisy LLM string outputs.
+4. Introduced file-based LLM response caching.
+5. Added sentence review to score and rewrite unnatural generated sentences before downstream use.
 
-1. **`_extract_json()` nested JSON** — flat-object regex `r'\{[^{}]+\}'` could not match nested dicts like `{"nouns":[...]}`. Fixed: replaced with a brace-depth scanner `_find_json_objects()`.
-
-2. **Vocab string whitespace** — LLM returned `' irregular'` (leading space) causing schema validation failure. Fixed: added strip pass over all string values in `vocab_generator.generate_vocab()`.
-
-3. **`PERSONS` format mismatch** — `config.py` had `["I", "you", "she"]` (plain strings) but `build_grammar_generate_prompt` expects `list[tuple[str,str,str]]`. Fixed: changed to `[("I","私","watashi"), ...]`.
-
-4. **moviepy 2.x audio API** — `CompositeVideoClip([img, audio])` raised `AttributeError: 'AudioFileClip' has no attribute 'layer_index'`. Fixed: changed to `img_clip.with_audio(audio_clip)`.
-
-**Demo result (2026-03-15, `qwen/qwen3-14b`, 192s total):**
-- Lesson 1 (food): 6 sentences, 3 noun items → `output/demo/lesson_01_food.mp4` (482 KB)
-- Lesson 2 (travel): 6 sentences, 3 noun items → `output/demo/lesson_02_travel.mp4` (571 KB)
-- Curriculum saved → `output/demo/curriculum_demo.json`
+These changes converted the LLM layer from spike-grade behavior into a more reliable
+production-oriented subsystem.
 
 ---
 
-## Phase 3 — Unit Test Suite (2026-05-30)
+## Chapter 3 — Compilation And Output Rendering
+
+### Mid March 2026 — TTS and card-rendering spikes
+
+#### spike_01 — TTS engine
+
+- Validated `edge-tts` with `ja-JP-NanamiNeural`
+- Discovered service rate limiting
+- Added retry and pacing behavior during experimentation
+
+#### spike_02 — Card renderer
+
+- Validated Pillow at 1920×1080
+- Established Japanese-first card layout conventions
+- Confirmed fallback chain around Yu Gothic / MS Gothic on Windows
+
+### Mid March 2026 — Video composition spikes
+
+#### spike_03 / spike_04 — Video pipeline
+
+- Confirmed end-to-end composition from cards + TTS audio to MP4
+- Switched to FFmpeg stream-copy strategy for a large speedup
+- Validated the lesson timing model used by later production rendering
+
+#### spike_05 — Performance investigation
+
+- Confirmed the previous FFmpeg path as a bottleneck before stream-copy optimization
+
+### March 2026 — Production rendering architecture added
+
+Feature-level additions:
+
+- explicit compilation models for assets, touches, phases, and repetition steps
+- profile system separating passive-video and active-flash-card behavior
+- asset compiler for rendering cards and TTS per item
+- touch compiler for profile-driven interleaving
+- multi-audio clip support in the video builder
+- profile-aware markdown lesson reporting
+
+This was the point where rendering stopped being an ad-hoc dict pipeline and became
+an explicit staged transformation.
+
+---
+
+## Chapter 4 — Lesson Pipeline And Delivery Flow
+
+### 2026-03-15 — spike_08 curriculum workflow validation
+
+- Validated grammar select → grammar generate → content validate → noun practice
+- Confirmed the lesson workflow could run end to end with `qwen/qwen3-14b`
+- Persisted representative output and curriculum data for inspection
+
+### 2026-03-15 — spike_09 two-lesson integrated demo
+
+First fully integrated demo combining:
+
+- LLM generation
+- TTS synthesis
+- card rendering
+- video output
+- curriculum persistence
+
+#### Bugs fixed during the first integrated demo
+
+1. Nested JSON extraction bug in `_extract_json()`
+2. Leading-space noise in LLM vocab fields
+3. `PERSONS` tuple format mismatch
+4. moviepy 2.x audio API breakage requiring `with_audio()` usage
+
+### March 2026 — Production pipeline growth
+
+Feature-level milestones:
+
+1. Full lesson pipeline wired into the CLI
+2. Lesson content persistence added before rendering
+3. Verb practice step integrated into the pipeline
+4. Seeded vocab shuffle introduced without touching global RNG state
+5. Markdown lesson report added
+6. Compilation pipeline stages wired into the lesson pipeline
+7. `--profile` CLI option added
+8. Sentence review step inserted between sentence generation and downstream practice stages
+
+Net effect:
+
+- the application moved from spike scripts to a stable packaged workflow
+- content generation, compilation, reporting, and video rendering became one coherent path
+
+---
+
+## Chapter 5 — Quality, Testing, And Engineering Discipline
+
+### 2026-05-30 — First large unit-test baseline
 
 | Test file | Tests | Markers |
 |-----------|-------|---------|
@@ -134,42 +194,37 @@ First fully integrated demo: LLM pipeline + TTS + video render.
 | `test_prompt_template.py` | 37 | — |
 | **Total** | **204** | **20 non-unit deselected** |
 
-```
+Unit path result at that point:
+
+```text
 pytest tests/ -m "not integration and not internet and not video"
 → 184 passed, 20 deselected in 6.65s
 ```
 
----
+### March 2026 onward — Coverage growth through feature waves
 
-## LLM Integration — Technical Notes
+Later milestones captured in status reporting and retained as historical fact:
 
-### json_schema vs json_object
-LM Studio uses llama.cpp grammar-based sampling. `json_object` returns HTTP 400. Must use
-`json_schema` with a schema definition. This enforces valid JSON at the token level.
+- 274 total tests after cache and shuffle work
+- 299 total tests after markdown report work
+- 392 total tests after compilation pipeline work
+- 414 total tests after pipeline integration work
+- 437 total tests after sentence review work
 
-### Thinking model handling
-Models: `qwen3-14b`, `qwen3.5-9b`, `phi-4-reasoning-plus`, `ministral-3-14b-reasoning`
-- Send `/no_think` as system message to suppress reasoning blocks
-- `_strip_think()` in `llm_client.py` strips residual `<think>...</think>` blocks
-- `_extract_json()` scans from end of text (reasoning models place answer last)
+### Durable engineering learnings
 
-### Mistral v0.x GGUF chat template
-`mistral-7b-instruct-v0.3` GGUF has no system-role token in its `[INST]` template.
-Sending a system message causes HTTP 400. Solution: prepend system content to user turn.
-Handled automatically by `LLMClient._build_messages()`.
-
-### ask_llm_json_free() vs ask_llm_json()
-- `ask_llm_json()` (via `generate_json(json_mode=True)`) uses `json_schema` with the fixed
-  `_TRANSLATION_SCHEMA` — for structured translation responses only.
-- `ask_llm_json_free()` uses `generate_text(json_mode=False)` + `_extract_json()` — for
-  free-form JSON where the response shape varies (vocab dicts, sentence arrays, validation reports).
+1. Spike-before-scale kept uncovering non-obvious constraints early.
+2. Structured output enforcement was more reliable than post-hoc cleanup.
+3. Rendering and compilation quality improved once intermediate data structures became explicit.
+4. Documentation needed separation between active work, historical record, and architectural truth.
 
 ---
 
-## Key Learnings
+## Historical Notes Relevant To Future Work
 
-- **`json_schema` is the right tool** for constrained JSON on llama.cpp backends — bypasses all verbose reasoning noise.
-- **Spike before scaling** — each spike discovered at least one non-obvious constraint (rate limits, API quirks, movie py API breakage, font path issues).
-- **Grammar sampling requires known schema** — for variable-shape JSON (`ask_llm_json_free`), plain text + extraction is more flexible than rigid `json_schema`.
-- **moviepy 2.x broke the audio API** — `with_audio()` replaced composite clip pattern; always pin major dependencies in `pyproject.toml`.
-- **LLM output is noisy** — string whitespace trimming, nested JSON extraction, and think-block stripping are all necessary in production LLM parsing.
+These findings are likely to matter again in later feature waves:
+
+- flat theme vocab files are convenient but weak as a long-term content platform
+- Windows font handling worked for local delivery but remains a portability debt
+- pipeline checkpointing was deferred while lesson builds were still relatively small
+- retrieval and multilingual branching are natural next-scale concerns now that the lesson pipeline is stable
