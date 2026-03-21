@@ -4,15 +4,15 @@ import asyncio
 import time
 from pathlib import Path
 
-from .asset_compiler import compile_assets
-from .language_config import get_language_config
-from .lesson_store import load_lesson_content
-from .models import Phase
+from jlesson.asset_compiler import compile_assets
+from jlesson.language_config import get_language_config
+from jlesson.lesson_store import load_lesson_content
+from jlesson.models import Phase
 from .pipeline_core import LessonConfig, LessonContext, PipelineStep, StepInfo
 from .pipeline_gadgets import PipelineGadgets
-from .profiles import get_profile
-from .touch_compiler import compile_touches
-from .video.builder import VideoBuilder
+from jlesson.profiles import get_profile
+from jlesson.touch_compiler import compile_touches
+from jlesson.video.builder import VideoBuilder
 
 
 def run_pipeline(

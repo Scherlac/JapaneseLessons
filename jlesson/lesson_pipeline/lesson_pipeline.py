@@ -36,7 +36,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from .curriculum import load_curriculum, suggest_new_vocab
+from jlesson.curriculum import load_curriculum, suggest_new_vocab
 from .pipeline_core import LessonConfig, LessonContext, PipelineStep, StepInfo
 from .pipeline_gadgets import PipelineGadgets
 from .pipeline_orchestrator import (
@@ -45,7 +45,7 @@ from .pipeline_orchestrator import (
 )
 
 
-from .lesson_pipeline_steps import (
+from .lesson_pipeline import (
     CompileAssetsStep,
     CompileTouchesStep,
     GenerateSentencesStep,
@@ -60,7 +60,6 @@ from .lesson_pipeline_steps import (
     SelectVocabStep,
     VerbPracticeStep,
 )
-
 
 # ---------------------------------------------------------------------------
 # Pipeline runner
@@ -83,27 +82,3 @@ PIPELINE: list[PipelineStep] = [
 ]
 
 
-def run_pipeline(config: LessonConfig) -> LessonContext:
-    """Run the full lesson generation pipeline."""
-    return _run_pipeline_impl(
-        config,
-        pipeline=PIPELINE,
-        load_curriculum_fn=load_curriculum,
-    )
-
-
-def render_existing_lesson(
-    lesson_id: int,
-    output_dir: Path | None = None,
-    profile: str = "passive_video",
-    language: str = "eng-jap",
-    verbose: bool = True,
-) -> Path:
-    """Render MP4 for an already-generated lesson content file."""
-    return _render_existing_lesson_impl(
-        lesson_id=lesson_id,
-        output_dir=output_dir,
-        profile=profile,
-        language=language,
-        verbose=verbose,
-    )

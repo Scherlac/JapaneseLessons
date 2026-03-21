@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .language_config import get_language_config
-from .llm_client import ask_llm_json_free
-from .models import GrammarItem
+from jlesson.language_config import get_language_config
+from jlesson.llm_client import ask_llm_json_free
+from jlesson.models import GrammarItem
 
 _VOCAB_DIR = Path(__file__).parent.parent / "vocab"
 
@@ -22,7 +22,7 @@ class PipelineGadgets:
             with open(path, encoding="utf-8") as file_handle:
                 return json.load(file_handle)
         print(f"  [vocab] {theme}.json not found — generating via LLM...")
-        from .vocab_generator import generate_vocab
+        from jlesson.vocab_generator import generate_vocab
 
         return generate_vocab(
             theme=theme,
@@ -35,7 +35,7 @@ class PipelineGadgets:
     def ask_llm(ctx, prompt: str) -> dict:
         """Route LLM call through cache when use_cache is enabled."""
         if ctx.config.use_cache:
-            from .llm_cache import ask_llm_cached
+            from jlesson.llm_cache import ask_llm_cached
 
             return ask_llm_cached(prompt)
         return ask_llm_json_free(prompt)

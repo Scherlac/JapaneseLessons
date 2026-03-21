@@ -4,10 +4,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .language_config import LanguageConfig, get_language_config
-from .lesson_report import ReportBuilder
-from .models import CompiledItem, GeneralItem, GrammarItem, Sentence, Touch
-from .retrieval import RetrievalResult
+from jlesson.language_config import LanguageConfig, get_language_config
+from jlesson.lesson_report import ReportBuilder
+from jlesson.models import CompiledItem, GeneralItem, GrammarItem, Sentence, Touch
+from jlesson.retrieval import RetrievalResult
 
 
 @dataclass
