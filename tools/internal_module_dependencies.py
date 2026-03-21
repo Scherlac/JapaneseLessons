@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import os
 from collections import deque
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -14,6 +15,8 @@ from typing import Iterable
 class GraphData:
     modules: set[str]
     edges: dict[str, set[str]]
+    module_files: dict[str, Path]
+    edge_locations: dict[tuple[str, str], tuple[Path, int]]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -108,6 +111,58 @@ def nearest_known_module(name: str, known_modules: set[str]) -> str | None:
     return None
 
 
+def collect_graph_metadata(
+    root: Path,
+    package: str,
+    modules: set[str],
+    edges: dict[str, set[str]],
+) -> tuple[dict[str, Path], dict[tuple[str, str], tuple[Path, int]]]:
+    package_dir = root / package.replace(".", "/")
+    module_files: dict[str, Path] = {}
+    edge_locations: dict[tuple[str, str], tuple[Path, int]] = {}
+
+    for file_path in iter_python_files(package_dir):
+        module_name = module_name_for_file(root, file_path)
+        if module_name not in modules:
+            continue
+
+        module_files[module_name] = file_path
+        source = file_path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(file_path))
+
+        for node in ast.walk(tree):
+            targets: list[str] = []
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if not alias.name.startswith(f"{package}.") and alias.name != package:
+                        continue
+                    target = nearest_known_module(alias.name, modules)
+                    if target and target in edges.get(module_name, set()) and target != module_name:
+                        targets.append(target)
+
+            if isinstance(node, ast.ImportFrom):
+                if node.level:
+                    base_module = resolve_relative_module(module_name, node.level, node.module)
+                else:
+                    base_module = node.module or ""
+
+                if not base_module.startswith(package):
+                    continue
+
+                for alias in node.names:
+                    candidate = f"{base_module}.{alias.name}" if base_module else alias.name
+                    target = nearest_known_module(candidate, modules)
+                    if target is None:
+                        target = nearest_known_module(base_module, modules)
+                    if target and target in edges.get(module_name, set()) and target != module_name:
+                        targets.append(target)
+
+            for target in targets:
+                edge_locations.setdefault((module_name, target), (file_path, node.lineno))
+
+    return module_files, edge_locations
+
+
 def graph_from_ast(root: Path, package: str) -> GraphData:
     package_dir = root / package.replace(".", "/")
     modules = {module_name_for_file(root, path) for path in iter_python_files(package_dir)}
@@ -144,7 +199,13 @@ def graph_from_ast(root: Path, package: str) -> GraphData:
                     if target and target != module_name:
                         edges[module_name].add(target)
 
-    return GraphData(modules=modules, edges=edges)
+    module_files, edge_locations = collect_graph_metadata(root, package, modules, edges)
+    return GraphData(
+        modules=modules,
+        edges=edges,
+        module_files=module_files,
+        edge_locations=edge_locations,
+    )
 
 
 def graph_from_grimp(root: Path, package: str) -> GraphData:
@@ -157,7 +218,13 @@ def graph_from_grimp(root: Path, package: str) -> GraphData:
         for imported in graph.find_modules_directly_imported_by(importer):
             if imported in modules and imported != importer:
                 edges[importer].add(imported)
-    return GraphData(modules=modules, edges=edges)
+    module_files, edge_locations = collect_graph_metadata(root, package, modules, edges)
+    return GraphData(
+        modules=modules,
+        edges=edges,
+        module_files=module_files,
+        edge_locations=edge_locations,
+    )
 
 
 def build_graph(root: Path, package: str, backend: str) -> tuple[GraphData, str]:
@@ -280,9 +347,50 @@ def direct_group_edges(
         if module_group(source, package) != source_group:
             continue
         for target in sorted(edges[source]):
+            if target not in modules:
+                continue
             if module_group(target, package) == target_group:
                 pairs.append((source, target))
     return pairs
+
+
+def cycle_nodes_for_groups(
+    cycles: list[list[str]],
+    package: str,
+    left_group: str,
+    right_group: str,
+) -> set[str]:
+    nodes: set[str] = set()
+    for component in cycles:
+        groups = {module_group(module, package) for module in component}
+        if left_group in groups and right_group in groups:
+            nodes.update(component)
+    return nodes
+
+
+def cycle_group_path(
+    edges: dict[str, set[str]],
+    package: str,
+    source_group: str,
+    target_group: str,
+    allowed_nodes: set[str],
+) -> list[str] | None:
+    best: list[str] | None = None
+    sources = sorted(
+        module for module in allowed_nodes if module_group(module, package) == source_group
+    )
+    targets = sorted(
+        module for module in allowed_nodes if module_group(module, package) == target_group
+    )
+
+    for source in sources:
+        for target in targets:
+            path = shortest_path(edges, source, target, allowed=allowed_nodes)
+            if path is None:
+                continue
+            if best is None or len(path) < len(best) or path < best:
+                best = path
+    return best
 
 
 def representative_cycle(edges: dict[str, set[str]], component: list[str]) -> list[str]:
@@ -361,6 +469,46 @@ def render_mermaid(grouped_edges: dict[str, Counter[str]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def markdown_link(report_path: Path, target_path: Path, label: str, line: int | None = None) -> str:
+    relative = Path(os.path.relpath(target_path, report_path.parent)).as_posix()
+    if line is not None:
+        return f"[{label}]({relative}#L{line})"
+    return f"[{label}]({relative})"
+
+
+def module_text(module: str) -> str:
+    return f"`{module}`"
+
+
+def module_ellipsis_link(module: str, graph: GraphData, report_path: Path) -> str | None:
+    file_path = graph.module_files.get(module)
+    if file_path is None:
+        return None
+    return markdown_link(report_path, file_path, "...", line=1)
+
+
+def edge_ellipsis_link(source: str, target: str, graph: GraphData, report_path: Path) -> str | None:
+    location = graph.edge_locations.get((source, target))
+    if location is None:
+        return None
+    file_path, line = location
+    return markdown_link(report_path, file_path, "...", line=line)
+
+
+def format_path_text(path: list[str]) -> str:
+    return " -> ".join(module_text(module) for module in path)
+
+
+def path_ellipsis_link(path: list[str], graph: GraphData, report_path: Path) -> str | None:
+    if len(path) >= 2:
+        link = edge_ellipsis_link(path[0], path[1], graph, report_path)
+        if link is not None:
+            return link
+    if path:
+        return module_ellipsis_link(path[0], graph, report_path)
+    return None
+
+
 def render_markdown_report(
     *,
     package: str,
@@ -371,6 +519,7 @@ def render_markdown_report(
     in_degree: Counter[str],
     out_degree: Counter[str],
     top: int,
+    report_path: Path,
 ) -> str:
     lines = [
         f"# Internal Module Dependencies: {package}",
@@ -391,7 +540,11 @@ def render_markdown_report(
     ]
 
     for module, count in out_degree.most_common(top):
-        lines.append(f"- `{module}`: `{count}`")
+        entry = f"- {module_text(module)}: `{count}`"
+        source_link = module_ellipsis_link(module, graph, report_path)
+        if source_link is not None:
+            entry = f"{entry} {source_link}"
+        lines.append(entry)
 
     lines.extend([
         "",
@@ -400,7 +553,11 @@ def render_markdown_report(
     ])
 
     for module, count in in_degree.most_common(top):
-        lines.append(f"- `{module}`: `{count}`")
+        entry = f"- {module_text(module)}: `{count}`"
+        source_link = module_ellipsis_link(module, graph, report_path)
+        if source_link is not None:
+            entry = f"{entry} {source_link}"
+        lines.append(entry)
 
     lines.extend([
         "",
@@ -427,7 +584,11 @@ def render_markdown_report(
         lines.append("- None")
     else:
         for component in cycles:
-            lines.append(f"- `{' -> '.join(component)}`")
+            entry = f"- {format_path_text(component)}"
+            source_link = path_ellipsis_link(component, graph, report_path)
+            if source_link is not None:
+                entry = f"{entry} {source_link}"
+            lines.append(entry)
 
     lines.append("")
     return "\n".join(lines)
@@ -476,6 +637,7 @@ def render_detailed_markdown_report(
     out_degree: Counter[str],
     top: int,
     focus_groups: list[tuple[str, str]],
+    report_path: Path,
 ) -> str:
     cycle_paths = [representative_cycle(graph.edges, component) for component in cycles]
     dependency_paths = top_dependency_paths(
@@ -503,7 +665,11 @@ def render_detailed_markdown_report(
         lines.append("- None")
     else:
         for path in cycle_paths:
-            lines.append(f"- `{' -> '.join(path)}`")
+            entry = f"- {format_path_text(path)}"
+            source_link = path_ellipsis_link(path, graph, report_path)
+            if source_link is not None:
+                entry = f"{entry} {source_link}"
+            lines.append(entry)
 
     lines.extend([
         "",
@@ -518,6 +684,7 @@ def render_detailed_markdown_report(
             lines.append(f"### `{left_group}` <-> `{right_group}`")
             lines.append("")
 
+            cycle_nodes = cycle_nodes_for_groups(cycles, package, left_group, right_group)
             left_to_right_edges = direct_group_edges(
                 graph.edges,
                 graph.modules,
@@ -532,40 +699,93 @@ def render_detailed_markdown_report(
                 right_group,
                 left_group,
             )
-            left_to_right_path = shortest_group_path(
+            cycle_left_to_right_edges = direct_group_edges(
                 graph.edges,
-                graph.modules,
+                cycle_nodes,
                 package,
                 left_group,
                 right_group,
-            )
-            right_to_left_path = shortest_group_path(
+            ) if cycle_nodes else []
+            cycle_right_to_left_edges = direct_group_edges(
                 graph.edges,
-                graph.modules,
+                cycle_nodes,
                 package,
                 right_group,
                 left_group,
-            )
+            ) if cycle_nodes else []
+            left_to_right_path = cycle_group_path(
+                graph.edges,
+                package,
+                left_group,
+                right_group,
+                cycle_nodes,
+            ) if cycle_nodes else None
+            right_to_left_path = cycle_group_path(
+                graph.edges,
+                package,
+                right_group,
+                left_group,
+                cycle_nodes,
+            ) if cycle_nodes else None
 
             lines.append(f"- Direct imports `{left_group}` -> `{right_group}`: `{len(left_to_right_edges)}`")
             if left_to_right_edges:
                 for source, target in left_to_right_edges[:8]:
-                    lines.append(f"  - `{source}` -> `{target}`")
+                    import_link = edge_ellipsis_link(source, target, graph, report_path)
+                    edge_summary = f"{module_text(source)} -> {module_text(target)}"
+                    if import_link is not None:
+                        edge_summary = f"{edge_summary} {import_link}"
+                    lines.append(f"  - {edge_summary}")
 
             lines.append(f"- Direct imports `{right_group}` -> `{left_group}`: `{len(right_to_left_edges)}`")
             if right_to_left_edges:
                 for source, target in right_to_left_edges[:8]:
-                    lines.append(f"  - `{source}` -> `{target}`")
+                    import_link = edge_ellipsis_link(source, target, graph, report_path)
+                    edge_summary = f"{module_text(source)} -> {module_text(target)}"
+                    if import_link is not None:
+                        edge_summary = f"{edge_summary} {import_link}"
+                    lines.append(f"  - {edge_summary}")
+
+            lines.append(f"- Cycle nodes spanning both groups: `{len(cycle_nodes)}`")
+            if cycle_nodes:
+                lines.append(
+                    f"- Cycle-direct imports `{left_group}` -> `{right_group}`: `{len(cycle_left_to_right_edges)}`"
+                )
+                if cycle_left_to_right_edges:
+                    for source, target in cycle_left_to_right_edges[:8]:
+                        import_link = edge_ellipsis_link(source, target, graph, report_path)
+                        edge_summary = f"{module_text(source)} -> {module_text(target)}"
+                        if import_link is not None:
+                            edge_summary = f"{edge_summary} {import_link}"
+                        lines.append(f"  - {edge_summary}")
+                lines.append(
+                    f"- Cycle-direct imports `{right_group}` -> `{left_group}`: `{len(cycle_right_to_left_edges)}`"
+                )
+                if cycle_right_to_left_edges:
+                    for source, target in cycle_right_to_left_edges[:8]:
+                        import_link = edge_ellipsis_link(source, target, graph, report_path)
+                        edge_summary = f"{module_text(source)} -> {module_text(target)}"
+                        if import_link is not None:
+                            edge_summary = f"{edge_summary} {import_link}"
+                        lines.append(f"  - {edge_summary}")
 
             if left_to_right_path is not None:
-                lines.append(f"- Shortest path `{left_group}` -> `{right_group}`: `{' -> '.join(left_to_right_path)}`")
+                entry = f"- Cycle path `{left_group}` -> `{right_group}`: {format_path_text(left_to_right_path)}"
+                source_link = path_ellipsis_link(left_to_right_path, graph, report_path)
+                if source_link is not None:
+                    entry = f"{entry} {source_link}"
+                lines.append(entry)
             else:
-                lines.append(f"- Shortest path `{left_group}` -> `{right_group}`: none")
+                lines.append(f"- Cycle path `{left_group}` -> `{right_group}`: none")
 
             if right_to_left_path is not None:
-                lines.append(f"- Shortest path `{right_group}` -> `{left_group}`: `{' -> '.join(right_to_left_path)}`")
+                entry = f"- Cycle path `{right_group}` -> `{left_group}`: {format_path_text(right_to_left_path)}"
+                source_link = path_ellipsis_link(right_to_left_path, graph, report_path)
+                if source_link is not None:
+                    entry = f"{entry} {source_link}"
+                lines.append(entry)
             else:
-                lines.append(f"- Shortest path `{right_group}` -> `{left_group}`: none")
+                lines.append(f"- Cycle path `{right_group}` -> `{left_group}`: none")
 
             lines.append("")
 
@@ -579,10 +799,18 @@ def render_detailed_markdown_report(
         lines.append("- None")
     else:
         for source, paths in dependency_paths.items():
-            lines.append(f"### `{source}`")
+            header = f"### {module_text(source)}"
+            source_link = module_ellipsis_link(source, graph, report_path)
+            if source_link is not None:
+                header = f"{header} {source_link}"
+            lines.append(header)
             lines.append("")
             for path in paths:
-                lines.append(f"- `{' -> '.join(path)}`")
+                entry = f"- {format_path_text(path)}"
+                source_link = path_ellipsis_link(path, graph, report_path)
+                if source_link is not None:
+                    entry = f"{entry} {source_link}"
+                lines.append(entry)
             lines.append("")
 
     lines.extend([
@@ -592,13 +820,21 @@ def render_detailed_markdown_report(
 
     for module, _ in out_degree.most_common(min(top, 10)):
         direct_imports = sorted(graph.edges[module])
-        lines.append(f"### `{module}`")
+        header = f"### {module_text(module)}"
+        source_link = module_ellipsis_link(module, graph, report_path)
+        if source_link is not None:
+            header = f"{header} {source_link}"
+        lines.append(header)
         lines.append("")
         if not direct_imports:
             lines.append("- None")
         else:
             for imported in direct_imports:
-                lines.append(f"- `{imported}`")
+                import_link = edge_ellipsis_link(module, imported, graph, report_path)
+                entry = module_text(imported)
+                if import_link is not None:
+                    entry = f"{entry} {import_link}"
+                lines.append(f"- {entry}")
         lines.append("")
 
     return "\n".join(lines)
@@ -677,6 +913,7 @@ def main() -> int:
         in_degree=in_degree,
         out_degree=out_degree,
         top=args.top,
+        report_path=args.markdown_out,
     )
     args.markdown_out.write_text(markdown, encoding="utf-8")
     print(f"wrote markdown: {args.markdown_out}")
@@ -690,6 +927,7 @@ def main() -> int:
         out_degree=out_degree,
         top=args.top,
         focus_groups=focus_groups,
+        report_path=args.details_markdown_out,
     )
     args.details_markdown_out.write_text(details_markdown, encoding="utf-8")
     print(f"wrote details markdown: {args.details_markdown_out}")
@@ -699,7 +937,18 @@ def main() -> int:
             "backend": backend_used,
             "package": args.package,
             "modules": sorted(graph.modules),
+            "module_files": {
+                module: path.relative_to(root).as_posix()
+                for module, path in sorted(graph.module_files.items())
+            },
             "edges": {module: sorted(targets) for module, targets in sorted(graph.edges.items())},
+            "edge_locations": {
+                f"{source} -> {target}": {
+                    "path": path.relative_to(root).as_posix(),
+                    "line": line,
+                }
+                for (source, target), (path, line) in sorted(graph.edge_locations.items())
+            },
             "cycles": cycles,
             "fan_in": in_degree.most_common(),
             "fan_out": out_degree.most_common(),
