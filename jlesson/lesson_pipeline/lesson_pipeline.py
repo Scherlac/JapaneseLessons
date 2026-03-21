@@ -61,6 +61,7 @@ from .lesson_pipeline import (
     VerbPracticeStep,
 )
 
+
 # ---------------------------------------------------------------------------
 # Pipeline runner
 # ---------------------------------------------------------------------------
@@ -82,3 +83,27 @@ PIPELINE: list[PipelineStep] = [
 ]
 
 
+def run_pipeline(config: LessonConfig) -> LessonContext:
+    """Run the full lesson generation pipeline."""
+    return _run_pipeline_impl(
+        config,
+        pipeline=PIPELINE,
+        load_curriculum_fn=load_curriculum,
+    )
+
+
+def render_existing_lesson(
+    lesson_id: int,
+    output_dir: Path | None = None,
+    profile: str = "passive_video",
+    language: str = "eng-jap",
+    verbose: bool = True,
+) -> Path:
+    """Render MP4 for an already-generated lesson content file."""
+    return _render_existing_lesson_impl(
+        lesson_id=lesson_id,
+        output_dir=output_dir,
+        profile=profile,
+        language=language,
+        verbose=verbose,
+    )
