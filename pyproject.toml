@@ -25,8 +25,12 @@ video = [
 llm = [
     "openai>=1.0",
 ]
+retrieval = [
+    "openai>=1.0",
+    "chromadb>=0.5",
+]
 all = [
-    "japanese-lesson-generator[video,llm]",
+    "japanese-lesson-generator[video,llm,retrieval]",
 ]
 
 [project.scripts]

@@ -1,20 +1,21 @@
 """
 Lesson generation pipeline.
 
-Orchestrates the full lesson workflow through twelve sequential steps:
+Orchestrates the full lesson workflow through thirteen sequential steps:
 
-  step 1   select_vocab       — pick fresh nouns/verbs from the vocab file
-  step 2   grammar_select     — LLM: pick 1-2 grammar points for this lesson
-  step 3   generate_sentences — LLM: produce practice sentences
-  step 4   review_sentences   — LLM: rate naturalness, rewrite awkward sentences
-  step 5   noun_practice      — LLM: enrich nouns with examples + memory tips
-  step 6   verb_practice      — LLM: enrich verbs with conjugations + memory tips
-  step 7   register_lesson    — add+complete the lesson in curriculum.json
-  step 8   persist_content    — save LessonContent to output/<id>/content.json
-  step 9   compile_assets     — render card images + TTS audio per item (Stage 2)
-  step 10  compile_touches    — profile-driven touch sequencing (Stage 3)
-  step 11  render_video       — assemble MP4 from touch sequence
-  step 12  save_report        — finalize and save Markdown lesson report
+    step 1   retrieve_material  — optional retrieval with safe fallback
+    step 2   select_vocab       — pick fresh nouns/verbs from the vocab file
+    step 3   grammar_select     — LLM: pick 1-2 grammar points for this lesson
+    step 4   generate_sentences — LLM: produce practice sentences
+    step 5   review_sentences   — LLM: rate naturalness, rewrite awkward sentences
+    step 6   noun_practice      — LLM: enrich nouns with examples + memory tips
+    step 7   verb_practice      — LLM: enrich verbs with conjugations + memory tips
+    step 8   register_lesson    — add+complete the lesson in curriculum.json
+    step 9   persist_content    — save LessonContent to output/<id>/content.json
+    step 10  compile_assets     — render card images + TTS audio per item (Stage 2)
+    step 11  compile_touches    — profile-driven touch sequencing (Stage 3)
+    step 12  render_video       — assemble MP4 from touch sequence
+    step 13  save_report        — finalize and save Markdown lesson report
 
 Each step is a PipelineStep subclass with an execute(ctx) method,
 making them individually testable and easy to extend.
@@ -66,6 +67,7 @@ from .models import (
     VerbItem,
 )
 from .profiles import get_profile
+from .retrieval import RetrievalResult, get_retrieval_service
 from .prompt_template import (
     build_grammar_generate_prompt,
     build_grammar_select_prompt,
@@ -102,6 +104,12 @@ class LessonConfig:
     profile: str = "passive_video"
     language: str = "eng-jap"
     narrative: str = ""
+    retrieval_enabled: bool = True
+    retrieval_store_path: Path | None = None
+    retrieval_backend: str = "file"
+    retrieval_embedding_model: str = "text-embedding-3-small"
+    retrieval_min_coverage: float = 0.6
+    retrieval_limit: int = 24
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +164,7 @@ class LessonContext:
     video_path: Path | None = None
     report_path: Path | None = None
     language_config: LanguageConfig | None = None
+    retrieval_result: RetrievalResult | None = None
 
     def __post_init__(self) -> None:
         if self.language_config is None:
@@ -224,6 +233,57 @@ def _resolve_output_dir(config: LessonConfig) -> Path:
         lang_cfg = get_language_config(config.language)
         return base / lang_cfg.native_language.lower()
     return base
+
+
+def _resolve_retrieval_store_path(config: LessonConfig) -> Path:
+    if config.retrieval_store_path is not None:
+        return Path(config.retrieval_store_path)
+    return Path(__file__).parent.parent / "output" / "retrieval" / "material_index.json"
+
+
+def _get_non_english_branch_language(ctx: LessonContext) -> str:
+    native = ctx.language_config.native_language.lower()
+    target = ctx.language_config.target_language.lower()
+    if native != "english":
+        return native
+    return target
+
+
+def _estimate_retrieval_coverage(ctx: LessonContext, result: RetrievalResult) -> float:
+    requested_total = max(ctx.config.num_nouns + ctx.config.num_verbs, 1)
+    retrieved_total = min(len(result.material.nouns), ctx.config.num_nouns)
+    retrieved_total += min(len(result.material.verbs), ctx.config.num_verbs)
+    return retrieved_total / requested_total
+
+
+def _render_retrieval_trace(result: RetrievalResult) -> str:
+    lines = [
+        "## Retrieval Trace",
+        "",
+        f"> Query: `{result.query}`",
+        f"> Requested language: `{result.requested_language}`",
+        f"> Coverage: {result.coverage:.0%}",
+    ]
+    if result.filters:
+        filters = ", ".join(
+            f"{key}={value}" for key, value in sorted(result.filters.items())
+        )
+        lines.append(f"> Filters: `{filters}`")
+    if result.used_retrieval:
+        lines.append("> Outcome: used retrieved material")
+    elif result.fallback_reason:
+        lines.append(f"> Fallback: {result.fallback_reason}")
+    else:
+        lines.append("> Outcome: retrieval produced candidates but coverage was insufficient")
+    lines.extend(["", "| # | Type | Canonical | Score |", "|---|------|-----------|-------|"])
+    for index, candidate in enumerate(result.candidates[:5], 1):
+        lines.append(
+            f"| {index} | {candidate.concept_type} | {candidate.canonical_text_en} | {candidate.score:.1f} |"
+        )
+    if not result.candidates:
+        lines.append("| - | - | no candidates | 0.0 |")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _build_video_items(noun_items: list[dict], sentences: list[dict]) -> list[dict]:
@@ -306,6 +366,9 @@ class SelectVocabStep(PipelineStep):
     description = "Pick fresh nouns/verbs from the vocab file"
 
     def execute(self, ctx: LessonContext) -> LessonContext:
+        if ctx.nouns and ctx.verbs:
+            self._log(ctx, "       using retrieved vocabulary")
+            return ctx
         vocab_dir = Path(__file__).parent.parent / ctx.language_config.vocab_dir
         ctx.vocab = _load_vocab(ctx.config.theme, vocab_dir)
         ctx.nouns, ctx.verbs = suggest_new_vocab(
@@ -329,6 +392,9 @@ class GrammarSelectStep(PipelineStep):
     description = "LLM: pick 1-2 grammar points for this lesson"
 
     def execute(self, ctx: LessonContext) -> LessonContext:
+        if ctx.selected_grammar:
+            self._log(ctx, "       using retrieved grammar")
+            return ctx
         lang_cfg = ctx.language_config
         progression = list(lang_cfg.grammar_progression)
         covered = ctx.curriculum.get("covered_grammar_ids", [])
@@ -369,6 +435,9 @@ class GenerateSentencesStep(PipelineStep):
     description = "LLM: produce practice sentences"
 
     def execute(self, ctx: LessonContext) -> LessonContext:
+        if ctx.sentences:
+            self._log(ctx, "       using retrieved sentences")
+            return ctx
         noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
         verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
@@ -525,6 +594,9 @@ class NounPracticeStep(PipelineStep):
     description = "LLM: enrich nouns with examples + memory tips"
 
     def execute(self, ctx: LessonContext) -> LessonContext:
+        if ctx.noun_items:
+            self._log(ctx, "       using retrieved noun items")
+            return ctx
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
         noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
         result = _ask_llm(ctx, ctx.language_config.prompts.build_noun_practice_prompt(noun_items, lesson_number))
@@ -593,6 +665,9 @@ class VerbPracticeStep(PipelineStep):
     description = "LLM: enrich verbs with conjugations + memory tips"
 
     def execute(self, ctx: LessonContext) -> LessonContext:
+        if ctx.verb_items:
+            self._log(ctx, "       using retrieved verb items")
+            return ctx
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
         verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
         result = _ask_llm(ctx, ctx.language_config.prompts.build_verb_practice_prompt(verb_items, lesson_number))
@@ -707,6 +782,71 @@ class RegisterLessonStep(PipelineStep):
         self._log(
             ctx, f"       lesson #{ctx.lesson_id} \u2192 {ctx.config.curriculum_path}"
         )
+        return ctx
+
+
+class RetrieveLessonMaterialStep(PipelineStep):
+    """Step 1 — Optional retrieval before the current generation flow."""
+
+    name = "retrieve_material"
+    description = "Retrieve reusable lesson material with safe fallback"
+
+    def execute(self, ctx: LessonContext) -> LessonContext:
+        service = get_retrieval_service(
+            ctx.config.retrieval_enabled,
+            _resolve_retrieval_store_path(ctx.config),
+            backend=ctx.config.retrieval_backend,
+            embedding_model=ctx.config.retrieval_embedding_model,
+        )
+        result = service.search(
+            ctx.config.theme,
+            requested_language=_get_non_english_branch_language(ctx),
+            filters={"theme": ctx.config.theme},
+            limit=ctx.config.retrieval_limit,
+        )
+        result.coverage = _estimate_retrieval_coverage(ctx, result)
+        if result.coverage < ctx.config.retrieval_min_coverage:
+            if not result.fallback_reason:
+                result.fallback_reason = (
+                    f"coverage {result.coverage:.0%} below minimum "
+                    f"{ctx.config.retrieval_min_coverage:.0%}"
+                )
+            self._log(ctx, f"       fallback : {result.fallback_reason}")
+        else:
+            ctx.nouns = result.material.nouns[: ctx.config.num_nouns]
+            ctx.verbs = result.material.verbs[: ctx.config.num_verbs]
+            ctx.noun_items = [
+                ctx.language_config.generator.convert_raw_noun(item)
+                for item in ctx.nouns
+            ]
+            for item in ctx.noun_items:
+                item.item_type = "noun"
+            ctx.verb_items = [
+                ctx.language_config.generator.convert_raw_verb(item)
+                for item in ctx.verbs
+            ]
+            for item in ctx.verb_items:
+                item.item_type = "verb"
+            ctx.sentences = [
+                ctx.language_config.generator.convert_sentence(item)
+                for item in result.material.sentences
+            ]
+            grammar_map = {
+                grammar.id: grammar for grammar in ctx.language_config.grammar_progression
+            }
+            ctx.selected_grammar = [
+                grammar_map[grammar_id]
+                for grammar_id in result.material.grammar_ids
+                if grammar_id in grammar_map
+            ]
+            result.used_retrieval = True
+            self._log(
+                ctx,
+                "       hit : "
+                f"{len(ctx.nouns)} nouns, {len(ctx.verbs)} verbs, {len(ctx.sentences)} sentences",
+            )
+        ctx.retrieval_result = result
+        ctx.report.add("retrieval", _render_retrieval_trace(result))
         return ctx
 
 
@@ -878,6 +1018,7 @@ class SaveReportStep(PipelineStep):
 # ---------------------------------------------------------------------------
 
 PIPELINE: list[PipelineStep] = [
+    RetrieveLessonMaterialStep(),
     SelectVocabStep(),
     GrammarSelectStep(),
     GenerateSentencesStep(),
@@ -896,7 +1037,7 @@ PIPELINE: list[PipelineStep] = [
 def run_pipeline(config: LessonConfig) -> LessonContext:
     """Run the full lesson generation pipeline.
 
-    Loads the curriculum from config.curriculum_path, executes all twelve
+    Loads the curriculum from config.curriculum_path, executes all pipeline
     steps in sequence, and returns the completed LessonContext.
     """
     ctx = LessonContext(config=config)

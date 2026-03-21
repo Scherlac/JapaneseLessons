@@ -286,6 +286,38 @@ def lesson() -> None:
     default=None,
     help="Path to a text file with story context for sentence generation.",
 )
+@click.option(
+    "--retrieval/--no-retrieval",
+    default=True,
+    show_default=True,
+    help="Enable retrieval before the current generation flow.",
+)
+@click.option(
+    "--retrieval-store",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to a JSON retrieval store.",
+)
+@click.option(
+    "--retrieval-backend",
+    default="file",
+    show_default=True,
+    type=click.Choice(["file", "chroma"]),
+    help="Retrieval backend implementation.",
+)
+@click.option(
+    "--retrieval-embedding-model",
+    default="text-embedding-3-small",
+    show_default=True,
+    help="Embedding model used by vector retrieval backends.",
+)
+@click.option(
+    "--retrieval-min-coverage",
+    type=float,
+    default=0.6,
+    show_default=True,
+    help="Minimum retrieval coverage required before retrieved material is used.",
+)
 @LANGUAGE_OPTION
 def lesson_next(
     theme: str,
@@ -301,6 +333,11 @@ def lesson_next(
     profile: str,
     narrative: str,
     narrative_file: Path | None,
+    retrieval: bool,
+    retrieval_store: Path | None,
+    retrieval_backend: str,
+    retrieval_embedding_model: str,
+    retrieval_min_coverage: float,
     language: str,
 ) -> None:
     """Run the full pipeline for the next lesson.
@@ -333,6 +370,11 @@ def lesson_next(
         profile=profile,
         language=language,
         narrative=narrative_text,
+        retrieval_enabled=retrieval,
+        retrieval_store_path=retrieval_store,
+        retrieval_backend=retrieval_backend,
+        retrieval_embedding_model=retrieval_embedding_model,
+        retrieval_min_coverage=retrieval_min_coverage,
     )
     try:
         run_pipeline(config)

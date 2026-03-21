@@ -21,6 +21,7 @@ class ReportBuilder:
 
     SECTION_ORDER = (
         "header",
+        "retrieval",
         "vocabulary",
         "noun_practice",
         "verb_practice",

@@ -16,6 +16,7 @@ from jlesson.lesson_pipeline import (
     NounPracticeStep,
     PersistContentStep,
     RegisterLessonStep,
+    RetrieveLessonMaterialStep,
     RenderVideoStep,
     ReviewSentencesStep,
     SaveReportStep,
@@ -27,6 +28,7 @@ from jlesson.lesson_pipeline import (
     run_pipeline,
 )
 from jlesson.models import CompiledItem, ItemAssets, NounItem, Phase, Touch, TouchIntent, TouchType, VerbItem, Sentence, GeneralItem, PartialItem
+from jlesson.retrieval import CanonicalLessonNode, FileBackedRetrievalService, LanguageBranch
 
 
 # ---------------------------------------------------------------------------
@@ -1205,6 +1207,135 @@ def test_save_report_summary_active_flash_cards(ctx, tmp_path):
     assert "| Nouns | 2 | 5 | 10 |" in md
     assert "| Verbs | 2 | 5 | 10 |" in md
     assert "| Grammar | 1 | 3 | 3 |" in md
+
+
+# ---------------------------------------------------------------------------
+# Retrieval integration
+# ---------------------------------------------------------------------------
+
+
+def test_run_pipeline_uses_retrieval_hit_and_skips_vocab(config, tmp_path):
+    store_path = tmp_path / "retrieval.json"
+    service = FileBackedRetrievalService(store_path)
+    service.ingest_canonical_node(
+        CanonicalLessonNode(
+            node_id="noun-water",
+            canonical_text_en="water",
+            concept_type="noun",
+            metadata_tags={"theme": "food"},
+            source_payload={"english": "water"},
+        )
+    )
+    service.attach_branch(
+        LanguageBranch(
+            node_id="noun-water",
+            language_code="japanese",
+            payload={"japanese": "みず", "romaji": "mizu", "kanji": "水"},
+        )
+    )
+    service.ingest_canonical_node(
+        CanonicalLessonNode(
+            node_id="noun-bread",
+            canonical_text_en="bread",
+            concept_type="noun",
+            metadata_tags={"theme": "food"},
+            source_payload={"english": "bread"},
+        )
+    )
+    service.attach_branch(
+        LanguageBranch(
+            node_id="noun-bread",
+            language_code="japanese",
+            payload={"japanese": "パン", "romaji": "pan", "kanji": "パン"},
+        )
+    )
+    service.ingest_canonical_node(
+        CanonicalLessonNode(
+            node_id="verb-eat",
+            canonical_text_en="to eat",
+            concept_type="verb",
+            metadata_tags={"theme": "food"},
+            source_payload={"english": "to eat"},
+        )
+    )
+    service.attach_branch(
+        LanguageBranch(
+            node_id="verb-eat",
+            language_code="japanese",
+            payload={
+                "japanese": "たべる",
+                "romaji": "taberu",
+                "kanji": "食べる",
+                "masu_form": "食べます",
+            },
+        )
+    )
+    service.ingest_canonical_node(
+        CanonicalLessonNode(
+            node_id="verb-drink",
+            canonical_text_en="to drink",
+            concept_type="verb",
+            metadata_tags={"theme": "food"},
+            source_payload={"english": "to drink"},
+        )
+    )
+    service.attach_branch(
+        LanguageBranch(
+            node_id="verb-drink",
+            language_code="japanese",
+            payload={
+                "japanese": "のむ",
+                "romaji": "nomu",
+                "kanji": "飲む",
+                "masu_form": "飲みます",
+            },
+        )
+    )
+
+    config.retrieval_store_path = store_path
+
+    with patch(
+        "jlesson.lesson_pipeline.PIPELINE",
+        [RetrieveLessonMaterialStep(), SelectVocabStep()],
+    ), patch(
+        "jlesson.lesson_pipeline.load_curriculum",
+        return_value=create_curriculum("Test"),
+    ), patch(
+        "jlesson.lesson_pipeline._load_vocab",
+        return_value=_VOCAB,
+    ) as mock_load_vocab:
+        ctx = run_pipeline(config)
+
+    assert mock_load_vocab.call_count == 0
+    assert ctx.retrieval_result is not None
+    assert ctx.retrieval_result.used_retrieval is True
+    assert [noun["english"] for noun in ctx.nouns] == ["water", "bread"]
+    assert [verb["english"] for verb in ctx.verbs] == ["to eat", "to drink"]
+    assert [item.item_type for item in ctx.noun_items] == ["noun", "noun"]
+    assert [item.item_type for item in ctx.verb_items] == ["verb", "verb"]
+
+
+def test_run_pipeline_retrieval_miss_falls_back_to_vocab(config, tmp_path):
+    config.retrieval_store_path = tmp_path / "missing.json"
+
+    with patch(
+        "jlesson.lesson_pipeline.PIPELINE",
+        [RetrieveLessonMaterialStep(), SelectVocabStep()],
+    ), patch(
+        "jlesson.lesson_pipeline.load_curriculum",
+        return_value=create_curriculum("Test"),
+    ), patch(
+        "jlesson.lesson_pipeline._load_vocab",
+        return_value=_VOCAB,
+    ) as mock_load_vocab:
+        ctx = run_pipeline(config)
+
+    assert mock_load_vocab.call_count == 1
+    assert ctx.retrieval_result is not None
+    assert ctx.retrieval_result.used_retrieval is False
+    assert "no retrieval candidates" in ctx.retrieval_result.fallback_reason
+    assert len(ctx.nouns) == 2
+    assert len(ctx.verbs) == 2
 
 
 # ---------------------------------------------------------------------------

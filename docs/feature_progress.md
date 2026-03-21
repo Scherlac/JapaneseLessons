@@ -1,58 +1,107 @@
-
-Next should be the first production-safe retrieval slice.
+Retrieval is now in its first production-safe slice.
 
 - [docs/vector_indexing.md](vector_indexing.md) — retrieval feature specification
-- [spike/vector_indexing/README.md](../spike/vector_indexing/README.md) — retrieval spike implementation and research
+- [spike/vector_indexing/README.md](../spike/vector_indexing/README.md) — retrieval spike overview and research entry point
 - [progress_report.md](../progress_report.md) for active feature development
 - [software_engineering.md](software_engineering.md) for engineering principles and development cycle
 
-Why this is the right next step
+Current status
 
-- progress_report.md now makes retrieval the active feature focus.
-- architecture.md already defines the correct insertion point: upstream of the existing lesson pipeline, with fallback to the current generation flow.
-- project_scale.md identifies the real missing piece: canonical node and branch schemas do not exist yet.
-- development_history.md now makes the multilingual story clear: multilingual pipeline support already exists, so the next job is not “add multilingual” but “add retrieval and reusable multilingual content storage”.
+The codebase now has a minimal retrieval boundary integrated upstream of the lesson pipeline with a safe fallback path.
 
-Recommended next implementation order
+Implemented in production code
 
-1. Define the minimal retrieval data model
-   Put in production code:
+1. Minimal retrieval data model
+   Added:
    - canonical lesson node
    - language branch
-   - metadata tags
+   - retrieval candidate
    - retrieval result envelope
+   - pipeline-friendly retrieved material payload
 
-   Goal:
-   make the schema compatible with the current pipeline without changing rendering or lesson compilation.
-
-2. Add a small retrieval module boundary
-   Create a narrow API such as:
+2. Retrieval module boundary
+   Added a narrow API for:
    - ingest canonical node
    - attach branch
    - search with metadata filters
-   - return pipeline-friendly lesson material
+   - return lesson-material payload compatible with the current pipeline
 
-   Goal:
-   isolate retrieval from the rest of the app so it can be enabled or bypassed cleanly.
+3. Safe upstream pipeline integration
+   Flow is now:
+   - try retrieval first
+   - estimate noun/verb coverage
+   - use retrieved material when coverage is above threshold
+   - otherwise fall back to the existing vocab + LLM generation path
 
-3. Integrate retrieval as optional upstream enrichment
-   Flow should become:
-   - try retrieval
-   - if coverage is good enough, use retrieved material
-   - otherwise fall back to the current LLM-first generation path
-
-   Goal:
-   no regression in lesson generation.
-
-4. Log retrieval traces
-   Capture:
+4. Retrieval trace logging
+   Current trace captures:
    - query
    - filters
+   - requested language
    - top candidates
-   - fallback reason
+   - estimated coverage
+   - fallback reason or retrieval-use outcome
 
-   Goal:
-   give yourself real evidence before expanding the database design.
+5. Validation coverage
+   Added tests for:
+   - retrieval hit
+   - retrieval miss with fallback to vocab flow
+   - file-backed branch projection
+   - branch attachment validation
+
+What this implementation intentionally is
+
+- a file-backed retrieval skeleton
+- a stable production interface
+- a low-dependency first slice
+- a safe insertion point for later vector-backed implementations
+
+What this implementation intentionally is not yet
+
+- not Chroma-backed production retrieval
+- not embedding-driven semantic search
+- not spike benchmark parity
+- not multilingual branch projection quality evaluation
+- not source-vocab durability hardening
+
+Why this was the correct first landing
+
+- architecture.md already identified the correct insertion point: upstream of generation with fallback to the current flow
+- retrieval can now be enabled or bypassed cleanly from the CLI
+- downstream compilation, rendering, and persistence remain unchanged
+- the codebase now has a concrete seam where spike learnings can be pulled into production incrementally
+
+Important follow-up note
+
+The retrieval spike documentation was used as design input for this slice, but the spike implementation details have not yet been fully ported into production code.
+
+That means the current production retrieval layer reflects the intended shape of the spike, but not yet its vector-store, embedding, or benchmark machinery.
+
+Recommended next implementation order
+
+1. Review and align with the spike implementation in detail
+   Pull across:
+   - spike query model
+   - metadata filter conventions
+   - benchmark structure
+   - store adapter shape where useful
+
+2. Add ingest tooling for the production retrieval store
+   Add commands or utilities to:
+   - ingest canonical nodes
+   - attach language branches
+   - inspect stored retrieval material
+
+3. Expand retrieval beyond vocab reuse
+   Add support for:
+   - sentence material
+   - grammar-linked retrieval payloads
+   - richer branch metadata
+
+4. Evaluate whether to add a vector-backed implementation behind the same interface
+   Candidates remain:
+   - Chroma
+   - Postgres + pgvector
 
 5. Only after that, harden vocab durability
    Then address:
@@ -61,25 +110,21 @@ Recommended next implementation order
    - cross-theme deduplication
 
    Reason:
-   retrieval quality will depend on that source layer, but you first need the retrieval boundary in code.
+   retrieval quality will still be bounded by source-data consistency, but the retrieval boundary now exists and can be exercised first.
 
-What I would not do next
+What I would still not do next
 
 - not checkpointing first
 - not Anki export
 - not broader architecture docs
-- not full vector platform buildout
-
-Those are valid, but they are downstream of the retrieval boundary.
+- not a full vector platform buildout before aligning production code with spike findings
 
 Concrete next deliverable
 
-The best next commit would be:
+The best next commit after this slice would be:
 
-- add retrieval models
-- add a retrieval service interface
-- add a no-op or file-backed implementation
-- wire it into lesson generation behind a safe fallback path
-- add tests for “retrieval hit” and “retrieval miss → fallback”
-
-If you want, I can implement that next and start with the smallest viable retrieval skeleton in the codebase.
+- review the spike implementation files directly
+- align the production retrieval request/filter model with the spike
+- add production ingest tooling for the file-backed store
+- add sentence and grammar retrieval coverage
+- preserve the existing fallback guarantees and test coverage
