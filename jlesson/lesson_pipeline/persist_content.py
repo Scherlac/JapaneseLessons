@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 
 from jlesson.models import LessonContent
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_gadgets import PipelineGadgets
+from .pipeline_grammar import grammar_id
+from .pipeline_paths import resolve_output_dir
 from jlesson.lesson_store import save_lesson_content
 
 
@@ -24,7 +25,7 @@ class PersistContentStep(PipelineStep):
             theme=ctx.config.theme,
             language=ctx.config.language,
             grammar_ids=[
-                PipelineGadgets.grammar_id(g)
+                grammar_id(g)
                 for g in ctx.selected_grammar
             ],
             words=words,
@@ -39,7 +40,7 @@ class PersistContentStep(PipelineStep):
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         content = self.build_content(ctx)
-        output_dir = PipelineGadgets.resolve_output_dir(ctx.config)
+        output_dir = resolve_output_dir(ctx.config)
         ctx.content_path = save_lesson_content(content, output_dir)
         ctx.report.add_artifact("Content JSON", ctx.content_path)
         self._log(ctx, f"       {ctx.content_path}")

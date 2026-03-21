@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from jlesson.lesson_report import save_report
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_gadgets import PipelineGadgets
+from .pipeline_paths import resolve_output_dir
 from jlesson.profiles import get_profile
 from jlesson.touch_compiler import count_touches
 
@@ -18,7 +18,7 @@ class SaveReportStep(PipelineStep):
     def execute(self, ctx: LessonContext) -> LessonContext:
         ctx.report.add("summary", self._summary(ctx))
         report = ctx.report.render()
-        output_dir = PipelineGadgets.resolve_output_dir(ctx.config)
+        output_dir = resolve_output_dir(ctx.config)
         report_path = output_dir / f"lesson_{ctx.lesson_id:03d}" / "report.md"
         ctx.report_path = save_report(report, report_path)
         self._log(ctx, f"       {ctx.report_path}")

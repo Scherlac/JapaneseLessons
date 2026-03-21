@@ -4,7 +4,7 @@ from pathlib import Path
 
 from jlesson.curriculum import suggest_new_vocab
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_gadgets import PipelineGadgets
+from .pipeline_vocab import load_vocab
 
 
 class SelectVocabStep(PipelineStep):
@@ -18,7 +18,7 @@ class SelectVocabStep(PipelineStep):
             self._log(ctx, "       using retrieved vocabulary")
             return ctx
         vocab_dir = Path(__file__).parent.parent / ctx.language_config.vocab_dir
-        ctx.vocab = PipelineGadgets.load_vocab(ctx.config.theme, vocab_dir)
+        ctx.vocab = load_vocab(ctx.config.theme, vocab_dir)
         ctx.nouns, ctx.verbs = suggest_new_vocab(
             ctx.vocab["nouns"],
             ctx.vocab["verbs"],

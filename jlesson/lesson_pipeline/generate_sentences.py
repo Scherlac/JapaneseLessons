@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from jlesson.models import Sentence
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_gadgets import PipelineGadgets
+from .pipeline_grammar import coerce_grammar_items
+from .pipeline_llm import ask_llm
 
 
 class GenerateSentencesStep(PipelineStep):
@@ -25,13 +26,13 @@ class GenerateSentencesStep(PipelineStep):
                 lesson_number=lesson_number,
             )
         prompt = ctx.language_config.prompts.build_grammar_generate_prompt(
-            PipelineGadgets.coerce_grammar_items(ctx.selected_grammar),
+            coerce_grammar_items(ctx.selected_grammar),
             noun_items,
             verb_items,
             sentences_per_grammar=ctx.config.sentences_per_grammar,
             narrative=narrative,
         )
-        result = PipelineGadgets.ask_llm(ctx, prompt)
+        result = ask_llm(ctx, prompt)
         sentences = result.get("sentences", [])
         ctx.sentences = []
         for sentence_source in sentences:

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from jlesson.curriculum import get_next_grammar_from
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_gadgets import PipelineGadgets
+from .pipeline_grammar import grammar_id
+from .pipeline_llm import ask_llm
 
 
 class GrammarSelectStep(PipelineStep):
@@ -30,7 +31,7 @@ class GrammarSelectStep(PipelineStep):
             lesson_number,
             covered_grammar_ids=covered,
         )
-        result = PipelineGadgets.ask_llm(ctx, prompt)
+        result = ask_llm(ctx, prompt)
         selected_ids: list[str] = result.get("selected_ids") or [
             g.id for g in unlocked[:2]
         ]
@@ -44,6 +45,6 @@ class GrammarSelectStep(PipelineStep):
                 )
         self._log(
             ctx,
-            f"       selected : {[PipelineGadgets.grammar_id(g) for g in ctx.selected_grammar]}",
+            f"       selected : {[grammar_id(g) for g in ctx.selected_grammar]}",
         )
         return ctx

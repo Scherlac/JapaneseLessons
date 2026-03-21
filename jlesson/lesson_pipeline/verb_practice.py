@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from jlesson.models import GeneralItem
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_gadgets import PipelineGadgets
+from .pipeline_llm import ask_llm
 
 
 class VerbPracticeStep(PipelineStep):
@@ -17,7 +17,7 @@ class VerbPracticeStep(PipelineStep):
             return ctx
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
         verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
-        result = PipelineGadgets.ask_llm(
+        result = ask_llm(
             ctx,
             ctx.language_config.prompts.build_verb_practice_prompt(verb_items, lesson_number),
         )

@@ -33,57 +33,56 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
+from importlib import import_module
+from typing import Any
 
-from jlesson.curriculum import load_curriculum, suggest_new_vocab
 from .pipeline_core import LessonConfig, LessonContext, PipelineStep, StepInfo
-from .pipeline_gadgets import PipelineGadgets
-from .pipeline_orchestrator import (
-    render_existing_lesson as _render_existing_lesson_impl,
-    run_pipeline as _run_pipeline_impl,
-)
-from .compile_assets import CompileAssetsStep
-from .compile_touches import CompileTouchesStep
-from .generate_sentences import GenerateSentencesStep
-from .grammar_select import GrammarSelectStep
-from .noun_practice import NounPracticeStep
-from .persist_content import PersistContentStep
-from .register_lesson import RegisterLessonStep
-from .render_video import RenderVideoStep
-from .retrieve_material import RetrieveLessonMaterialStep
-from .review_sentences import ReviewSentencesStep
-from .save_report import SaveReportStep
-from .select_vocab import SelectVocabStep
-from .verb_practice import VerbPracticeStep
+
+_EXPORTS: dict[str, tuple[str, str]] = {
+    "CompileAssetsStep": (".compile_assets", "CompileAssetsStep"),
+    "CompileTouchesStep": (".compile_touches", "CompileTouchesStep"),
+    "GenerateSentencesStep": (".generate_sentences", "GenerateSentencesStep"),
+    "GrammarSelectStep": (".grammar_select", "GrammarSelectStep"),
+    "NounPracticeStep": (".noun_practice", "NounPracticeStep"),
+    "PersistContentStep": (".persist_content", "PersistContentStep"),
+    "PipelineGadgets": (".pipeline_gadgets", "PipelineGadgets"),
+    "RegisterLessonStep": (".register_lesson", "RegisterLessonStep"),
+    "RenderVideoStep": (".render_video", "RenderVideoStep"),
+    "RetrieveLessonMaterialStep": (".retrieve_material", "RetrieveLessonMaterialStep"),
+    "ReviewSentencesStep": (".review_sentences", "ReviewSentencesStep"),
+    "SaveReportStep": (".save_report", "SaveReportStep"),
+    "SelectVocabStep": (".select_vocab", "SelectVocabStep"),
+    "VerbPracticeStep": (".verb_practice", "VerbPracticeStep"),
+}
 
 
-# ---------------------------------------------------------------------------
-# Pipeline runner
-# ---------------------------------------------------------------------------
-
-PIPELINE: list[PipelineStep] = [
-    RetrieveLessonMaterialStep(),
-    SelectVocabStep(),
-    GrammarSelectStep(),
-    GenerateSentencesStep(),
-    ReviewSentencesStep(),
-    NounPracticeStep(),
-    VerbPracticeStep(),
-    RegisterLessonStep(),
-    PersistContentStep(),
-    CompileAssetsStep(),
-    CompileTouchesStep(),
-    RenderVideoStep(),
-    SaveReportStep(),
-]
+def _build_pipeline() -> list[PipelineStep]:
+    return [
+        __getattr__("RetrieveLessonMaterialStep")(),
+        __getattr__("SelectVocabStep")(),
+        __getattr__("GrammarSelectStep")(),
+        __getattr__("GenerateSentencesStep")(),
+        __getattr__("ReviewSentencesStep")(),
+        __getattr__("NounPracticeStep")(),
+        __getattr__("VerbPracticeStep")(),
+        __getattr__("RegisterLessonStep")(),
+        __getattr__("PersistContentStep")(),
+        __getattr__("CompileAssetsStep")(),
+        __getattr__("CompileTouchesStep")(),
+        __getattr__("RenderVideoStep")(),
+        __getattr__("SaveReportStep")(),
+    ]
 
 
 def run_pipeline(config: LessonConfig) -> LessonContext:
     """Run the full lesson generation pipeline."""
+    from jlesson.curriculum import load_curriculum
+    from .pipeline_orchestrator import run_pipeline as _run_pipeline_impl
+
     return _run_pipeline_impl(
         config,
-        pipeline=PIPELINE,
+        pipeline=_build_pipeline(),
         load_curriculum_fn=load_curriculum,
     )
 
@@ -96,6 +95,8 @@ def render_existing_lesson(
     verbose: bool = True,
 ) -> Path:
     """Render MP4 for an already-generated lesson content file."""
+    from .pipeline_existing_lesson import render_existing_lesson as _render_existing_lesson_impl
+
     return _render_existing_lesson_impl(
         lesson_id=lesson_id,
         output_dir=output_dir,
@@ -103,6 +104,23 @@ def render_existing_lesson(
         language=language,
         verbose=verbose,
     )
+
+
+def __getattr__(name: str) -> Any:
+    if name == "PIPELINE":
+        return _build_pipeline()
+    if name in {"load_curriculum", "suggest_new_vocab"}:
+        curriculum = import_module("jlesson.curriculum")
+        return getattr(curriculum, name)
+    if name in _EXPORTS:
+        module_name, attr_name = _EXPORTS[name]
+        module = import_module(module_name, __name__)
+        return getattr(module, attr_name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__))
 
 
 __all__ = [

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import jlesson.video.builder as video_builder_module
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_gadgets import PipelineGadgets
+from .pipeline_paths import resolve_output_dir
 
 
 class RenderVideoStep(PipelineStep):
@@ -54,7 +54,7 @@ class RenderVideoStep(PipelineStep):
             self._log(ctx, f"       ({reason})")
             return ctx
 
-        output_dir = PipelineGadgets.resolve_output_dir(ctx.config)
+        output_dir = resolve_output_dir(ctx.config)
         video_path = output_dir / f"lesson_{ctx.lesson_id:03d}_{ctx.config.theme}.mp4"
 
         video_builder = video_builder_module.VideoBuilder()

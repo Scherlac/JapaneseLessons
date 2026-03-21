@@ -3,32 +3,32 @@ flowchart LR
     asset_compiler -->|1| models
     asset_compiler -->|1| profiles
     asset_compiler -->|1| language_config
-    cli -->|1| config
-    cli -->|1| lesson_pipeline
     cli -->|1| vocab_generator
-    cli -->|1| prompt_template
+    cli -->|1| config
     cli -->|1| language_config
+    cli -->|1| lesson_pipeline
+    cli -->|1| prompt_template
     cli -->|1| curriculum
     curriculum -->|1| models
     item_generator -->|1| models
-    language_config -->|1| models
     language_config -->|1| item_generator
+    language_config -->|1| models
     language_config -->|1| prompt_template
     language_config -->|1| video
     language_config -->|1| curriculum
-    lesson_pipeline -->|9| models
+    lesson_pipeline -->|10| models
+    lesson_pipeline -->|4| language_config
     lesson_pipeline -->|4| curriculum
     lesson_pipeline -->|4| profiles
     lesson_pipeline -->|3| touch_compiler
-    lesson_pipeline -->|3| language_config
     lesson_pipeline -->|2| retrieval
+    lesson_pipeline -->|2| lesson_report
+    lesson_pipeline -->|2| asset_compiler
     lesson_pipeline -->|2| video
     lesson_pipeline -->|2| lesson_store
-    lesson_pipeline -->|2| asset_compiler
-    lesson_pipeline -->|2| lesson_report
-    lesson_pipeline -->|1| vocab_generator
-    lesson_pipeline -->|1| llm_cache
     lesson_pipeline -->|1| llm_client
+    lesson_pipeline -->|1| llm_cache
+    lesson_pipeline -->|1| vocab_generator
     lesson_store -->|1| models
     llm_cache -->|1| llm_client
     llm_client -->|1| config
@@ -36,10 +36,10 @@ flowchart LR
     prompt_template -->|1| models
     touch_compiler -->|1| models
     touch_compiler -->|1| profiles
-    video -->|1| models
     video -->|1| language_config
-    vocab_generator -->|1| llm_client
+    video -->|1| models
     vocab_generator -->|1| prompt_template
+    vocab_generator -->|1| llm_client
     asset_compiler[asset_compiler]
     cli[cli]
     config[config]

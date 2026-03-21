@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_gadgets import PipelineGadgets
+from .pipeline_grammar import coerce_grammar_items
+from .pipeline_llm import ask_llm
 
 
 class ReviewSentencesStep(PipelineStep):
@@ -28,9 +29,9 @@ class ReviewSentencesStep(PipelineStep):
             ctx.sentences,
             noun_items,
             verb_items,
-            PipelineGadgets.coerce_grammar_items(ctx.selected_grammar),
+            coerce_grammar_items(ctx.selected_grammar),
         )
-        result = PipelineGadgets.ask_llm(ctx, prompt)
+        result = ask_llm(ctx, prompt)
         reviews = result.get("reviews", [])
         revised_count = 0
         for review in reviews:

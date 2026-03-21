@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from jlesson.curriculum import add_lesson, complete_lesson, save_curriculum
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_gadgets import PipelineGadgets
+from .pipeline_grammar import grammar_id
 
 
 class RegisterLessonStep(PipelineStep):
@@ -21,7 +21,7 @@ class RegisterLessonStep(PipelineStep):
             theme=ctx.config.theme,
             nouns=ctx.nouns,
             verbs=ctx.verbs,
-            grammar_ids=[PipelineGadgets.grammar_id(g) for g in ctx.selected_grammar],
+            grammar_ids=[grammar_id(g) for g in ctx.selected_grammar],
             items_count=len(ctx.noun_items) + len(ctx.sentences),
         )
         complete_lesson(ctx.curriculum, lesson["id"])
@@ -32,7 +32,7 @@ class RegisterLessonStep(PipelineStep):
             .isoformat(timespec="seconds")
             .replace("+00:00", "Z")
         )
-        grammar_ids = [PipelineGadgets.grammar_id(g) for g in ctx.selected_grammar]
+        grammar_ids = [grammar_id(g) for g in ctx.selected_grammar]
         ctx.report.add(
             "header",
             "\n".join(
