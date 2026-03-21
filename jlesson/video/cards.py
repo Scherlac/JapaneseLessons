@@ -11,7 +11,6 @@ from typing import Dict, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont
 
 from jlesson.language_config import LanguageConfig
-from jlesson.lesson_pipeline import StepInfo
 from jlesson.models import GeneralItem, Touch, TouchIntent
 
 
@@ -136,18 +135,18 @@ class CardRenderer:
         self,
         item: GeneralItem,
         touch: Touch | None,
-        step: StepInfo,
+        label: str = "",
+        progress: float = 0.0,
         lang_cfg: LanguageConfig | None =None,
     ) -> Image.Image:
         """
-        Render a card based on the touch intent.
+        Render a reusable static card.
 
         Args:
             item: GeneralItem object containing card data
-            touch: Touch object containing intent information
-            step: StepInfo object containing step details
-            step_label: Step counter (e.g., "1/30")
-            progress: Progress bar fill (0.0 to 1.0)
+            touch: Optional Touch object containing intent information
+            label: Optional top label for touch-specific rendering
+            progress: Optional progress bar fill (0.0 to 1.0)
 
         Returns:
             PIL Image object
@@ -159,9 +158,9 @@ class CardRenderer:
         intent = touch.intent if touch else TouchIntent.UNKNOWN
         intent_label = self.intent_mapping.get(intent, "")
 
-        # Step label
-        draw.text((cx, 60), f"{intent_label}  {step.label}", font=self.fonts["label"],
-                 anchor="mm", fill=self.dim_color)
+        header = "  ".join(part for part in (intent_label, label) if part)
+        if header:
+            draw.text((cx, 60), header, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
 
         if intent.show_source():
             # English word (prompt)
@@ -185,8 +184,8 @@ class CardRenderer:
                 self.text_color, self.dim_color,
             )
 
-        # Progress bar
-        self._draw_progress_bar(draw, self.height - 80, step.progress)
+        if progress > 0:
+            self._draw_progress_bar(draw, self.height - 80, progress)
 
         return img
 

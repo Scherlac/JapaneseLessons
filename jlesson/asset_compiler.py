@@ -9,7 +9,7 @@ Produces a list of CompiledItem objects with populated asset paths.
 
 Usage:
     from jlesson.asset_compiler import compile_assets
-    compiled = await compile_assets(items_by_phase, profile, step_info, output_dir)
+    compiled = await compile_assets(items_by_phase, profile, output_dir=output_dir)
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ import asyncio
 from pathlib import Path
 
 from jlesson.language_config import LanguageConfig
-from jlesson.lesson_pipeline import StepInfo
 from jlesson.video.cards import CardRenderer
 
 from .models import (
@@ -37,7 +36,6 @@ from .profiles import Profile
 def _render_item_cards(
     item: GeneralItem,
     required: set[str],
-    step_info: StepInfo,
     cards_dir: Path,
     item_index: int,
     renderer : CardRenderer,
@@ -57,7 +55,6 @@ def _render_item_cards(
         card = renderer.render_card(
             item=item,
             touch=None,  # Touch-specific details are not needed for static card rendering
-            step=step_info, 
             lang_cfg=lang_cfg,
         )
         renderer.save_card(card, path)
@@ -138,8 +135,8 @@ async def _render_item_audio(
 def compile_assets_sync(
     items_by_phase: dict[Phase, list[GeneralItem]],
     profile: Profile,
-    step_info: StepInfo,
-    output_dir: Path,
+    step_info=None,
+    output_dir: Path | None = None,
     renderer=None,
     lang_cfg=None,
 ) -> list[CompiledItem]:
@@ -148,10 +145,16 @@ def compile_assets_sync(
     Useful for dry-run or report-only modes. For full compilation with TTS,
     use ``compile_assets()``.
 
+    ``step_info`` is retained for call-site compatibility but ignored because
+    asset compilation renders reusable static cards, not touch-progress cards.
+
     *lang_cfg* is an optional :class:`~jlesson.language_config.LanguageConfig`
     that enables language-aware card dispatch.  When ``None``, falls back to
     the legacy Japanese-specific renderers.
     """
+    if output_dir is None:
+        raise ValueError("output_dir is required")
+
     if renderer is None:
         from .video.cards import CardRenderer
         renderer = CardRenderer()
@@ -169,7 +172,7 @@ def compile_assets_sync(
         for item in items:
             item_index += 1
             _render_item_cards(
-                item, required, step_info, cards_dir, item_index, renderer, lang_cfg=lang_cfg,
+                item, required, cards_dir, item_index, renderer, lang_cfg=lang_cfg,
             )
             compiled_item = item.model_copy()
             compiled_item.phase = phase
@@ -181,8 +184,8 @@ def compile_assets_sync(
 async def compile_assets(
     items_by_phase: dict[Phase, list[GeneralItem]],
     profile: Profile,
-    step_info: StepInfo,
-    output_dir: Path,
+    step_info=None,
+    output_dir: Path | None = None,
     renderer=None,
     create_engine_fn=None,
     lang_cfg: LanguageConfig | None =None,
@@ -193,12 +196,15 @@ async def compile_assets(
     ----------
     items_by_phase : dict mapping Phase → list of items
     profile : Profile rulebook determining which assets to render
-    step_info : StepInfo for logging / card rendering context
+    step_info : retained for call-site compatibility; ignored for static cards
     output_dir : base directory for cards/ and audio/ subdirectories
     renderer : optional CardRenderer instance (created if None)
     create_engine_fn : optional factory ``(voice_key, rate) → TTSEngine``
     lang_cfg : optional LanguageConfig for language-aware rendering dispatch
     """
+    if output_dir is None:
+        raise ValueError("output_dir is required")
+
     if renderer is None:
         from .video.cards import CardRenderer
         renderer = CardRenderer()
@@ -223,7 +229,7 @@ async def compile_assets(
             item_index += 1
 
             _render_item_cards(
-                item, required, step_info, cards_dir, item_index, renderer, lang_cfg=lang_cfg,
+                item, required, cards_dir, item_index, renderer, lang_cfg=lang_cfg,
             )
 
             await _render_item_audio(
