@@ -44,6 +44,29 @@
 
 This created the current repository shape used by later pipeline work.
 
+### 2026-03-16 to 2026-03-18 — Multilingual support introduced in production
+
+The first real introduction of multiple-language support was not the later lesson-database
+proposal. It began as a Hungarian adaptation track and then became a language-agnostic
+pipeline refactor.
+
+Verified git milestones:
+
+- `2026-03-16 09:20` — `9f448fd`  
+    Added `docs/guide_hungarian_english_adaptation.md`, which defined the adaptation goal:
+    reuse the lesson generator to teach English to Hungarian children.
+- `2026-03-18 02:43` — `a4dce56`  
+    Merged the work as full Hungarian → English support and described the pipeline as
+    language-agnostic via `LanguageConfig` / `FieldMap`.
+
+Important architectural outcome:
+
+- the codebase stopped being implicitly Japanese-only
+- language-specific voices, fonts, prompt builders, vocab schema details, and grammar
+  progression started moving behind configuration and mapping layers
+- multilingual support became a first-class product capability before the later retrieval
+  and canonical-node work was proposed
+
 ---
 
 ## Chapter 2 — LLM Generation And Validation
@@ -176,6 +199,27 @@ Net effect:
 
 - the application moved from spike scripts to a stable packaged workflow
 - content generation, compilation, reporting, and video rendering became one coherent path
+
+### 2026-03-19 — Multilingual branching introduced as a database design
+
+After production multilingual support already existed, a second multilingual milestone
+appeared at the architecture/specification level.
+
+Verified git milestones:
+
+1. `2026-03-19 20:36` — `13df310`  
+    Added [vector_indexing.md](vector_indexing.md) and proposed a unified lesson-material
+    database with English canonical nodes and multilingual branches.
+2. `2026-03-19 21:12` — `b3de6a7`  
+    Added provisional policy for branch production eligibility and language enablement thresholds.
+
+This was a different kind of multilingual introduction:
+
+- `2026-03-16` introduced multilingual support in the production pipeline
+- `2026-03-19` introduced multilingual branching as a future retrieval and knowledge-base model
+
+That distinction matters because the repository already supported multiple language pairs
+before the canonical-node / branch architecture was proposed.
 
 ---
 
