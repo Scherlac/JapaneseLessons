@@ -97,9 +97,29 @@ This candidate introduces three higher-level seams:
 
 | Candidate component | Intended role | Likely current modules |
 |---------------------|---------------|------------------------|
-| `generator engine` | produce configured content-generation steps for a lesson run | `item_generator.py`, `vocab_generator.py`, `prompt_template.py` |
-| `render engine` | produce configured rendering / compilation steps for a profile or output mode | `touch_compiler.py`, `asset_compiler.py`, `profiles.py`, `video/` |
-| `storage service` | hide persistence, retrieval, and cache/client boundaries behind a narrower service interface | `retrieval.py`, `llm_cache.py`, `llm_client.py`, `curriculum.py`, `lesson_store.py` |
+| `generation suite` | configure and connect specialised generation steps from a selected profile/request | `item_generator.py`, `vocab_generator.py`, `prompt_template.py` |
+| `render suite` | configure and connect specialised render/compilation steps from a selected profile/request | `touch_compiler.py`, `asset_compiler.py`, `profiles.py`, `video/` |
+| `runtime services` | runtime-facing retrieval, persistence, cache, and state access used by pipeline steps | `retrieval.py`, `llm_cache.py`, `llm_client.py`, `curriculum.py`, `lesson_store.py` |
+
+Current interpretation of the candidate:
+
+- the CLI would talk to suite configurators first
+- configured suites would then be passed into the orchestrator
+- the orchestrator would assemble and run the final pipeline
+- runtime services would be used mainly by configured pipeline steps during execution
+
+The main complexity in a suite is not simply grouping modules. It is expressing which specialised
+steps produce intermediate outputs, which later steps consume them, and whether the profile is a
+simple step list or a more explicit step graph.
+
+The suite itself would not own the concrete generation or rendering work. Its primary role would
+be to configure specialised steps and connect them into an execution-ready flow.
+
+Example under evaluation:
+
+- narrative frame generation
+- sentence generation constrained by grammar progression and the narrative
+- coherence review over the generated narrative lesson content
 
 Important status note:
 
@@ -117,7 +137,7 @@ Key expected benefits if adopted:
 Current risks under evaluation:
 
 1. the term `engine` may hide too many responsibilities if boundaries are not strict
-2. `storage service` may become an over-broad bucket if curriculum and retrieval are forced together prematurely
+2. `runtime services` may become an over-broad bucket if curriculum and retrieval are forced together prematurely
 3. render plugins need a stable intermediate representation or the abstraction will leak
 4. a step-producing architecture adds indirection and may not be worth it unless multiple concrete pipelines are really needed
 
@@ -154,7 +174,7 @@ CLI
 ```
 
 Detailed touch and profile semantics live in [structure.md](structure.md).
-Decision preparation for the candidate engine/service split lives in
+Decision preparation for the candidate suite/runtime-services split lives in
 [decision_engine_service_boundaries.md](decision_engine_service_boundaries.md).
 
 ---

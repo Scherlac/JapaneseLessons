@@ -51,14 +51,14 @@ The retrieval work should integrate into `jlesson` with a safe fallback to the c
 generation flow. Existing lesson generation, compilation, report generation, and video
 rendering remain the production path until retrieval proves useful in real usage.
 
-### 4. Evaluate internal engine / service boundaries without committing yet
+### 4. Evaluate internal suite / runtime-service boundaries without committing yet
 
 An internal architecture concept is now under evaluation to reduce module coupling and
 prepare future pipeline variants:
 
-- `generator engine`
-- `render engine`
-- `storage service`
+- `generation suite`
+- `render suite`
+- `runtime services`
 
 This is documentation and boundary-evaluation work only. No implementation decision has
 been made, and the current production modules remain authoritative.
