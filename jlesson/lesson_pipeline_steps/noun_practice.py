@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 from jlesson.models import GeneralItem
+from jlesson.pipeline_core import LessonContext, PipelineStep
+from jlesson.pipeline_gadgets import PipelineGadgets
 
-from .runtime import lesson_pipeline_module
 
-
-class NounPracticeStep(lesson_pipeline_module().PipelineStep):
+class NounPracticeStep(PipelineStep):
     """Step 5 — LLM: enrich nouns with example sentences and memory tips."""
 
     name = "noun_practice"
     description = "LLM: enrich nouns with examples + memory tips"
 
-    def execute(self, ctx: lesson_pipeline_module().LessonContext) -> lesson_pipeline_module().LessonContext:
+    def execute(self, ctx: LessonContext) -> LessonContext:
         if ctx.noun_items:
             self._log(ctx, "       using retrieved noun items")
             return ctx
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
         noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
-        result = lesson_pipeline_module().PipelineGadgets.ask_llm(
+        result = PipelineGadgets.ask_llm(
             ctx,
             ctx.language_config.prompts.build_noun_practice_prompt(noun_items, lesson_number),
         )

@@ -3,18 +3,17 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from jlesson.curriculum import add_lesson, complete_lesson, save_curriculum
+from jlesson.pipeline_core import LessonContext, PipelineStep
+from jlesson.pipeline_gadgets import PipelineGadgets
 
-from .runtime import lesson_pipeline_module
 
-
-class RegisterLessonStep(lesson_pipeline_module().PipelineStep):
+class RegisterLessonStep(PipelineStep):
     """Step 7 — Register and complete the lesson in curriculum.json."""
 
     name = "register_lesson"
     description = "Add + complete the lesson in curriculum.json"
 
-    def execute(self, ctx: lesson_pipeline_module().LessonContext) -> lesson_pipeline_module().LessonContext:
-        pipeline = lesson_pipeline_module()
+    def execute(self, ctx: LessonContext) -> LessonContext:
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
         lesson = add_lesson(
             ctx.curriculum,
@@ -22,7 +21,7 @@ class RegisterLessonStep(lesson_pipeline_module().PipelineStep):
             theme=ctx.config.theme,
             nouns=ctx.nouns,
             verbs=ctx.verbs,
-            grammar_ids=[pipeline.PipelineGadgets.grammar_id(g) for g in ctx.selected_grammar],
+            grammar_ids=[PipelineGadgets.grammar_id(g) for g in ctx.selected_grammar],
             items_count=len(ctx.noun_items) + len(ctx.sentences),
         )
         complete_lesson(ctx.curriculum, lesson["id"])
@@ -33,7 +32,7 @@ class RegisterLessonStep(lesson_pipeline_module().PipelineStep):
             .isoformat(timespec="seconds")
             .replace("+00:00", "Z")
         )
-        grammar_ids = [pipeline.PipelineGadgets.grammar_id(g) for g in ctx.selected_grammar]
+        grammar_ids = [PipelineGadgets.grammar_id(g) for g in ctx.selected_grammar]
         ctx.report.add(
             "header",
             "\n".join(

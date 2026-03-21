@@ -2,23 +2,24 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .runtime import lesson_pipeline_module
+from jlesson.curriculum import suggest_new_vocab
+from jlesson.pipeline_core import LessonContext, PipelineStep
+from jlesson.pipeline_gadgets import PipelineGadgets
 
 
-class SelectVocabStep(lesson_pipeline_module().PipelineStep):
+class SelectVocabStep(PipelineStep):
     """Step 1 — Load vocab file and select fresh nouns/verbs."""
 
     name = "select_vocab"
     description = "Pick fresh nouns/verbs from the vocab file"
 
-    def execute(self, ctx: lesson_pipeline_module().LessonContext) -> lesson_pipeline_module().LessonContext:
+    def execute(self, ctx: LessonContext) -> LessonContext:
         if ctx.nouns and ctx.verbs:
             self._log(ctx, "       using retrieved vocabulary")
             return ctx
-        pipeline = lesson_pipeline_module()
-        vocab_dir = Path(pipeline.__file__).parent.parent / ctx.language_config.vocab_dir
-        ctx.vocab = pipeline.PipelineGadgets.load_vocab(ctx.config.theme, vocab_dir)
-        ctx.nouns, ctx.verbs = pipeline.suggest_new_vocab(
+        vocab_dir = Path(__file__).parent.parent / ctx.language_config.vocab_dir
+        ctx.vocab = PipelineGadgets.load_vocab(ctx.config.theme, vocab_dir)
+        ctx.nouns, ctx.verbs = suggest_new_vocab(
             ctx.vocab["nouns"],
             ctx.vocab["verbs"],
             covered_nouns=ctx.curriculum.get("covered_nouns", []),

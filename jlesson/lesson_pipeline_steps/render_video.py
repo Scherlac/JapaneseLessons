@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import jlesson.video.builder as video_builder_module
+from jlesson.pipeline_core import LessonContext, PipelineStep
+from jlesson.pipeline_gadgets import PipelineGadgets
 
-from .runtime import lesson_pipeline_module
 
-
-class RenderVideoStep(lesson_pipeline_module().PipelineStep):
+class RenderVideoStep(PipelineStep):
     """Step 11 — Assemble MP4 from touch sequence."""
 
     name = "render_video"
@@ -48,13 +48,13 @@ class RenderVideoStep(lesson_pipeline_module().PipelineStep):
 
         return items
 
-    def execute(self, ctx: lesson_pipeline_module().LessonContext) -> lesson_pipeline_module().LessonContext:
+    def execute(self, ctx: LessonContext) -> LessonContext:
         if not ctx.config.render_video or ctx.config.dry_run:
             reason = "dry-run" if ctx.config.dry_run else "skipped"
             self._log(ctx, f"       ({reason})")
             return ctx
 
-        output_dir = lesson_pipeline_module().PipelineGadgets.resolve_output_dir(ctx.config)
+        output_dir = PipelineGadgets.resolve_output_dir(ctx.config)
         video_path = output_dir / f"lesson_{ctx.lesson_id:03d}_{ctx.config.theme}.mp4"
 
         video_builder = video_builder_module.VideoBuilder()

@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from jlesson.curriculum import get_next_grammar_from
+from jlesson.pipeline_core import LessonContext, PipelineStep
+from jlesson.pipeline_gadgets import PipelineGadgets
 
-from .runtime import lesson_pipeline_module
 
-
-class GrammarSelectStep(lesson_pipeline_module().PipelineStep):
+class GrammarSelectStep(PipelineStep):
     """Step 2 — LLM: select 1-2 grammar points for this lesson."""
 
     name = "grammar_select"
     description = "LLM: pick 1-2 grammar points for this lesson"
 
-    def execute(self, ctx: lesson_pipeline_module().LessonContext) -> lesson_pipeline_module().LessonContext:
+    def execute(self, ctx: LessonContext) -> LessonContext:
         if ctx.selected_grammar:
             self._log(ctx, "       using retrieved grammar")
             return ctx
@@ -30,11 +30,10 @@ class GrammarSelectStep(lesson_pipeline_module().PipelineStep):
             lesson_number,
             covered_grammar_ids=covered,
         )
-        result = lesson_pipeline_module().PipelineGadgets.ask_llm(ctx, prompt)
+        result = PipelineGadgets.ask_llm(ctx, prompt)
         selected_ids: list[str] = result.get("selected_ids") or [
             g.id for g in unlocked[:2]
         ]
-        pipeline = lesson_pipeline_module()
         ctx.selected_grammar = []
         for grammar_id in selected_ids:
             if grammar_id in grammar_map:
@@ -45,6 +44,6 @@ class GrammarSelectStep(lesson_pipeline_module().PipelineStep):
                 )
         self._log(
             ctx,
-            f"       selected : {[pipeline.PipelineGadgets.grammar_id(g) for g in ctx.selected_grammar]}",
+            f"       selected : {[PipelineGadgets.grammar_id(g) for g in ctx.selected_grammar]}",
         )
         return ctx

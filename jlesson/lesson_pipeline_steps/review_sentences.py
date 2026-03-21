@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from .runtime import lesson_pipeline_module
+from jlesson.pipeline_core import LessonContext, PipelineStep
+from jlesson.pipeline_gadgets import PipelineGadgets
 
 
-class ReviewSentencesStep(lesson_pipeline_module().PipelineStep):
+class ReviewSentencesStep(PipelineStep):
     """Step 4 — LLM: rate sentences for naturalness, rewrite awkward ones."""
 
     name = "review_sentences"
@@ -11,11 +12,10 @@ class ReviewSentencesStep(lesson_pipeline_module().PipelineStep):
 
     NATURALNESS_THRESHOLD = 3
 
-    def execute(self, ctx: lesson_pipeline_module().LessonContext) -> lesson_pipeline_module().LessonContext:
+    def execute(self, ctx: LessonContext) -> LessonContext:
         if not ctx.sentences:
             self._log(ctx, "       (no sentences to review)")
             return ctx
-        pipeline = lesson_pipeline_module()
 
         for index, sentence in enumerate(ctx.sentences):
             if isinstance(sentence, dict):
@@ -28,9 +28,9 @@ class ReviewSentencesStep(lesson_pipeline_module().PipelineStep):
             ctx.sentences,
             noun_items,
             verb_items,
-            pipeline.PipelineGadgets.coerce_grammar_items(ctx.selected_grammar),
+            PipelineGadgets.coerce_grammar_items(ctx.selected_grammar),
         )
-        result = pipeline.PipelineGadgets.ask_llm(ctx, prompt)
+        result = PipelineGadgets.ask_llm(ctx, prompt)
         reviews = result.get("reviews", [])
         revised_count = 0
         for review in reviews:

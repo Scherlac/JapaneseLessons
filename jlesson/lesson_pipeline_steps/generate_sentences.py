@@ -1,21 +1,20 @@
 from __future__ import annotations
 
 from jlesson.models import Sentence
+from jlesson.pipeline_core import LessonContext, PipelineStep
+from jlesson.pipeline_gadgets import PipelineGadgets
 
-from .runtime import lesson_pipeline_module
 
-
-class GenerateSentencesStep(lesson_pipeline_module().PipelineStep):
+class GenerateSentencesStep(PipelineStep):
     """Step 3 — LLM: generate practice sentences."""
 
     name = "generate_sentences"
     description = "LLM: produce practice sentences"
 
-    def execute(self, ctx: lesson_pipeline_module().LessonContext) -> lesson_pipeline_module().LessonContext:
+    def execute(self, ctx: LessonContext) -> LessonContext:
         if ctx.sentences:
             self._log(ctx, "       using retrieved sentences")
             return ctx
-        pipeline = lesson_pipeline_module()
         noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
         verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
@@ -26,13 +25,13 @@ class GenerateSentencesStep(lesson_pipeline_module().PipelineStep):
                 lesson_number=lesson_number,
             )
         prompt = ctx.language_config.prompts.build_grammar_generate_prompt(
-            pipeline.PipelineGadgets.coerce_grammar_items(ctx.selected_grammar),
+            PipelineGadgets.coerce_grammar_items(ctx.selected_grammar),
             noun_items,
             verb_items,
             sentences_per_grammar=ctx.config.sentences_per_grammar,
             narrative=narrative,
         )
-        result = pipeline.PipelineGadgets.ask_llm(ctx, prompt)
+        result = PipelineGadgets.ask_llm(ctx, prompt)
         sentences = result.get("sentences", [])
         ctx.sentences = []
         for sentence_source in sentences:

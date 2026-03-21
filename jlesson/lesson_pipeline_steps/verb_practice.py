@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 from jlesson.models import GeneralItem
+from jlesson.pipeline_core import LessonContext, PipelineStep
+from jlesson.pipeline_gadgets import PipelineGadgets
 
-from .runtime import lesson_pipeline_module
 
-
-class VerbPracticeStep(lesson_pipeline_module().PipelineStep):
+class VerbPracticeStep(PipelineStep):
     """Step 6 — LLM: enrich verbs with conjugation forms and memory tips."""
 
     name = "verb_practice"
     description = "LLM: enrich verbs with conjugations + memory tips"
 
-    def execute(self, ctx: lesson_pipeline_module().LessonContext) -> lesson_pipeline_module().LessonContext:
+    def execute(self, ctx: LessonContext) -> LessonContext:
         if ctx.verb_items:
             self._log(ctx, "       using retrieved verb items")
             return ctx
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
         verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
-        result = lesson_pipeline_module().PipelineGadgets.ask_llm(
+        result = PipelineGadgets.ask_llm(
             ctx,
             ctx.language_config.prompts.build_verb_practice_prompt(verb_items, lesson_number),
         )

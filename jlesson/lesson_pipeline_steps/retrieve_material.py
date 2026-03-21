@@ -4,14 +4,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from jlesson.retrieval import get_retrieval_service
-
-from .runtime import lesson_pipeline_module
+from jlesson.pipeline_core import LessonContext, LessonConfig, PipelineStep
 
 if TYPE_CHECKING:
-    from jlesson.lesson_pipeline import LessonConfig, LessonContext
+    pass
 
 
-class RetrieveLessonMaterialStep(lesson_pipeline_module().PipelineStep):
+class RetrieveLessonMaterialStep(PipelineStep):
     """Step 1 — Optional retrieval before the current generation flow."""
 
     name = "retrieve_material"
