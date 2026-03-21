@@ -36,12 +36,12 @@ class GrammarSelectStep(PipelineStep):
             g.id for g in unlocked[:2]
         ]
         ctx.selected_grammar = []
-        for grammar_id in selected_ids:
-            if grammar_id in grammar_map:
-                ctx.selected_grammar.append(grammar_map[grammar_id].model_dump())
+        for selected_id in selected_ids:
+            if selected_id in grammar_map:
+                ctx.selected_grammar.append(grammar_map[selected_id].model_dump())
             else:
                 self._log(
-                    ctx, f"       Warning: unknown grammar id {grammar_id!r}, skipping"
+                    ctx, f"       Warning: unknown grammar id {selected_id!r}, skipping"
                 )
         self._log(
             ctx,
