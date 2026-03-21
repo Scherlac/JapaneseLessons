@@ -20,6 +20,7 @@ class LessonConfig:
     num_nouns: int = 4
     num_verbs: int = 3
     sentences_per_grammar: int = 3
+    lesson_blocks: int = 1
     seed: int | None = None
     use_cache: bool = True
     render_video: bool = True

@@ -19,13 +19,15 @@ class SelectVocabStep(PipelineStep):
             return ctx
         vocab_dir = Path(__file__).parent.parent / ctx.language_config.vocab_dir
         ctx.vocab = load_vocab(ctx.config.theme, vocab_dir)
+        requested_nouns = ctx.config.num_nouns * ctx.config.lesson_blocks
+        requested_verbs = ctx.config.num_verbs * ctx.config.lesson_blocks
         ctx.nouns, ctx.verbs = suggest_new_vocab(
             ctx.vocab["nouns"],
             ctx.vocab["verbs"],
             covered_nouns=ctx.curriculum.get("covered_nouns", []),
             covered_verbs=ctx.curriculum.get("covered_verbs", []),
-            num_nouns=ctx.config.num_nouns,
-            num_verbs=ctx.config.num_verbs,
+            num_nouns=requested_nouns,
+            num_verbs=requested_verbs,
             seed=ctx.config.seed,
         )
         self._log(ctx, f"       nouns : {[n['english'] for n in ctx.nouns]}")

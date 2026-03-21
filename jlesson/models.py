@@ -58,6 +58,7 @@ class GeneralItem(_NullStrCoerce):
     """
     source: PartialItem = Field(default_factory=PartialItem)
     target: PartialItem = Field(default_factory=PartialItem)
+    block_index: int = 1
     phase: Phase | None = None  # Added for compilation pipeline
     item_type: str = ""  # "noun", "verb", "sentence"
 

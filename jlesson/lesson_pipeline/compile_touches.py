@@ -17,6 +17,6 @@ class CompileTouchesStep(PipelineStep):
         self._log(
             ctx,
             f"       {len(ctx.touches)} touches "
-            f"(profile: {ctx.config.profile})",
+            f"across {ctx.config.lesson_blocks} blocks (profile: {ctx.config.profile})",
         )
         return ctx

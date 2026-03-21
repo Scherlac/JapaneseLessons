@@ -108,6 +108,16 @@ class TestCompileTouchesStructure:
         touches = compile_touches([ci], ACTIVE_FLASH_CARDS)
         assert len(touches) == 3
 
+    def test_multiple_blocks_keep_distinct_content_order(self):
+        first = _compiled(_noun("dog"), Phase.NOUNS)
+        second = _compiled(_noun("cat"), Phase.NOUNS)
+        first.block_index = 1
+        second.block_index = 2
+        touches = compile_touches([first, second], PASSIVE_VIDEO)
+        assert len(touches) == 6
+        assert [t.item.source.display_text for t in touches[:3]] == ["dog", "dog", "dog"]
+        assert [t.item.source.display_text for t in touches[3:]] == ["cat", "cat", "cat"]
+
 
 # ---------------------------------------------------------------------------
 # compile_touches — interleaving order
@@ -163,7 +173,16 @@ class TestCompileTouchesInterleaving:
             _compiled(_sentence("g1"), Phase.GRAMMAR),
             _compiled(_sentence("g2"), Phase.GRAMMAR),
         ]
-        touches = compile_touches(items, PASSIVE_VIDEO)
+        custom = Profile(
+            name="batch-one",
+            cycles=PASSIVE_VIDEO.cycles,
+            batch_sizes={
+                Phase.NOUNS: 1,
+                Phase.VERBS: 1,
+                Phase.GRAMMAR: 1,
+            },
+        )
+        touches = compile_touches(items, custom)
 
         # With batch size 1 per phase: n1 -> v1 -> g1 -> n2 -> v2 -> g2
         block_starts = [0, 3, 6, 8, 11, 14]

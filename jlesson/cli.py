@@ -251,6 +251,13 @@ def lesson() -> None:
 @click.option("--nouns", default=4, show_default=True, help="Nouns per lesson.")
 @click.option("--verbs", default=3, show_default=True, help="Verbs per lesson.")
 @click.option("--sentences", default=3, show_default=True, help="Sentences per grammar point.")
+@click.option(
+    "--blocks",
+    default=1,
+    show_default=True,
+    type=click.IntRange(1),
+    help="Generate this many fresh content blocks within the lesson.",
+)
 @click.option("--seed", type=int, default=None, help="Random seed for reproducible vocab selection.")
 @click.option(
     "--curriculum",
@@ -324,6 +331,7 @@ def lesson_next(
     nouns: int,
     verbs: int,
     sentences: int,
+    blocks: int,
     seed: int | None,
     curriculum_path: str | None,
     output_dir: str | None,
@@ -363,6 +371,7 @@ def lesson_next(
         num_nouns=nouns,
         num_verbs=verbs,
         sentences_per_grammar=sentences,
+        lesson_blocks=blocks,
         seed=seed,
         use_cache=not no_cache,
         render_video=not no_video,
