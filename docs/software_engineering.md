@@ -12,6 +12,10 @@ This file focuses on **how the project is built**, not on status reporting.
 
 ---
 
+## Working the current environment
+
+Use `conda activate py312` to get an activated environment. Avoid using `conda run` to avoid issues with buffered output and subprocesses. 
+
 ## Design Principles
 
 The project is guided by a small set of core engineering principles:

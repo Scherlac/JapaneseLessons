@@ -140,6 +140,7 @@ output/               # Generated lessons and videos (gitignored)
 Use the documentation set by intent:
 
 - `progress_report.md` — current feature development and near-term priorities
+- `docs/feature_progress.md` — feature-by-feature implementation status and milestones
 - `docs/project_scale.md` — system-level scale topics and growth pressure
 - `docs/architecture.md` — compact arc42-style architecture reference
 - `docs/development_history.md` — completed work, spikes, and historical detail

@@ -17,6 +17,7 @@ It answers three questions only:
 2. What is the next implementation slice?
 3. What is currently blocking or constraining that slice?
 
+Current development focus is at [docs/feature_progress.md](docs/feature_progress.md).
 Historical detail has been moved to [docs/development_history.md](docs/development_history.md).
 System-wide concerns live in [docs/project_scale.md](docs/project_scale.md).
 
