@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from jlesson.models import Sentence
-from jlesson.pipeline_core import LessonContext, PipelineStep
-from jlesson.pipeline_gadgets import PipelineGadgets
+from .pipeline_core import LessonContext, PipelineStep
+from .pipeline_gadgets import PipelineGadgets
 
 
 class GenerateSentencesStep(PipelineStep):

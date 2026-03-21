@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from jlesson.curriculum import suggest_new_vocab
-from jlesson.pipeline_core import LessonContext, PipelineStep
-from jlesson.pipeline_gadgets import PipelineGadgets
+from .pipeline_core import LessonContext, PipelineStep
+from .pipeline_gadgets import PipelineGadgets
 
 
 class SelectVocabStep(PipelineStep):

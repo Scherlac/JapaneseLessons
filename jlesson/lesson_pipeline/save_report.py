@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from jlesson.lesson_report import save_report
-from jlesson.pipeline_core import LessonContext, PipelineStep
-from jlesson.pipeline_gadgets import PipelineGadgets
+from .pipeline_core import LessonContext, PipelineStep
+from .pipeline_gadgets import PipelineGadgets
 from jlesson.profiles import get_profile
 from jlesson.touch_compiler import count_touches
 

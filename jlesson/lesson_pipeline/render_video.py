@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import jlesson.video.builder as video_builder_module
-from jlesson.pipeline_core import LessonContext, PipelineStep
-from jlesson.pipeline_gadgets import PipelineGadgets
+from .pipeline_core import LessonContext, PipelineStep
+from .pipeline_gadgets import PipelineGadgets
 
 
 class RenderVideoStep(PipelineStep):

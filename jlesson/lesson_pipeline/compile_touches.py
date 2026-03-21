@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import jlesson.touch_compiler as touch_compiler
-from jlesson.pipeline_core import LessonContext, PipelineStep
+from .pipeline_core import LessonContext, PipelineStep
 from jlesson.profiles import get_profile
 
 

@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from jlesson.models import LessonContent
-from jlesson.pipeline_core import LessonContext, PipelineStep
-from jlesson.pipeline_gadgets import PipelineGadgets
+from .pipeline_core import LessonContext, PipelineStep
+from .pipeline_gadgets import PipelineGadgets
 from jlesson.lesson_store import save_lesson_content
 
 

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from jlesson.retrieval import get_retrieval_service
-from jlesson.pipeline_core import LessonContext, LessonConfig, PipelineStep
+from .pipeline_core import LessonContext, LessonConfig, PipelineStep
 
 if TYPE_CHECKING:
     pass
