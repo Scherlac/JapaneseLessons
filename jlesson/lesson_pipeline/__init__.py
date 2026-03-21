@@ -1,36 +1,3 @@
-"""Concrete lesson pipeline steps."""
-
-from .compile_assets import CompileAssetsStep
-from .compile_touches import CompileTouchesStep
-from .generate_sentences import GenerateSentencesStep
-from .grammar_select import GrammarSelectStep
-from .noun_practice import NounPracticeStep
-from .persist_content import PersistContentStep
-from .register_lesson import RegisterLessonStep
-from .render_video import RenderVideoStep
-from .retrieve_material import RetrieveLessonMaterialStep
-from .review_sentences import ReviewSentencesStep
-from .save_report import SaveReportStep
-from .select_vocab import SelectVocabStep
-from .verb_practice import VerbPracticeStep
-
-__all__ = [
-    "CompileAssetsStep",
-    "CompileTouchesStep",
-    "GenerateSentencesStep",
-    "GrammarSelectStep",
-    "NounPracticeStep",
-    "PersistContentStep",
-    "RegisterLessonStep",
-    "RenderVideoStep",
-    "RetrieveLessonMaterialStep",
-    "ReviewSentencesStep",
-    "SaveReportStep",
-    "SelectVocabStep",
-    "VerbPracticeStep",
-]
-
-
 """
 Lesson generation pipeline.
 
@@ -71,27 +38,24 @@ from pathlib import Path
 
 from jlesson.curriculum import load_curriculum, suggest_new_vocab
 from .pipeline_core import LessonConfig, LessonContext, PipelineStep, StepInfo
+from .pipeline_gadgets import PipelineGadgets
 from .pipeline_orchestrator import (
     render_existing_lesson as _render_existing_lesson_impl,
     run_pipeline as _run_pipeline_impl,
 )
-
-
-from .lesson_pipeline import (
-    CompileAssetsStep,
-    CompileTouchesStep,
-    GenerateSentencesStep,
-    GrammarSelectStep,
-    NounPracticeStep,
-    PersistContentStep,
-    RegisterLessonStep,
-    RenderVideoStep,
-    RetrieveLessonMaterialStep,
-    ReviewSentencesStep,
-    SaveReportStep,
-    SelectVocabStep,
-    VerbPracticeStep,
-)
+from .compile_assets import CompileAssetsStep
+from .compile_touches import CompileTouchesStep
+from .generate_sentences import GenerateSentencesStep
+from .grammar_select import GrammarSelectStep
+from .noun_practice import NounPracticeStep
+from .persist_content import PersistContentStep
+from .register_lesson import RegisterLessonStep
+from .render_video import RenderVideoStep
+from .retrieve_material import RetrieveLessonMaterialStep
+from .review_sentences import ReviewSentencesStep
+from .save_report import SaveReportStep
+from .select_vocab import SelectVocabStep
+from .verb_practice import VerbPracticeStep
 
 
 # ---------------------------------------------------------------------------
@@ -139,3 +103,30 @@ def render_existing_lesson(
         language=language,
         verbose=verbose,
     )
+
+
+__all__ = [
+    "CompileAssetsStep",
+    "CompileTouchesStep",
+    "GenerateSentencesStep",
+    "GrammarSelectStep",
+    "LessonConfig",
+    "LessonContext",
+    "NounPracticeStep",
+    "PersistContentStep",
+    "PIPELINE",
+    "PipelineGadgets",
+    "PipelineStep",
+    "RegisterLessonStep",
+    "RenderVideoStep",
+    "RetrieveLessonMaterialStep",
+    "ReviewSentencesStep",
+    "SaveReportStep",
+    "SelectVocabStep",
+    "StepInfo",
+    "VerbPracticeStep",
+    "load_curriculum",
+    "render_existing_lesson",
+    "run_pipeline",
+    "suggest_new_vocab",
+]
