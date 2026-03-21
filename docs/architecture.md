@@ -87,6 +87,40 @@ Key strategic choices:
 
 ## 5. Building Block View
 
+### Candidate future internal architecture (under evaluation)
+
+The current codebase still reflects a module-first evolution. A candidate next
+internal architecture is being evaluated to reduce coupling and make future
+multilingual, retrieval, and rendering variants easier to compose.
+
+This candidate introduces three higher-level seams:
+
+| Candidate component | Intended role | Likely current modules |
+|---------------------|---------------|------------------------|
+| `generator engine` | produce configured content-generation steps for a lesson run | `item_generator.py`, `vocab_generator.py`, `prompt_template.py` |
+| `render engine` | produce configured rendering / compilation steps for a profile or output mode | `touch_compiler.py`, `asset_compiler.py`, `profiles.py`, `video/` |
+| `storage service` | hide persistence, retrieval, and cache/client boundaries behind a narrower service interface | `retrieval.py`, `llm_cache.py`, `llm_client.py`, `curriculum.py`, `lesson_store.py` |
+
+Important status note:
+
+- this is a concept evaluation only
+- no architectural decision has been made yet
+- existing production orchestration remains the source of truth
+
+Key expected benefits if adopted:
+
+1. make pipeline assembly more declarative
+2. separate content-generation concerns from rendering concerns
+3. reduce direct dependency pressure on orchestration modules
+4. create clearer plugin seams for future rendering variants
+
+Current risks under evaluation:
+
+1. the term `engine` may hide too many responsibilities if boundaries are not strict
+2. `storage service` may become an over-broad bucket if curriculum and retrieval are forced together prematurely
+3. render plugins need a stable intermediate representation or the abstraction will leak
+4. a step-producing architecture adds indirection and may not be worth it unless multiple concrete pipelines are really needed
+
 ### Top-level modules
 
 | Module | Responsibility |
@@ -120,6 +154,8 @@ CLI
 ```
 
 Detailed touch and profile semantics live in [structure.md](structure.md).
+Decision preparation for the candidate engine/service split lives in
+[decision_engine_service_boundaries.md](decision_engine_service_boundaries.md).
 
 ---
 

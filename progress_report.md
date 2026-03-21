@@ -51,6 +51,18 @@ The retrieval work should integrate into `jlesson` with a safe fallback to the c
 generation flow. Existing lesson generation, compilation, report generation, and video
 rendering remain the production path until retrieval proves useful in real usage.
 
+### 4. Evaluate internal engine / service boundaries without committing yet
+
+An internal architecture concept is now under evaluation to reduce module coupling and
+prepare future pipeline variants:
+
+- `generator engine`
+- `render engine`
+- `storage service`
+
+This is documentation and boundary-evaluation work only. No implementation decision has
+been made, and the current production modules remain authoritative.
+
 ---
 
 ## Current Baseline
@@ -108,6 +120,22 @@ The vocab source layer still needs protection before large-scale ingest:
 
 This remains important because retrieval quality depends on source-data quality.
 
+### Slice D — Architecture boundary preparation
+
+Goal:
+- evaluate whether the current module graph should be reorganized around a small number
+  of higher-level engines/services without committing to that structure yet
+
+Expected output:
+- concept notes in architecture documentation
+- one decision-preparation document listing options, benefits, risks, and open questions
+- no production architecture switch and no migration commitment yet
+
+Acceptance signals:
+- candidate boundaries are explicit enough to critique
+- ambiguous ownership areas are listed instead of hidden
+- follow-up refactors can be prioritized without pretending a decision already exists
+
 ---
 
 ## Active Constraints
@@ -124,6 +152,7 @@ This remains important because retrieval quality depends on source-data quality.
 1. Pipeline checkpointing is still missing for long LLM-driven lesson builds.
 2. LLM client configuration still relies on a shared singleton model/client path.
 3. Retrieval quality governance is not yet defined beyond structural validity.
+4. Internal module ownership is improving, but the long-term composition model is not yet decided.
 
 ---
 
@@ -181,6 +210,7 @@ Those can return later if retrieval evidence justifies them.
 ## Reference Documents
 
 - [docs/architecture.md](docs/architecture.md) — compact architecture reference
+- [docs/decision_engine_service_boundaries.md](docs/decision_engine_service_boundaries.md) — concept preparation for generator/render/storage split
 - [docs/project_scale.md](docs/project_scale.md) — scale-oriented system view
 - [docs/development_history.md](docs/development_history.md) — completed work and chronology
 - [docs/software_engineering.md](docs/software_engineering.md) — process and working principles
