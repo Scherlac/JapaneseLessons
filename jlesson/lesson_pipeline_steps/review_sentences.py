@@ -28,9 +28,9 @@ class ReviewSentencesStep(lesson_pipeline_module().PipelineStep):
             ctx.sentences,
             noun_items,
             verb_items,
-            pipeline._coerce_grammar_items(ctx.selected_grammar),
+            pipeline.PipelineGadgets.coerce_grammar_items(ctx.selected_grammar),
         )
-        result = pipeline._ask_llm(ctx, prompt)
+        result = pipeline.PipelineGadgets.ask_llm(ctx, prompt)
         reviews = result.get("reviews", [])
         revised_count = 0
         for review in reviews:

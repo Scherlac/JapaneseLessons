@@ -30,7 +30,7 @@ class GrammarSelectStep(lesson_pipeline_module().PipelineStep):
             lesson_number,
             covered_grammar_ids=covered,
         )
-        result = lesson_pipeline_module()._ask_llm(ctx, prompt)
+        result = lesson_pipeline_module().PipelineGadgets.ask_llm(ctx, prompt)
         selected_ids: list[str] = result.get("selected_ids") or [
             g.id for g in unlocked[:2]
         ]
@@ -44,6 +44,7 @@ class GrammarSelectStep(lesson_pipeline_module().PipelineStep):
                     ctx, f"       Warning: unknown grammar id {grammar_id!r}, skipping"
                 )
         self._log(
-            ctx, f"       selected : {[pipeline._grammar_id(g) for g in ctx.selected_grammar]}"
+            ctx,
+            f"       selected : {[pipeline.PipelineGadgets.grammar_id(g) for g in ctx.selected_grammar]}",
         )
         return ctx

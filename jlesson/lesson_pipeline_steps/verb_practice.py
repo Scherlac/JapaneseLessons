@@ -17,7 +17,7 @@ class VerbPracticeStep(lesson_pipeline_module().PipelineStep):
             return ctx
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
         verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
-        result = lesson_pipeline_module()._ask_llm(
+        result = lesson_pipeline_module().PipelineGadgets.ask_llm(
             ctx,
             ctx.language_config.prompts.build_verb_practice_prompt(verb_items, lesson_number),
         )

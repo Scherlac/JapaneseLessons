@@ -14,6 +14,7 @@ from jlesson.lesson_pipeline import (
     LessonConfig,
     LessonContext,
     NounPracticeStep,
+    PipelineGadgets,
     PersistContentStep,
     RegisterLessonStep,
     RetrieveLessonMaterialStep,
@@ -23,8 +24,6 @@ from jlesson.lesson_pipeline import (
     SelectVocabStep,
     StepInfo,
     VerbPracticeStep,
-    _build_items_by_phase,
-    _build_video_items,
     run_pipeline,
 )
 from jlesson.models import CompiledItem, ItemAssets, NounItem, Phase, Touch, TouchIntent, TouchType, VerbItem, Sentence, GeneralItem, PartialItem
@@ -118,7 +117,7 @@ def test_step_info_label():
 
 
 def test_select_vocab_populates_nouns_and_verbs(ctx):
-    with patch("jlesson.lesson_pipeline._load_vocab", return_value=_VOCAB):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB):
         ctx = SelectVocabStep().execute(ctx)
     assert len(ctx.nouns) == 2
     assert len(ctx.verbs) == 2
@@ -128,7 +127,7 @@ def test_select_vocab_excludes_covered_nouns(config):
     c = LessonContext(config=config)
     c.curriculum = create_curriculum("Test")
     c.curriculum["covered_nouns"] = ["water", "bread"]
-    with patch("jlesson.lesson_pipeline._load_vocab", return_value=_VOCAB):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB):
         c = SelectVocabStep().execute(c)
     fresh = {n["english"] for n in c.nouns}
     assert "rice" in fresh or "tea" in fresh
@@ -140,7 +139,7 @@ def test_select_vocab_with_seed_is_deterministic(config):
     for _ in range(2):
         c = LessonContext(config=config)
         c.curriculum = create_curriculum("T")
-        with patch("jlesson.lesson_pipeline._load_vocab", return_value=_VOCAB):
+        with patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB):
             c = SelectVocabStep().execute(c)
         results.append([n["english"] for n in c.nouns])
     assert results[0] == results[1]
@@ -158,7 +157,7 @@ def test_grammar_select_picks_valid_grammar(ctx):
         "selected_ids": ["action_present_affirmative"],
         "rationale": "Good start",
     }
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_result):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_result):
         ctx = GrammarSelectStep().execute(ctx)
     assert len(ctx.selected_grammar) == 1
     assert ctx.selected_grammar[0]["id"] == "action_present_affirmative"
@@ -167,7 +166,7 @@ def test_grammar_select_picks_valid_grammar(ctx):
 def test_grammar_select_falls_back_when_llm_empty(ctx):
     ctx.nouns = _NOUNS[:2]
     ctx.verbs = _VERBS[:2]
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value={}):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value={}):
         ctx = GrammarSelectStep().execute(ctx)
     assert len(ctx.selected_grammar) >= 1
 
@@ -176,7 +175,7 @@ def test_grammar_select_skips_unknown_ids(ctx):
     ctx.nouns = _NOUNS[:2]
     ctx.verbs = _VERBS[:2]
     mock_result = {"selected_ids": ["nonexistent_grammar_id"]}
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_result):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_result):
         ctx = GrammarSelectStep().execute(ctx)
     assert len(ctx.selected_grammar) == 0
 
@@ -201,7 +200,7 @@ def test_generate_sentences_stores_sentences(ctx):
             }
         ]
     }
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
         ctx = GenerateSentencesStep().execute(ctx)
     assert len(ctx.sentences) == 1
     assert ctx.sentences[0].source.display_text == "I eat bread."
@@ -220,7 +219,7 @@ def test_generate_sentences_adds_grammar_to_report(ctx):
             }
         ]
     }
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
         ctx = GenerateSentencesStep().execute(ctx)
     md = ctx.report.render()
     assert "## Phase 3" in md
@@ -231,7 +230,7 @@ def test_generate_sentences_empty_llm_response(ctx):
     ctx.nouns = _NOUNS[:2]
     ctx.verbs = _VERBS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value={}):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value={}):
         ctx = GenerateSentencesStep().execute(ctx)
     assert ctx.sentences == []
 
@@ -283,7 +282,7 @@ def test_review_sentences_applies_revisions(ctx):
         ],
         "overall_naturalness": 3,
     }
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     assert ctx.sentences[0].source.display_text == "I eat bread."
     assert ctx.sentences[1].source.display_text == "There is water in the kitchen."
@@ -301,7 +300,7 @@ def test_review_sentences_no_revisions_needed(ctx):
         ],
         "overall_naturalness": 5,
     }
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     assert ctx.sentences[0].source.display_text == "I eat bread."
 
@@ -317,7 +316,7 @@ def test_review_sentences_empty_llm_response(ctx):
     ctx.verbs = _VERBS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES]
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value={}):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value={}):
         ctx = ReviewSentencesStep().execute(ctx)
     assert len(ctx.sentences) == 2
     assert ctx.sentences[0].source.display_text == "I eat bread."
@@ -348,7 +347,7 @@ def test_review_sentences_ignores_high_score_with_revision(ctx):
         ],
         "overall_naturalness": 4,
     }
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     assert ctx.sentences[0].source.display_text == "I eat bread."
 
@@ -370,7 +369,7 @@ def test_review_sentences_ignores_out_of_bounds_index(ctx):
         ],
         "overall_naturalness": 1,
     }
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     assert ctx.sentences[0].source.display_text == "I eat bread."
 
@@ -387,7 +386,7 @@ def test_review_sentences_ignores_null_revised_sentence(ctx):
         ],
         "overall_naturalness": 1,
     }
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     assert ctx.sentences[0].source.display_text == "I eat bread."
 
@@ -417,7 +416,7 @@ def test_review_sentences_adds_report_on_revisions(ctx):
         ],
         "overall_naturalness": 3,
     }
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     md = ctx.report.render()
     assert "## Sentence Review" in md
@@ -436,7 +435,7 @@ def test_review_sentences_no_report_when_all_natural(ctx):
         ],
         "overall_naturalness": 5,
     }
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock_review):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     md = ctx.report.render()
     assert "## Sentence Review" not in md
@@ -471,7 +470,7 @@ def test_noun_practice_stores_items(ctx):
             },
         ]
     }
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
         ctx = NounPracticeStep().execute(ctx)
     assert len(ctx.noun_items) == 2
     assert ctx.noun_items[0].source.display_text == "water"
@@ -480,7 +479,7 @@ def test_noun_practice_stores_items(ctx):
 def test_noun_practice_adds_to_report(ctx):
     ctx.nouns = _NOUNS[:2]
     mock = {"noun_items": [dict(n) for n in _NOUNS[:2]]}
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
         ctx = NounPracticeStep().execute(ctx)
     md = ctx.report.render()
     assert "## Vocabulary" in md
@@ -491,7 +490,7 @@ def test_noun_practice_adds_to_report(ctx):
 def test_noun_practice_fills_missing_fields_from_source(ctx):
     ctx.nouns = _NOUNS[:2]
     mock = {"noun_items": [{"english": "water"}, {"english": "bread"}]}
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
         ctx = NounPracticeStep().execute(ctx)
     assert ctx.noun_items[0].target.display_text == "\u307f\u305a"
     assert ctx.noun_items[0].target.pronunciation == "mizu"
@@ -500,7 +499,7 @@ def test_noun_practice_fills_missing_fields_from_source(ctx):
 
 def test_noun_practice_fallback_on_empty_llm(ctx):
     ctx.nouns = _NOUNS[:2]
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value={}):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value={}):
         ctx = NounPracticeStep().execute(ctx)
     assert len(ctx.noun_items) == 2
 
@@ -538,7 +537,7 @@ def test_verb_practice_stores_items(ctx):
             },
         ]
     }
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
         ctx = VerbPracticeStep().execute(ctx)
     assert len(ctx.verb_items) == 2
     assert ctx.verb_items[0].target.extra["masu_form"] == "\u98df\u3079\u307e\u3059"
@@ -547,7 +546,7 @@ def test_verb_practice_stores_items(ctx):
 def test_verb_practice_adds_to_report(ctx):
     ctx.verbs = _VERBS[:2]
     mock = {"verb_items": [dict(v) for v in _VERBS[:2]]}
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
         ctx = VerbPracticeStep().execute(ctx)
     md = ctx.report.render()
     assert "### Verbs" in md
@@ -557,7 +556,7 @@ def test_verb_practice_adds_to_report(ctx):
 def test_verb_practice_fills_missing_fields_from_source(ctx):
     ctx.verbs = _VERBS[:2]
     mock = {"verb_items": [{"english": "to eat"}, {"english": "to drink"}]}
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value=mock):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
         ctx = VerbPracticeStep().execute(ctx)
     assert ctx.verb_items[0].target.extra["masu_form"] == "\u98df\u3079\u307e\u3059"
     assert ctx.verb_items[1].target.pronunciation == "nomu"
@@ -565,7 +564,7 @@ def test_verb_practice_fills_missing_fields_from_source(ctx):
 
 def test_verb_practice_fallback_on_empty_llm(ctx):
     ctx.verbs = _VERBS[:2]
-    with patch("jlesson.lesson_pipeline._ask_llm", return_value={}):
+    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value={}):
         ctx = VerbPracticeStep().execute(ctx)
     assert len(ctx.verb_items) == 2
 
@@ -703,38 +702,38 @@ def test_persist_content_is_loadable(ctx, tmp_path):
 
 def test_build_video_items_noun_step_is_introduce():
     nouns = [{"english": "water", "japanese": "\u307f\u305a", "romaji": "mizu"}]
-    items = _build_video_items(nouns, [])
+    items = RenderVideoStep.build_video_items(nouns, [])
     assert items[0]["step"] == "INTRODUCE"
 
 
 def test_build_video_items_sentence_step_is_translate():
     sentences = [{"english": "I eat.", "japanese": "\u98df\u3079\u307e\u3059\u3002"}]
-    items = _build_video_items([], sentences)
+    items = RenderVideoStep.build_video_items([], sentences)
     assert items[0]["step"] == "TRANSLATE"
 
 
 def test_build_video_items_counter_format():
     nouns = [{"english": "water", "japanese": "\u307f\u305a", "romaji": "mizu"}]
     sentences = [{"english": "I eat.", "japanese": "\u98df\u3079\u307e\u3059\u3002"}]
-    items = _build_video_items(nouns, sentences)
+    items = RenderVideoStep.build_video_items(nouns, sentences)
     assert items[0]["counter"] == "1/2"
     assert items[1]["counter"] == "2/2"
 
 
 def test_build_video_items_reveal_includes_romaji():
     nouns = [{"english": "water", "japanese": "\u307f\u305a", "romaji": "mizu"}]
-    items = _build_video_items(nouns, [])
+    items = RenderVideoStep.build_video_items(nouns, [])
     assert "mizu" in items[0]["reveal"]
 
 
 def test_build_video_items_empty_inputs():
-    assert _build_video_items([], []) == []
+    assert RenderVideoStep.build_video_items([], []) == []
 
 
 def test_build_video_items_total_count():
     nouns = [{"english": "w", "japanese": "j", "romaji": "r"}] * 3
     sents = [{"english": "e", "japanese": "j"}] * 2
-    assert len(_build_video_items(nouns, sents)) == 5
+    assert len(RenderVideoStep.build_video_items(nouns, sents)) == 5
 
 
 # ---------------------------------------------------------------------------
@@ -809,9 +808,9 @@ def test_run_pipeline_no_video_completes(config):
     }
 
     with (
-        patch("jlesson.lesson_pipeline._load_vocab", return_value=_VOCAB),
+        patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB),
         patch(
-            "jlesson.lesson_pipeline._ask_llm",
+            "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
             side_effect=[mock_grammar, mock_sentences, mock_review, mock_nouns, mock_verbs],
         ),
     ):
@@ -832,9 +831,9 @@ def test_run_pipeline_persists_correct_theme(config, tmp_path):
     mock_verbs = {"verb_items": []}
 
     with (
-        patch("jlesson.lesson_pipeline._load_vocab", return_value=_VOCAB),
+        patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB),
         patch(
-            "jlesson.lesson_pipeline._ask_llm",
+            "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
             side_effect=[mock_grammar, mock_sentences, mock_nouns, mock_verbs],
         ),
     ):
@@ -853,9 +852,9 @@ def test_run_pipeline_curriculum_updated(config, tmp_path):
     mock_verbs = {"verb_items": []}
 
     with (
-        patch("jlesson.lesson_pipeline._load_vocab", return_value=_VOCAB),
+        patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB),
         patch(
-            "jlesson.lesson_pipeline._ask_llm",
+            "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
             side_effect=[mock_grammar, mock_sentences, mock_nouns, mock_verbs],
         ),
     ):
@@ -917,9 +916,9 @@ def test_run_pipeline_report_contains_all_sections(config):
     }
 
     with (
-        patch("jlesson.lesson_pipeline._load_vocab", return_value=_VOCAB),
+        patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB),
         patch(
-            "jlesson.lesson_pipeline._ask_llm",
+            "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
             side_effect=[mock_grammar, mock_sentences, mock_review, mock_nouns, mock_verbs],
         ),
     ):
@@ -956,7 +955,7 @@ def test_build_items_by_phase_groups_correctly(ctx):
             person="I",
         ),
     ]
-    result = _build_items_by_phase(ctx)
+    result = CompileAssetsStep.build_items_by_phase(ctx)
     assert len(result[Phase.NOUNS]) == 1
     assert len(result[Phase.VERBS]) == 1
     assert len(result[Phase.GRAMMAR]) == 1
@@ -969,7 +968,7 @@ def test_build_items_by_phase_empty(ctx):
     ctx.noun_items = []
     ctx.verb_items = []
     ctx.sentences = []
-    result = _build_items_by_phase(ctx)
+    result = CompileAssetsStep.build_items_by_phase(ctx)
     assert result[Phase.NOUNS] == []
     assert result[Phase.VERBS] == []
     assert result[Phase.GRAMMAR] == []
@@ -1301,7 +1300,7 @@ def test_run_pipeline_uses_retrieval_hit_and_skips_vocab(config, tmp_path):
         "jlesson.lesson_pipeline.load_curriculum",
         return_value=create_curriculum("Test"),
     ), patch(
-        "jlesson.lesson_pipeline._load_vocab",
+        "jlesson.lesson_pipeline.PipelineGadgets.load_vocab",
         return_value=_VOCAB,
     ) as mock_load_vocab:
         ctx = run_pipeline(config)
@@ -1325,7 +1324,7 @@ def test_run_pipeline_retrieval_miss_falls_back_to_vocab(config, tmp_path):
         "jlesson.lesson_pipeline.load_curriculum",
         return_value=create_curriculum("Test"),
     ), patch(
-        "jlesson.lesson_pipeline._load_vocab",
+        "jlesson.lesson_pipeline.PipelineGadgets.load_vocab",
         return_value=_VOCAB,
     ) as mock_load_vocab:
         ctx = run_pipeline(config)

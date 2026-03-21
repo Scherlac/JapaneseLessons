@@ -17,7 +17,7 @@ class SelectVocabStep(lesson_pipeline_module().PipelineStep):
             return ctx
         pipeline = lesson_pipeline_module()
         vocab_dir = Path(pipeline.__file__).parent.parent / ctx.language_config.vocab_dir
-        ctx.vocab = pipeline._load_vocab(ctx.config.theme, vocab_dir)
+        ctx.vocab = pipeline.PipelineGadgets.load_vocab(ctx.config.theme, vocab_dir)
         ctx.nouns, ctx.verbs = pipeline.suggest_new_vocab(
             ctx.vocab["nouns"],
             ctx.vocab["verbs"],

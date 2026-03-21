@@ -25,7 +25,7 @@ class CompileAssetsStep(lesson_pipeline_module().PipelineStep):
         pipeline = lesson_pipeline_module()
         items_by_phase = self.build_items_by_phase(ctx)
         profile = get_profile(ctx.config.profile)
-        output_dir = pipeline._resolve_output_dir(ctx.config)
+        output_dir = pipeline.PipelineGadgets.resolve_output_dir(ctx.config)
         lesson_dir = output_dir / f"lesson_{ctx.lesson_id:03d}"
 
         total_items = sum(len(items) for items in items_by_phase.values())

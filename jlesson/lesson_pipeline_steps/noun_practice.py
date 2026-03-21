@@ -17,7 +17,7 @@ class NounPracticeStep(lesson_pipeline_module().PipelineStep):
             return ctx
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
         noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
-        result = lesson_pipeline_module()._ask_llm(
+        result = lesson_pipeline_module().PipelineGadgets.ask_llm(
             ctx,
             ctx.language_config.prompts.build_noun_practice_prompt(noun_items, lesson_number),
         )

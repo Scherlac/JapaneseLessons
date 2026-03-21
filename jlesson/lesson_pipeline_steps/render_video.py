@@ -54,7 +54,7 @@ class RenderVideoStep(lesson_pipeline_module().PipelineStep):
             self._log(ctx, f"       ({reason})")
             return ctx
 
-        output_dir = lesson_pipeline_module()._resolve_output_dir(ctx.config)
+        output_dir = lesson_pipeline_module().PipelineGadgets.resolve_output_dir(ctx.config)
         video_path = output_dir / f"lesson_{ctx.lesson_id:03d}_{ctx.config.theme}.mp4"
 
         video_builder = video_builder_module.VideoBuilder()

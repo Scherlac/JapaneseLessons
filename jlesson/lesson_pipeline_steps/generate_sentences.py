@@ -26,13 +26,13 @@ class GenerateSentencesStep(lesson_pipeline_module().PipelineStep):
                 lesson_number=lesson_number,
             )
         prompt = ctx.language_config.prompts.build_grammar_generate_prompt(
-            pipeline._coerce_grammar_items(ctx.selected_grammar),
+            pipeline.PipelineGadgets.coerce_grammar_items(ctx.selected_grammar),
             noun_items,
             verb_items,
             sentences_per_grammar=ctx.config.sentences_per_grammar,
             narrative=narrative,
         )
-        result = pipeline._ask_llm(ctx, prompt)
+        result = pipeline.PipelineGadgets.ask_llm(ctx, prompt)
         sentences = result.get("sentences", [])
         ctx.sentences = []
         for sentence_source in sentences:

@@ -22,7 +22,7 @@ class RegisterLessonStep(lesson_pipeline_module().PipelineStep):
             theme=ctx.config.theme,
             nouns=ctx.nouns,
             verbs=ctx.verbs,
-            grammar_ids=[pipeline._grammar_id(g) for g in ctx.selected_grammar],
+            grammar_ids=[pipeline.PipelineGadgets.grammar_id(g) for g in ctx.selected_grammar],
             items_count=len(ctx.noun_items) + len(ctx.sentences),
         )
         complete_lesson(ctx.curriculum, lesson["id"])
@@ -33,7 +33,7 @@ class RegisterLessonStep(lesson_pipeline_module().PipelineStep):
             .isoformat(timespec="seconds")
             .replace("+00:00", "Z")
         )
-        grammar_ids = [pipeline._grammar_id(g) for g in ctx.selected_grammar]
+        grammar_ids = [pipeline.PipelineGadgets.grammar_id(g) for g in ctx.selected_grammar]
         ctx.report.add(
             "header",
             "\n".join(

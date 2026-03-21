@@ -34,7 +34,6 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -44,7 +43,6 @@ from .curriculum import load_curriculum, suggest_new_vocab
 from .language_config import LanguageConfig, get_language_config
 from .lesson_report import ReportBuilder
 from .lesson_store import load_lesson_content
-from .llm_client import ask_llm_json_free
 from .models import (
     CompiledItem,
     GeneralItem,
@@ -53,6 +51,7 @@ from .models import (
     Sentence,
     Touch,
 )
+from .pipeline_gadgets import PipelineGadgets
 from .profiles import get_profile
 from .retrieval import RetrievalResult
 
@@ -174,66 +173,8 @@ class PipelineStep(ABC):
 
 
 # ---------------------------------------------------------------------------
-# Internal helpers
+# Shared gadgets
 # ---------------------------------------------------------------------------
-
-_VOCAB_DIR = Path(__file__).parent.parent / "vocab"
-
-
-def _load_vocab(theme: str, vocab_dir: Path | None = None) -> dict:
-    """Load vocab file; generate via LLM if missing."""
-    base_dir = vocab_dir if vocab_dir is not None else _VOCAB_DIR
-    path = base_dir / f"{theme}.json"
-    if path.exists():
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    print(f"  [vocab] {theme}.json not found — generating via LLM...")
-    from .vocab_generator import generate_vocab
-
-    return generate_vocab(theme=theme, num_nouns=12, num_verbs=10, output_dir=base_dir)
-
-
-def _ask_llm(ctx: LessonContext, prompt: str) -> dict:
-    """Route LLM call through cache when use_cache is enabled."""
-    if ctx.config.use_cache:
-        from .llm_cache import ask_llm_cached
-
-        return ask_llm_cached(prompt)
-    return ask_llm_json_free(prompt)
-
-
-def _coerce_grammar_item(grammar: GrammarItem | dict) -> GrammarItem:
-    if isinstance(grammar, GrammarItem):
-        return grammar
-    return GrammarItem(**grammar)
-
-
-def _coerce_grammar_items(grammar_items: list[GrammarItem | dict]) -> list[GrammarItem]:
-    return [_coerce_grammar_item(item) for item in grammar_items]
-
-
-def _grammar_id(grammar: GrammarItem | dict) -> str:
-    if isinstance(grammar, GrammarItem):
-        return grammar.id
-    return str(grammar.get("id", ""))
-
-
-def _resolve_output_dir(config: LessonConfig) -> Path:
-    base = Path(config.output_dir) if config.output_dir is not None else Path(__file__).parent.parent / "output"
-    if config.language != "eng-jap":
-        lang_cfg = get_language_config(config.language)
-        return base / lang_cfg.native_language.lower()
-    return base
-
-
-def _build_video_items(noun_items: list[dict], sentences: list[dict]) -> list[dict]:
-    """Compatibility wrapper for the render step helper."""
-    return RenderVideoStep.build_video_items(noun_items, sentences)
-
-
-def _build_items_by_phase(ctx: LessonContext) -> dict[Phase, list]:
-    """Compatibility wrapper for the compile-assets helper."""
-    return CompileAssetsStep.build_items_by_phase(ctx)
 
 
 from .lesson_pipeline_steps import (
@@ -334,7 +275,7 @@ def render_existing_lesson(
         language=language,
         verbose=verbose,
     )
-    resolved_output_dir = _resolve_output_dir(config)
+    resolved_output_dir = PipelineGadgets.resolve_output_dir(config)
     content = load_lesson_content(lesson_id, resolved_output_dir)
     lang_cfg = get_language_config(content.language or language)
     profile_obj = get_profile(profile)

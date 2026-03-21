@@ -18,7 +18,7 @@ class SaveReportStep(lesson_pipeline_module().PipelineStep):
     def execute(self, ctx: lesson_pipeline_module().LessonContext) -> lesson_pipeline_module().LessonContext:
         ctx.report.add("summary", self._summary(ctx))
         report = ctx.report.render()
-        output_dir = lesson_pipeline_module()._resolve_output_dir(ctx.config)
+        output_dir = lesson_pipeline_module().PipelineGadgets.resolve_output_dir(ctx.config)
         report_path = output_dir / f"lesson_{ctx.lesson_id:03d}" / "report.md"
         ctx.report_path = save_report(report, report_path)
         self._log(ctx, f"       {ctx.report_path}")

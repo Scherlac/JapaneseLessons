@@ -75,7 +75,7 @@ def test_generate_sentences_passes_explicit_narrative_to_prompt(tmp_path: Path):
         "build_grammar_generate_prompt",
         return_value="PROMPT",
     ) as mock_builder, patch(
-        "jlesson.lesson_pipeline._ask_llm",
+        "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
         return_value={"sentences": []},
     ):
         GenerateSentencesStep().execute(ctx)
@@ -115,7 +115,7 @@ def test_generate_sentences_uses_default_narrative_when_missing(tmp_path: Path):
         "build_grammar_generate_prompt",
         return_value="PROMPT",
     ) as mock_builder, patch(
-        "jlesson.lesson_pipeline._ask_llm",
+        "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
         return_value={"sentences": []},
     ):
         GenerateSentencesStep().execute(ctx)

@@ -23,7 +23,10 @@ class PersistContentStep(lesson_pipeline_module().PipelineStep):
             lesson_id=ctx.lesson_id,
             theme=ctx.config.theme,
             language=ctx.config.language,
-            grammar_ids=[lesson_pipeline_module()._grammar_id(g) for g in ctx.selected_grammar],
+            grammar_ids=[
+                lesson_pipeline_module().PipelineGadgets.grammar_id(g)
+                for g in ctx.selected_grammar
+            ],
             words=words,
             sentences=ctx.sentences,
             created_at=ctx.created_at
@@ -37,7 +40,7 @@ class PersistContentStep(lesson_pipeline_module().PipelineStep):
     def execute(self, ctx: lesson_pipeline_module().LessonContext) -> lesson_pipeline_module().LessonContext:
         pipeline = lesson_pipeline_module()
         content = self.build_content(ctx)
-        output_dir = pipeline._resolve_output_dir(ctx.config)
+        output_dir = pipeline.PipelineGadgets.resolve_output_dir(ctx.config)
         ctx.content_path = save_lesson_content(content, output_dir)
         ctx.report.add_artifact("Content JSON", ctx.content_path)
         self._log(ctx, f"       {ctx.content_path}")
