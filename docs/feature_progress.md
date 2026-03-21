@@ -3,6 +3,8 @@ Next should be the first production-safe retrieval slice.
 
 - [docs/vector_indexing.md](vector_indexing.md) — retrieval feature specification
 - [spike/vector_indexing/README.md](../spike/vector_indexing/README.md) — retrieval spike implementation and research
+- [progress_report.md](../progress_report.md) for active feature development
+- [software_engineering.md](software_engineering.md) for engineering principles and development cycle
 
 Why this is the right next step
 
