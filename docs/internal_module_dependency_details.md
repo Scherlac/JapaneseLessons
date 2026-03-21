@@ -9,6 +9,29 @@
 
 - `jlesson.asset_compiler -> jlesson.lesson_pipeline -> jlesson.lesson_pipeline.compile_assets -> jlesson.asset_compiler`
 
+## Focused Boundaries
+
+### `lesson_pipeline` <-> `video`
+
+- Direct imports `lesson_pipeline` -> `video`: `2`
+  - `jlesson.lesson_pipeline.pipeline_orchestrator` -> `jlesson.video.builder`
+  - `jlesson.lesson_pipeline.render_video` -> `jlesson.video.builder`
+- Direct imports `video` -> `lesson_pipeline`: `1`
+  - `jlesson.video.cards` -> `jlesson.lesson_pipeline`
+- Shortest path `lesson_pipeline` -> `video`: `jlesson.lesson_pipeline.render_video -> jlesson.lesson_pipeline.pipeline_core -> jlesson.language_config -> jlesson.video.tts_engine`
+- Shortest path `video` -> `lesson_pipeline`: `jlesson.video.cards -> jlesson.lesson_pipeline`
+
+### `lesson_pipeline` <-> `asset_compiler`
+
+- Direct imports `lesson_pipeline` -> `asset_compiler`: `2`
+  - `jlesson.lesson_pipeline.compile_assets` -> `jlesson.asset_compiler`
+  - `jlesson.lesson_pipeline.pipeline_orchestrator` -> `jlesson.asset_compiler`
+- Direct imports `asset_compiler` -> `lesson_pipeline`: `1`
+  - `jlesson.asset_compiler` -> `jlesson.lesson_pipeline`
+- Shortest path `lesson_pipeline` -> `asset_compiler`: `jlesson.lesson_pipeline.compile_assets -> jlesson.asset_compiler`
+- Shortest path `asset_compiler` -> `lesson_pipeline`: `jlesson.asset_compiler -> jlesson.lesson_pipeline`
+
+
 ## Top Transitive Dependency Paths
 
 ### `jlesson.lesson_pipeline`
@@ -23,12 +46,6 @@
 - `jlesson.lesson_pipeline.pipeline_orchestrator -> jlesson.asset_compiler -> jlesson.lesson_pipeline -> jlesson.lesson_pipeline.compile_assets`
 - `jlesson.lesson_pipeline.pipeline_orchestrator -> jlesson.asset_compiler -> jlesson.lesson_pipeline -> jlesson.lesson_pipeline.compile_touches`
 
-### `jlesson.asset_compiler`
-
-- `jlesson.asset_compiler -> jlesson.lesson_pipeline -> jlesson.lesson_pipeline.pipeline_gadgets -> jlesson.llm_client -> jlesson.config`
-- `jlesson.asset_compiler -> jlesson.lesson_pipeline -> jlesson.lesson_pipeline.pipeline_gadgets -> jlesson.llm_client`
-- `jlesson.asset_compiler -> jlesson.lesson_pipeline -> jlesson.lesson_pipeline.compile_touches -> jlesson.touch_compiler`
-
 ### `jlesson.cli`
 
 - `jlesson.cli -> jlesson.lesson_pipeline -> jlesson.lesson_pipeline.compile_assets -> jlesson.asset_compiler -> jlesson.video.cards`
@@ -40,6 +57,12 @@
 - `jlesson.lesson_pipeline.save_report -> jlesson.lesson_pipeline.pipeline_core -> jlesson.language_config -> jlesson.curriculum`
 - `jlesson.lesson_pipeline.save_report -> jlesson.lesson_pipeline.pipeline_core -> jlesson.language_config -> jlesson.prompt_template`
 - `jlesson.lesson_pipeline.save_report -> jlesson.lesson_pipeline.pipeline_gadgets -> jlesson.llm_client -> jlesson.config`
+
+### `jlesson.asset_compiler`
+
+- `jlesson.asset_compiler -> jlesson.lesson_pipeline -> jlesson.lesson_pipeline.pipeline_gadgets -> jlesson.llm_client -> jlesson.config`
+- `jlesson.asset_compiler -> jlesson.lesson_pipeline -> jlesson.lesson_pipeline.pipeline_gadgets -> jlesson.llm_client`
+- `jlesson.asset_compiler -> jlesson.lesson_pipeline -> jlesson.lesson_pipeline.compile_touches -> jlesson.touch_compiler`
 
 ## Direct Imports For Highest Fan-Out Modules
 
@@ -75,15 +98,6 @@
 - `jlesson.touch_compiler`
 - `jlesson.video.builder`
 
-### `jlesson.asset_compiler`
-
-- `jlesson.language_config`
-- `jlesson.lesson_pipeline`
-- `jlesson.models`
-- `jlesson.profiles`
-- `jlesson.video.cards`
-- `jlesson.video.tts_engine`
-
 ### `jlesson.cli`
 
 - `jlesson.config`
@@ -102,6 +116,23 @@
 - `jlesson.profiles`
 - `jlesson.touch_compiler`
 
+### `jlesson.asset_compiler`
+
+- `jlesson.language_config`
+- `jlesson.lesson_pipeline`
+- `jlesson.models`
+- `jlesson.profiles`
+- `jlesson.video.cards`
+- `jlesson.video.tts_engine`
+
+### `jlesson.language_config`
+
+- `jlesson.curriculum`
+- `jlesson.item_generator`
+- `jlesson.models`
+- `jlesson.prompt_template`
+- `jlesson.video.tts_engine`
+
 ### `jlesson.lesson_pipeline.pipeline_gadgets`
 
 - `jlesson.language_config`
@@ -118,13 +149,12 @@
 - `jlesson.models`
 - `jlesson.profiles`
 
-### `jlesson.language_config`
+### `jlesson.lesson_pipeline.pipeline_core`
 
-- `jlesson.curriculum`
-- `jlesson.item_generator`
+- `jlesson.language_config`
+- `jlesson.lesson_report`
 - `jlesson.models`
-- `jlesson.prompt_template`
-- `jlesson.video.tts_engine`
+- `jlesson.retrieval`
 
 ### `jlesson.lesson_pipeline.persist_content`
 
@@ -132,10 +162,3 @@
 - `jlesson.lesson_pipeline.pipeline_gadgets`
 - `jlesson.lesson_store`
 - `jlesson.models`
-
-### `jlesson.lesson_pipeline.pipeline_core`
-
-- `jlesson.language_config`
-- `jlesson.lesson_report`
-- `jlesson.models`
-- `jlesson.retrieval`

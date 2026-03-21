@@ -61,6 +61,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write a detailed Markdown report with module-level cycles and dependency paths",
     )
     parser.add_argument(
+        "--focus-group",
+        action="append",
+        default=[],
+        help="Focus a boundary pair in the details report using 'group_a:group_b'. Can be passed multiple times.",
+    )
+    parser.add_argument(
         "--json-out",
         type=Path,
         help="Write the raw module graph summary to this file as JSON",
@@ -241,6 +247,44 @@ def shortest_path(
     return None
 
 
+def shortest_group_path(
+    edges: dict[str, set[str]],
+    modules: set[str],
+    package: str,
+    source_group: str,
+    target_group: str,
+) -> list[str] | None:
+    best: list[str] | None = None
+    sources = sorted(module for module in modules if module_group(module, package) == source_group)
+    targets = sorted(module for module in modules if module_group(module, package) == target_group)
+
+    for source in sources:
+        for target in targets:
+            path = shortest_path(edges, source, target)
+            if path is None:
+                continue
+            if best is None or len(path) < len(best) or path < best:
+                best = path
+    return best
+
+
+def direct_group_edges(
+    edges: dict[str, set[str]],
+    modules: set[str],
+    package: str,
+    source_group: str,
+    target_group: str,
+) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    for source in sorted(modules):
+        if module_group(source, package) != source_group:
+            continue
+        for target in sorted(edges[source]):
+            if module_group(target, package) == target_group:
+                pairs.append((source, target))
+    return pairs
+
+
 def representative_cycle(edges: dict[str, set[str]], component: list[str]) -> list[str]:
     allowed = set(component)
     best_cycle: list[str] | None = None
@@ -264,6 +308,36 @@ def module_group(module: str, package: str) -> str:
     if module == package or len(parts) == 1:
         return "(root)"
     return parts[1]
+
+
+def default_focus_groups(package: str) -> list[tuple[str, str]]:
+    if package == "jlesson":
+        return [
+            ("lesson_pipeline", "video"),
+            ("lesson_pipeline", "asset_compiler"),
+        ]
+    return []
+
+
+def parse_focus_groups(values: list[str], package: str) -> list[tuple[str, str]]:
+    if not values:
+        return default_focus_groups(package)
+
+    parsed: list[tuple[str, str]] = []
+    for value in values:
+        if ":" not in value:
+            raise ValueError(
+                f"Invalid --focus-group value '{value}'. Expected format 'group_a:group_b'."
+            )
+        left, right = value.split(":", 1)
+        left = left.strip()
+        right = right.strip()
+        if not left or not right:
+            raise ValueError(
+                f"Invalid --focus-group value '{value}'. Expected format 'group_a:group_b'."
+            )
+        parsed.append((left, right))
+    return parsed
 
 
 def group_edges(modules: Iterable[str], edges: dict[str, set[str]], package: str) -> dict[str, Counter[str]]:
@@ -401,6 +475,7 @@ def render_detailed_markdown_report(
     in_degree: Counter[str],
     out_degree: Counter[str],
     top: int,
+    focus_groups: list[tuple[str, str]],
 ) -> str:
     cycle_paths = [representative_cycle(graph.edges, component) for component in cycles]
     dependency_paths = top_dependency_paths(
@@ -429,6 +504,70 @@ def render_detailed_markdown_report(
     else:
         for path in cycle_paths:
             lines.append(f"- `{' -> '.join(path)}`")
+
+    lines.extend([
+        "",
+        "## Focused Boundaries",
+        "",
+    ])
+
+    if not focus_groups:
+        lines.append("- None")
+    else:
+        for left_group, right_group in focus_groups:
+            lines.append(f"### `{left_group}` <-> `{right_group}`")
+            lines.append("")
+
+            left_to_right_edges = direct_group_edges(
+                graph.edges,
+                graph.modules,
+                package,
+                left_group,
+                right_group,
+            )
+            right_to_left_edges = direct_group_edges(
+                graph.edges,
+                graph.modules,
+                package,
+                right_group,
+                left_group,
+            )
+            left_to_right_path = shortest_group_path(
+                graph.edges,
+                graph.modules,
+                package,
+                left_group,
+                right_group,
+            )
+            right_to_left_path = shortest_group_path(
+                graph.edges,
+                graph.modules,
+                package,
+                right_group,
+                left_group,
+            )
+
+            lines.append(f"- Direct imports `{left_group}` -> `{right_group}`: `{len(left_to_right_edges)}`")
+            if left_to_right_edges:
+                for source, target in left_to_right_edges[:8]:
+                    lines.append(f"  - `{source}` -> `{target}`")
+
+            lines.append(f"- Direct imports `{right_group}` -> `{left_group}`: `{len(right_to_left_edges)}`")
+            if right_to_left_edges:
+                for source, target in right_to_left_edges[:8]:
+                    lines.append(f"  - `{source}` -> `{target}`")
+
+            if left_to_right_path is not None:
+                lines.append(f"- Shortest path `{left_group}` -> `{right_group}`: `{' -> '.join(left_to_right_path)}`")
+            else:
+                lines.append(f"- Shortest path `{left_group}` -> `{right_group}`: none")
+
+            if right_to_left_path is not None:
+                lines.append(f"- Shortest path `{right_group}` -> `{left_group}`: `{' -> '.join(right_to_left_path)}`")
+            else:
+                lines.append(f"- Shortest path `{right_group}` -> `{left_group}`: none")
+
+            lines.append("")
 
     lines.extend([
         "",
@@ -485,6 +624,7 @@ def main() -> int:
         args.markdown_out = root / "docs" / "internal_module_dependencies.md"
     if args.details_markdown_out is None:
         args.details_markdown_out = root / "docs" / "internal_module_dependency_details.md"
+    focus_groups = parse_focus_groups(args.focus_group, args.package)
     graph, backend_used = build_graph(root, args.package, args.backend)
     inbound = invert_edges(graph.edges)
     cycles = strongly_connected_components(graph.edges)
@@ -549,6 +689,7 @@ def main() -> int:
         in_degree=in_degree,
         out_degree=out_degree,
         top=args.top,
+        focus_groups=focus_groups,
     )
     args.details_markdown_out.write_text(details_markdown, encoding="utf-8")
     print(f"wrote details markdown: {args.details_markdown_out}")

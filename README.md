@@ -170,6 +170,26 @@ Or use the automated script:
 .\install.ps1
 ```
 
+## Dependency Analysis
+
+Generate the internal module dependency reports for `jlesson`:
+
+```powershell
+.\tools\analyze_internal_dependencies.ps1
+```
+
+Outputs:
+- `docs/internal_module_dependencies.md` — main Markdown report with Mermaid diagram
+- `docs/internal_module_dependency_details.md` — detailed paths and focused boundaries
+- `docs/internal_module_dependencies.mmd` — raw Mermaid source
+- `output/internal_module_dependencies.json` — raw graph data
+
+Override the focused boundaries if needed:
+
+```powershell
+.\tools\analyze_internal_dependencies.ps1 -FocusGroup lesson_pipeline:video -FocusGroup lesson_pipeline:asset_compiler
+```
+
 **⚠️ Notes:**
 - Video generation requires internet access for TTS (Microsoft Edge TTS service)
 - LLM features require [LM Studio](https://lmstudio.ai) (or any OpenAI-compatible server) — configure URL in `.env`
