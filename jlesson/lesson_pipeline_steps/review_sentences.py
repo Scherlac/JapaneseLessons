@@ -1,0 +1,82 @@
+from __future__ import annotations
+
+from .runtime import lesson_pipeline_module
+
+
+class ReviewSentencesStep(lesson_pipeline_module().PipelineStep):
+    """Step 4 — LLM: rate sentences for naturalness, rewrite awkward ones."""
+
+    name = "review_sentences"
+    description = "LLM: review sentence naturalness + rewrite"
+
+    NATURALNESS_THRESHOLD = 3
+
+    def execute(self, ctx: lesson_pipeline_module().LessonContext) -> lesson_pipeline_module().LessonContext:
+        if not ctx.sentences:
+            self._log(ctx, "       (no sentences to review)")
+            return ctx
+        pipeline = lesson_pipeline_module()
+
+        for index, sentence in enumerate(ctx.sentences):
+            if isinstance(sentence, dict):
+                ctx.sentences[index] = ctx.language_config.generator.convert_sentence(sentence)
+
+        noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
+        verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
+
+        prompt = ctx.language_config.prompts.build_sentence_review_prompt(
+            ctx.sentences,
+            noun_items,
+            verb_items,
+            pipeline._coerce_grammar_items(ctx.selected_grammar),
+        )
+        result = pipeline._ask_llm(ctx, prompt)
+        reviews = result.get("reviews", [])
+        revised_count = 0
+        for review in reviews:
+            idx = review.get("index")
+            score = review.get("score", 5)
+            revised = review.get("revised_sentence")
+            if (
+                idx is not None
+                and score < self.NATURALNESS_THRESHOLD
+                and isinstance(revised, dict)
+                and 0 <= idx < len(ctx.sentences)
+            ):
+                original_en = ctx.sentences[idx].source.display_text
+                ctx.sentences[idx] = ctx.language_config.generator.convert_sentence(revised)
+                revised_count += 1
+                self._log(
+                    ctx,
+                    f"       [{idx}] score {score} - revised: {original_en!r}",
+                )
+
+        overall = result.get("overall_naturalness", "?")
+        self._log(
+            ctx,
+            f"       {len(ctx.sentences)} sentences reviewed "
+            f"(naturalness: {overall}/5, revised: {revised_count})",
+        )
+
+        if revised_count > 0:
+            ctx.report.add(
+                "review_notes",
+                self._review_section(reviews, revised_count),
+            )
+        return ctx
+
+    @staticmethod
+    def _review_section(reviews: list[dict], revised_count: int) -> str:
+        lines = [
+            "## Sentence Review",
+            "",
+            f"> {revised_count} sentence(s) revised for naturalness.",
+            "",
+        ]
+        for review in reviews:
+            score = review.get("score", "?")
+            issue = review.get("issue")
+            if issue:
+                lines.append(f"- **[{review.get('index', '?')}]** score {score}: {issue}")
+        lines.append("")
+        return "\n".join(lines)

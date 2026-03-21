@@ -257,6 +257,6 @@ class Touch(BaseModel):
     touch_type: TouchType
     intent: TouchIntent
 
-    artifacts: dict[str, Path] = Field(default_factory=dict)
+    artifacts: dict[str, Path | list[Path]] = Field(default_factory=dict)
 
     model_config = {"arbitrary_types_allowed": True}

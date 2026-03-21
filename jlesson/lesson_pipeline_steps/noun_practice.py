@@ -1,0 +1,77 @@
+from __future__ import annotations
+
+from jlesson.models import GeneralItem
+
+from .runtime import lesson_pipeline_module
+
+
+class NounPracticeStep(lesson_pipeline_module().PipelineStep):
+    """Step 5 — LLM: enrich nouns with example sentences and memory tips."""
+
+    name = "noun_practice"
+    description = "LLM: enrich nouns with examples + memory tips"
+
+    def execute(self, ctx: lesson_pipeline_module().LessonContext) -> lesson_pipeline_module().LessonContext:
+        if ctx.noun_items:
+            self._log(ctx, "       using retrieved noun items")
+            return ctx
+        lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
+        noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
+        result = lesson_pipeline_module()._ask_llm(
+            ctx,
+            ctx.language_config.prompts.build_noun_practice_prompt(noun_items, lesson_number),
+        )
+        raw_items = result.get("noun_items", [])
+        ctx.noun_items = []
+        for noun_item in raw_items:
+            source_item = next((n for n in ctx.nouns if n["english"] == noun_item["english"]), None)
+            if source_item:
+                ctx.noun_items.append(ctx.language_config.generator.convert_noun(noun_item, source_item))
+            else:
+                ctx.noun_items.append(ctx.language_config.generator.convert_noun(noun_item, {}))
+        if not ctx.noun_items:
+            for noun_source in ctx.nouns:
+                ctx.noun_items.append(ctx.language_config.generator.convert_raw_noun(noun_source))
+        for item in ctx.noun_items:
+            item.item_type = "noun"
+        self._log(ctx, f"       {len(ctx.noun_items)} noun items")
+        if ctx.language_config.code == "hun-eng":
+            src_lbl, tgt_lbl, ph_lbl, has_phonetic = "Magyar", "English", "Pronunciation", True
+        else:
+            src_lbl, tgt_lbl, ph_lbl, has_phonetic = "English", "Japanese", "Romaji", True
+        ctx.report.add("vocabulary", self._vocab_table(ctx.noun_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic))
+        ctx.report.add("noun_practice", self._practice_section(ctx.noun_items, tgt_lbl, ph_lbl))
+        return ctx
+
+    @staticmethod
+    def _vocab_table(items: list[GeneralItem], src_lbl: str, tgt_lbl: str, ph_lbl: str, has_phonetic: bool) -> str:
+        header = f"| # | {src_lbl} | {tgt_lbl} |"
+        sep = "|---|---------|----------|"
+        if has_phonetic:
+            header += f" {ph_lbl} |"
+            sep += "--------|"
+        lines = ["## Vocabulary", "", "### Nouns", "", header, sep]
+        for index, item in enumerate(items, 1):
+            row = f"| {index} | {item.source.display_text} | {item.target.display_text} |"
+            if has_phonetic and item.target.pronunciation:
+                row += f" {item.target.pronunciation} |"
+            lines.append(row)
+        lines.append("")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _practice_section(items: list[GeneralItem], tgt_lbl: str, ph_lbl: str) -> str:
+        lines: list[str] = ["## Phase 1 - Noun Practice", ""]
+        for index, item in enumerate(items, 1):
+            lines.extend([f"### {index}. {item.source.display_text}", ""])
+            lines.append(f"- **{tgt_lbl}:** {item.target.display_text}")
+            if item.target.pronunciation:
+                lines.append(f"- **{ph_lbl}:** {item.target.pronunciation}")
+            if item.target.extra.get("example_sentence_target"):
+                lines.append(f"- **Example:** {item.target.extra['example_sentence_target']}")
+            if item.target.extra.get("example_sentence_source"):
+                lines.append(f"  *{item.target.extra['example_sentence_source']}*")
+            if item.target.extra.get("memory_tip"):
+                lines.append(f"- **Memory tip:** {item.target.extra['memory_tip']}")
+            lines.append("")
+        return "\n".join(lines)
