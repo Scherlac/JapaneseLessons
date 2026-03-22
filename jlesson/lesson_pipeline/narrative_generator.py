@@ -56,3 +56,4 @@ class NarrativeGeneratorStep(PipelineStep):
         for index, block in enumerate(blocks, 1):
             lines.extend([f"### Block {index}", "", block, ""])
         return "\n".join(lines)
+

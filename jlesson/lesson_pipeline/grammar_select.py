@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from jlesson.curriculum import get_next_grammar_from
+from jlesson.models import GrammarItem
 from .pipeline_core import LessonContext, PipelineStep
 from .pipeline_grammar import grammar_id
 from .pipeline_gadgets import PipelineGadgets

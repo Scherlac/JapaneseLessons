@@ -193,7 +193,7 @@ def test_grammar_select_builds_block_progression(tmp_path: Path):
     selected_ids = [
         "identity_present_affirmative",
         "action_present_affirmative",
-        "existence_present_affirmative",
+        "existence_arimasu",
     ]
     with patch(
         "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
@@ -204,7 +204,7 @@ def test_grammar_select_builds_block_progression(tmp_path: Path):
     assert [[g["id"] for g in block] for block in ctx.selected_grammar_blocks] == [
         ["identity_present_affirmative"],
         ["action_present_affirmative"],
-        ["existence_present_affirmative"],
+        ["existence_arimasu"],
     ]
 
 

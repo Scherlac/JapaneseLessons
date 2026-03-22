@@ -742,6 +742,9 @@ def test_build_video_items_total_count():
 
 
 def test_run_pipeline_no_video_completes(config):
+    mock_narrative = {"blocks": [{"index": 1, "narrative": "A test narrative."}]}
+    mock_narrative_vocab = {"blocks": [{"index": 1, "nouns": [], "verbs": []}]}
+    mock_generate_narrative_vocab = {"theme": "food", "nouns": [], "verbs": []}
     mock_grammar = {"selected_ids": ["action_present_affirmative"]}
     mock_review = {
         "reviews": [{"index": 0, "score": 5, "is_natural": True, "issue": None, "revised_sentence": None}],
@@ -811,7 +814,7 @@ def test_run_pipeline_no_video_completes(config):
         patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB),
         patch(
             "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
-            side_effect=[mock_grammar, mock_sentences, mock_review, mock_nouns, mock_verbs],
+            side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_review, mock_nouns, mock_verbs],
         ),
     ):
         result = run_pipeline(config)
@@ -825,6 +828,9 @@ def test_run_pipeline_no_video_completes(config):
 
 
 def test_run_pipeline_persists_correct_theme(config, tmp_path):
+    mock_narrative = {"blocks": [{"index": 1, "narrative": "A test narrative."}]}
+    mock_narrative_vocab = {"blocks": [{"index": 1, "nouns": [], "verbs": []}]}
+    mock_generate_narrative_vocab = {"theme": "food", "nouns": [], "verbs": []}
     mock_grammar = {"selected_ids": ["action_present_affirmative"]}
     mock_sentences = {"sentences": []}
     mock_nouns = {"noun_items": []}
@@ -834,7 +840,7 @@ def test_run_pipeline_persists_correct_theme(config, tmp_path):
         patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB),
         patch(
             "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
-            side_effect=[mock_grammar, mock_sentences, mock_nouns, mock_verbs],
+            side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_nouns, mock_verbs],
         ),
     ):
         result = run_pipeline(config)
@@ -846,6 +852,9 @@ def test_run_pipeline_persists_correct_theme(config, tmp_path):
 
 
 def test_run_pipeline_curriculum_updated(config, tmp_path):
+    mock_narrative = {"blocks": [{"index": 1, "narrative": "A test narrative."}]}
+    mock_narrative_vocab = {"blocks": [{"index": 1, "nouns": [], "verbs": []}]}
+    mock_generate_narrative_vocab = {"theme": "food", "nouns": [], "verbs": []}
     mock_grammar = {"selected_ids": ["action_present_affirmative"]}
     mock_sentences = {"sentences": []}
     mock_nouns = {"noun_items": []}
@@ -855,7 +864,7 @@ def test_run_pipeline_curriculum_updated(config, tmp_path):
         patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB),
         patch(
             "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
-            side_effect=[mock_grammar, mock_sentences, mock_nouns, mock_verbs],
+            side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_nouns, mock_verbs],
         ),
     ):
         run_pipeline(config)
@@ -870,6 +879,9 @@ def test_run_pipeline_curriculum_updated(config, tmp_path):
 
 
 def test_run_pipeline_report_contains_all_sections(config):
+    mock_narrative = {"blocks": [{"index": 1, "narrative": "A test narrative."}]}
+    mock_narrative_vocab = {"blocks": [{"index": 1, "nouns": [], "verbs": []}]}
+    mock_generate_narrative_vocab = {"theme": "food", "nouns": [], "verbs": []}
     mock_grammar = {"selected_ids": ["action_present_affirmative"]}
     mock_review = {
         "reviews": [{"index": 0, "score": 5, "is_natural": True, "issue": None, "revised_sentence": None}],
@@ -919,7 +931,7 @@ def test_run_pipeline_report_contains_all_sections(config):
         patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB),
         patch(
             "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
-            side_effect=[mock_grammar, mock_sentences, mock_review, mock_nouns, mock_verbs],
+            side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_review, mock_nouns, mock_verbs],
         ),
     ):
         result = run_pipeline(config)
@@ -981,15 +993,7 @@ def test_build_items_by_phase_empty(ctx):
 
 def _make_compiled_items(count: int, phase: Phase) -> list[CompiledItem]:
     """Create mock compiled items for testing."""
-    items = []
-    for i in range(count):
-        item = NounItem(english=f"item_{i}", japanese=f"jp_{i}", romaji=f"r_{i}")
-        if phase == Phase.VERBS:
-            item = VerbItem(english=f"item_{i}", japanese=f"jp_{i}", romaji=f"r_{i}", masu_form=f"m_{i}")
-        elif phase == Phase.GRAMMAR:
-            item = Sentence(english=f"item_{i}", japanese=f"jp_{i}", romaji=f"r_{i}")
-        items.append(CompiledItem(item=item, phase=phase, assets=ItemAssets()))
-    return items
+    return [CompiledItem(phase=phase) for _ in range(count)]
 
 
 def test_compile_assets_step_dry_run(ctx, tmp_path):
@@ -1023,7 +1027,7 @@ def test_compile_assets_step_full(ctx, tmp_path):
         "jlesson.asset_compiler.compile_assets",
         return_value=mock_compiled,
     ):
-        with patch("jlesson.lesson_pipeline.asyncio.run", return_value=mock_compiled):
+        with patch("jlesson.lesson_pipeline.compile_assets.asyncio.run", return_value=mock_compiled):
             ctx = CompileAssetsStep().execute(ctx)
     assert len(ctx.compiled_items) == 1
 
@@ -1186,9 +1190,9 @@ def test_save_report_summary_uses_profile(ctx, tmp_path):
     md = ctx.report_path.read_text(encoding="utf-8")
     assert "passive_video" in md
     # passive_video: 3 noun touches per item, 3 verb, 2 grammar
-    assert "| Nouns | 2 | 3 | 6 |" in md
-    assert "| Verbs | 2 | 3 | 6 |" in md
-    assert "| Grammar | 1 | 2 | 2 |" in md
+    assert "| Nouns | 2 | 2 | 3 | 6 |" in md
+    assert "| Verbs | 2 | 2 | 3 | 6 |" in md
+    assert "| Grammar | 1 | 1 | 2 | 2 |" in md
 
 
 def test_save_report_summary_active_flash_cards(ctx, tmp_path):
@@ -1203,9 +1207,9 @@ def test_save_report_summary_active_flash_cards(ctx, tmp_path):
     md = ctx.report_path.read_text(encoding="utf-8")
     assert "active_flash_cards" in md
     # active_flash_cards: 5 noun/verb touches per item, 3 grammar
-    assert "| Nouns | 2 | 5 | 10 |" in md
-    assert "| Verbs | 2 | 5 | 10 |" in md
-    assert "| Grammar | 1 | 3 | 3 |" in md
+    assert "| Nouns | 2 | 2 | 5 | 10 |" in md
+    assert "| Verbs | 2 | 2 | 5 | 10 |" in md
+    assert "| Grammar | 1 | 1 | 3 | 3 |" in md
 
 
 # ---------------------------------------------------------------------------
@@ -1315,21 +1319,33 @@ def test_run_pipeline_uses_retrieval_hit_and_skips_vocab(config, tmp_path):
 
 
 def test_run_pipeline_retrieval_miss_falls_back_to_vocab(config, tmp_path):
+    # When retrieval misses, GenerateNarrativeVocabStep generates vocab from the
+    # narrative — no pre-existing vocab file is needed.
     config.retrieval_store_path = tmp_path / "missing.json"
 
-    with patch(
-        "jlesson.lesson_pipeline.PIPELINE",
-        [RetrieveLessonMaterialStep(), SelectVocabStep()],
-    ), patch(
-        "jlesson.lesson_pipeline.load_curriculum",
-        return_value=create_curriculum("Test"),
-    ), patch(
-        "jlesson.lesson_pipeline.PipelineGadgets.load_vocab",
-        return_value=_VOCAB,
-    ) as mock_load_vocab:
+    mock_narrative = {"blocks": [{"index": 1, "narrative": "A test narrative."}]}
+    mock_narrative_vocab = {"blocks": [{"index": 1, "nouns": [], "verbs": []}]}
+    mock_generate_narrative_vocab = {
+        "theme": "food",
+        "nouns": _NOUNS[:2],
+        "verbs": _VERBS[:2],
+    }
+    mock_grammar = {"selected_ids": ["action_present_affirmative"]}
+    mock_sentences = {"sentences": []}
+    mock_nouns = {"noun_items": []}
+    mock_verbs = {"verb_items": []}
+
+    with (
+        patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB) as mock_load_vocab,
+        patch(
+            "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
+            side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_nouns, mock_verbs],
+        ),
+    ):
         ctx = run_pipeline(config)
 
-    assert mock_load_vocab.call_count == 1
+    # load_vocab is no longer called — narrative vocab generation is the fallback
+    assert mock_load_vocab.call_count == 0
     assert ctx.retrieval_result is not None
     assert ctx.retrieval_result.used_retrieval is False
     assert "no retrieval candidates" in ctx.retrieval_result.fallback_reason

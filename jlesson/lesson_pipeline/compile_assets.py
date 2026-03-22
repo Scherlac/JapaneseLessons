@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import jlesson.asset_compiler as asset_compiler
 from jlesson.models import Phase
 from .pipeline_core import LessonContext, PipelineStep
@@ -40,8 +41,6 @@ class CompileAssetsStep(PipelineStep):
             )
         else:
             self._log(ctx, f"       {total_items} items -> cards + TTS")
-            import asyncio
-
             ctx.compiled_items = asyncio.run(
                 asset_compiler.compile_assets(
                     items_by_phase,

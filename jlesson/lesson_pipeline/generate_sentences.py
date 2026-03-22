@@ -51,10 +51,11 @@ class NarrativeGrammarStep(PipelineStep):
                 ctx.sentences.append(sentence)
         self._log(ctx, f"       {len(ctx.sentences)} sentences")
         if ctx.sentences:
-            if ctx.language_config.code == "hun-eng":
-                src_lbl, tgt_lbl, ph_lbl, has_phonetic = "Magyar", "English", "Pronunciation", True
-            else:
-                src_lbl, tgt_lbl, ph_lbl, has_phonetic = "English", "Japanese", "Romaji", True
+            fm = ctx.language_config.field_map
+            src_lbl = fm.source_label
+            tgt_lbl = fm.target_label
+            ph_lbl = fm.phonetic_label
+            has_phonetic = bool(fm.phonetic_label)
             ctx.report.add(
                 "grammar_practice",
                 self._grammar_section(ctx.sentences, src_lbl, tgt_lbl, ph_lbl, has_phonetic),

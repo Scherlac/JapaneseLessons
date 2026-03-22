@@ -18,7 +18,8 @@ class SelectVocabStep(PipelineStep):
             self._log(ctx, "       using retrieved vocabulary")
             return ctx
         vocab_dir = Path(__file__).parent.parent / ctx.language_config.vocab_dir
-        ctx.vocab = PipelineGadgets.load_vocab(ctx.config.theme, vocab_dir)
+        if not ctx.vocab:
+            ctx.vocab = PipelineGadgets.load_vocab(ctx.config.theme, vocab_dir)
         requested_nouns = ctx.config.num_nouns * ctx.config.lesson_blocks
         requested_verbs = ctx.config.num_verbs * ctx.config.lesson_blocks
         if ctx.narrative_vocab_terms:

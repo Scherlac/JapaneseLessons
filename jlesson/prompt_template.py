@@ -215,6 +215,52 @@ _VOCAB_EXAMPLE = """{
 }"""
 
 
+def build_narrative_vocab_generate_prompt(
+    nouns: list[str],
+    verbs: list[str],
+    theme: str,
+) -> str:
+    """Build a prompt to generate full Japanese vocab entries for a list of English terms.
+
+    The LLM returns a vocab JSON with exactly the requested nouns and verbs, so
+    no pre-existing vocab file is required when using a narrative-driven lesson.
+
+    Returns JSON matching the vocab schema (nouns + verbs lists).
+    Use with ask_llm_json_free().
+    """
+    noun_lines = "\n".join(f"  {i + 1}. {n}" for i, n in enumerate(nouns))
+    verb_lines = "\n".join(f"  {i + 1}. {v}" for i, v in enumerate(verbs))
+    total = len(nouns) + len(verbs)
+    return f"""\
+You are a Japanese language expert building vocabulary for a beginner lesson about "{theme}".
+
+Generate Japanese translations for exactly the following English words.
+
+NOUNS ({len(nouns)}):
+{noun_lines}
+
+VERBS ({len(verbs)}):
+{verb_lines}
+
+Rules:
+- Output exactly {total} entries — one per word above, in the same order.
+- Each noun entry must have: english, japanese (kana), kanji, romaji.
+- Each verb entry must have: english, japanese (kana), kanji, romaji,
+  type (one of "る-verb", "う-verb", "irregular", "な-adj"), masu_form.
+- Use beginner-appropriate, natural vocabulary.
+- Output ONLY a raw JSON object in this exact schema:
+{{
+  "theme": "{theme}",
+  "nouns": [
+    {{"english": "...", "japanese": "...", "kanji": "...", "romaji": "..."}}
+  ],
+  "verbs": [
+    {{"english": "...", "japanese": "...", "kanji": "...", "romaji": "...", "type": "...", "masu_form": "..."}}
+  ]
+}}
+""".strip()
+
+
 def build_vocab_prompt(
     theme: str,
     num_nouns: int = 12,
@@ -1355,6 +1401,16 @@ class PromptInterface(ABC):
         ...
 
     @abstractmethod
+    def build_narrative_vocab_generate_prompt(
+        self,
+        nouns: list[str],
+        verbs: list[str],
+        theme: str,
+    ) -> str:
+        """Build prompt to generate full Japanese vocab entries for extracted narrative terms."""
+        ...
+
+    @abstractmethod
     def build_grammar_generate_prompt(
         self,
         grammar_specs: list[GrammarItem],
@@ -1446,6 +1502,14 @@ class EngJapPrompts(PromptInterface):
             verbs_per_block=verbs_per_block,
         )
 
+    def build_narrative_vocab_generate_prompt(
+        self,
+        nouns: list[str],
+        verbs: list[str],
+        theme: str,
+    ) -> str:
+        return build_narrative_vocab_generate_prompt(nouns, verbs, theme)
+
     def build_grammar_generate_prompt(
         self,
         grammar_specs: list[GrammarItem],
@@ -1536,6 +1600,15 @@ class HunEngPrompts(PromptInterface):
             nouns_per_block=nouns_per_block,
             verbs_per_block=verbs_per_block,
         )
+
+    def build_narrative_vocab_generate_prompt(
+        self,
+        nouns: list[str],
+        verbs: list[str],
+        theme: str,
+    ) -> str:
+        # Hungarian lessons reuse the same generic prompt — terms are already in English
+        return build_narrative_vocab_generate_prompt(nouns, verbs, theme)
 
     def build_grammar_generate_prompt(
         self,
