@@ -33,6 +33,10 @@ class RegisterLessonStep(PipelineStep):
             .replace("+00:00", "Z")
         )
         grammar_ids = [grammar_id(g) for g in ctx.selected_grammar]
+        block_grammar_lines = []
+        for index, grammar_block in enumerate(ctx.selected_grammar_blocks, 1):
+            ids = ", ".join(grammar_id(g) for g in grammar_block) or "(none)"
+            block_grammar_lines.append(f"> Block {index} grammar: {ids}")
         ctx.report.add(
             "header",
             "\n".join(
@@ -41,6 +45,7 @@ class RegisterLessonStep(PipelineStep):
                     "",
                     f"> Generated: {ctx.created_at}",
                     f"> Grammar: {', '.join(grammar_ids) or '(none)'}",
+                    *block_grammar_lines,
                     "",
                 ]
             ),

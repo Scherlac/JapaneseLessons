@@ -24,6 +24,7 @@ class PersistContentStep(PipelineStep):
             lesson_id=ctx.lesson_id,
             theme=ctx.config.theme,
             language=ctx.config.language,
+            narrative_blocks=ctx.narrative_blocks,
             grammar_ids=[
                 grammar_id(g)
                 for g in ctx.selected_grammar

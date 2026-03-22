@@ -252,6 +252,20 @@ def lesson() -> None:
 @click.option("--verbs", default=3, show_default=True, help="Verbs per lesson.")
 @click.option("--sentences", default=3, show_default=True, help="Sentences per grammar point.")
 @click.option(
+    "--grammar-points",
+    default=2,
+    show_default=True,
+    type=click.IntRange(1),
+    help="How many grammar progression points to include in the lesson.",
+)
+@click.option(
+    "--grammar-points-per-block",
+    default=1,
+    show_default=True,
+    type=click.IntRange(1),
+    help="How many grammar points each block should actively practice from the lesson progression.",
+)
+@click.option(
     "--blocks",
     default=1,
     show_default=True,
@@ -284,8 +298,8 @@ def lesson() -> None:
 )
 @click.option(
     "--narrative",
-    default="",
-    help="Optional story context to guide sentence generation.",
+    multiple=True,
+    help="Optional block narrative. Repeat the option to provide a progression across blocks.",
 )
 @click.option(
     "--narrative-file",
@@ -331,6 +345,8 @@ def lesson_next(
     nouns: int,
     verbs: int,
     sentences: int,
+    grammar_points: int,
+    grammar_points_per_block: int,
     blocks: int,
     seed: int | None,
     curriculum_path: str | None,
@@ -339,7 +355,7 @@ def lesson_next(
     no_cache: bool,
     dry_run: bool,
     profile: str,
-    narrative: str,
+    narrative: tuple[str, ...],
     narrative_file: Path | None,
     retrieval: bool,
     retrieval_store: Path | None,
@@ -360,10 +376,11 @@ def lesson_next(
         Path(curriculum_path) if curriculum_path
         else Path(__file__).parent.parent / lang_cfg.curriculum_file
     )
-    narrative_text = narrative.strip()
+    narrative_blocks = [text.strip() for text in narrative if text.strip()]
     if narrative_file is not None:
-        file_text = narrative_file.read_text(encoding="utf-8").strip()
-        narrative_text = f"{narrative_text}\n\n{file_text}".strip() if narrative_text else file_text
+        file_text = narrative_file.read_text(encoding="utf-8")
+        file_blocks = [block.strip() for block in file_text.split("\n---\n") if block.strip()]
+        narrative_blocks.extend(file_blocks)
     config = LessonConfig(
         theme=theme,
         curriculum_path=resolved_curriculum,
@@ -371,6 +388,8 @@ def lesson_next(
         num_nouns=nouns,
         num_verbs=verbs,
         sentences_per_grammar=sentences,
+        grammar_points_per_lesson=grammar_points,
+        grammar_points_per_block=grammar_points_per_block,
         lesson_blocks=blocks,
         seed=seed,
         use_cache=not no_cache,
@@ -378,7 +397,7 @@ def lesson_next(
         dry_run=dry_run,
         profile=profile,
         language=language,
-        narrative=narrative_text,
+        narrative=narrative_blocks,
         retrieval_enabled=retrieval,
         retrieval_store_path=retrieval_store,
         retrieval_backend=retrieval_backend,

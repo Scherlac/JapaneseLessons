@@ -20,6 +20,8 @@ class LessonConfig:
     num_nouns: int = 4
     num_verbs: int = 3
     sentences_per_grammar: int = 3
+    grammar_points_per_lesson: int = 2
+    grammar_points_per_block: int = 1
     lesson_blocks: int = 1
     seed: int | None = None
     use_cache: bool = True
@@ -28,7 +30,7 @@ class LessonConfig:
     verbose: bool = True
     profile: str = "passive_video"
     language: str = "eng-jap"
-    narrative: str = ""
+    narrative: list[str] = field(default_factory=list)
     retrieval_enabled: bool = True
     retrieval_store_path: Path | None = None
     retrieval_backend: str = "file"
@@ -67,7 +69,10 @@ class LessonContext:
     vocab: dict = field(default_factory=dict)
     nouns: list[dict] = field(default_factory=list)
     verbs: list[dict] = field(default_factory=list)
+    narrative_blocks: list[str] = field(default_factory=list)
+    narrative_vocab_terms: list[dict[str, list[str]]] = field(default_factory=list)
     selected_grammar: list[GrammarItem | dict] = field(default_factory=list)
+    selected_grammar_blocks: list[list[GrammarItem | dict]] = field(default_factory=list)
     sentences: list[Sentence] = field(default_factory=list)
     noun_items: list[GeneralItem] = field(default_factory=list)
     verb_items: list[GeneralItem] = field(default_factory=list)

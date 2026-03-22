@@ -44,6 +44,8 @@ class SaveReportStep(PipelineStep):
             "",
             f"> Profile: **{ctx.config.profile}**",
             f"> Blocks: **{ctx.config.lesson_blocks}**",
+            f"> Grammar points per lesson: **{ctx.config.grammar_points_per_lesson}**",
+            f"> Grammar points per block: **{ctx.config.grammar_points_per_block}**",
             "",
             "| Phase | Items per block | Total items | Repetitions | Total touches |",
             "|-------|-----------------|-------------|-------------|---------------|",

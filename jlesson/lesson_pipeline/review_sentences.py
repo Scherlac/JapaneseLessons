@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from .pipeline_core import LessonContext, PipelineStep
 from .pipeline_grammar import coerce_grammar_items
-from .pipeline_llm import ask_llm
+from .pipeline_gadgets import PipelineGadgets
 
 
 class ReviewSentencesStep(PipelineStep):
@@ -31,7 +31,7 @@ class ReviewSentencesStep(PipelineStep):
             verb_items,
             coerce_grammar_items(ctx.selected_grammar),
         )
-        result = ask_llm(ctx, prompt)
+        result = PipelineGadgets.ask_llm(ctx, prompt)
         reviews = result.get("reviews", [])
         revised_count = 0
         for review in reviews:
@@ -45,7 +45,11 @@ class ReviewSentencesStep(PipelineStep):
                 and 0 <= idx < len(ctx.sentences)
             ):
                 original_en = ctx.sentences[idx].source.display_text
-                ctx.sentences[idx] = ctx.language_config.generator.convert_sentence(revised)
+                original_sentence = ctx.sentences[idx]
+                revised_sentence = ctx.language_config.generator.convert_sentence(revised)
+                revised_sentence.block_index = original_sentence.block_index
+                revised_sentence.phase = original_sentence.phase
+                ctx.sentences[idx] = revised_sentence
                 revised_count += 1
                 self._log(
                     ctx,

@@ -150,6 +150,7 @@ class LessonContent(BaseModel):
     lesson_id: int
     theme: str
     language: str = "eng-jap"
+    narrative_blocks: list[str] = Field(default_factory=list)
     grammar_ids: list[str] = Field(default_factory=list)
     words: list[GeneralItem] = Field(default_factory=list)
     sentences: list[Sentence] = Field(default_factory=list)

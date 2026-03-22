@@ -3,69 +3,53 @@ from __future__ import annotations
 from jlesson.models import Phase, Sentence
 from .pipeline_core import LessonContext, PipelineStep
 from .pipeline_grammar import coerce_grammar_items
-from .pipeline_llm import ask_llm
+from .pipeline_gadgets import PipelineGadgets
 
 
-class GenerateSentencesStep(PipelineStep):
-    """Step 3 — LLM: generate practice sentences."""
+class NarrativeGrammarStep(PipelineStep):
+    """Generate block-aware grammar sentences aligned to the narrative progression."""
 
-    name = "generate_sentences"
-    description = "LLM: produce practice sentences"
+    name = "narrative_grammar"
+    description = "LLM: generate grammar sentences for each narrative block"
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         if ctx.sentences:
             self._log(ctx, "       using retrieved sentences")
             return ctx
-        lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
-        narrative = (ctx.config.narrative or "").strip()
-        if not narrative:
-            narrative = ctx.language_config.generator.build_default_narrative(
-                theme=ctx.config.theme,
-                lesson_number=lesson_number,
-            )
         ctx.sentences = []
         noun_blocks = self._chunk(ctx.nouns, ctx.config.num_nouns)
         verb_blocks = self._chunk(ctx.verbs, ctx.config.num_verbs)
-        total_blocks = max(len(noun_blocks), len(verb_blocks), ctx.config.lesson_blocks)
+        total_blocks = max(
+            len(noun_blocks),
+            len(verb_blocks),
+            len(ctx.narrative_blocks),
+            ctx.config.lesson_blocks,
+        )
         for block_index in range(total_blocks):
             block_nouns = noun_blocks[block_index] if block_index < len(noun_blocks) else []
             block_verbs = verb_blocks[block_index] if block_index < len(verb_blocks) else []
             noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in block_nouns]
             verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in block_verbs]
-            block_narrative = narrative
-            if total_blocks > 1:
-                block_narrative = (
-                    f"{narrative}\n\n"
-                    f"This is block {block_index + 1} of {total_blocks}. "
-                    "Keep the situation coherent, but vary the concrete actions and details."
-                )
+            block_narrative = ctx.narrative_blocks[block_index] if block_index < len(ctx.narrative_blocks) else ""
+            block_grammar = (
+                ctx.selected_grammar_blocks[block_index]
+                if block_index < len(ctx.selected_grammar_blocks) and ctx.selected_grammar_blocks[block_index]
+                else ctx.selected_grammar
+            )
             prompt = ctx.language_config.prompts.build_grammar_generate_prompt(
-                coerce_grammar_items(ctx.selected_grammar),
+                coerce_grammar_items(block_grammar),
                 noun_items,
                 verb_items,
                 sentences_per_grammar=ctx.config.sentences_per_grammar,
                 narrative=block_narrative,
             )
-            result = ask_llm(ctx, prompt)
+            result = PipelineGadgets.ask_llm(ctx, prompt)
             for sentence_source in result.get("sentences", []):
                 sentence = ctx.language_config.generator.convert_sentence(sentence_source)
                 sentence.block_index = block_index + 1
                 sentence.phase = Phase.GRAMMAR
                 ctx.sentences.append(sentence)
         self._log(ctx, f"       {len(ctx.sentences)} sentences")
-        if narrative:
-            self._log(ctx, f"       narrative : {narrative[:96]}{'...' if len(narrative) > 96 else ''}")
-            ctx.report.add(
-                "grammar_context",
-                "\n".join(
-                    [
-                        "## Narrative Context",
-                        "",
-                        narrative,
-                        "",
-                    ]
-                ),
-            )
         if ctx.sentences:
             if ctx.language_config.code == "hun-eng":
                 src_lbl, tgt_lbl, ph_lbl, has_phonetic = "Magyar", "English", "Pronunciation", True
@@ -112,3 +96,6 @@ class GenerateSentencesStep(PipelineStep):
         if size <= 0:
             return [items] if items else []
         return [items[index:index + size] for index in range(0, len(items), size)]
+
+
+GenerateSentencesStep = NarrativeGrammarStep

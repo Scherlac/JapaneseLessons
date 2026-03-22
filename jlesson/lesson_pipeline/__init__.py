@@ -1,21 +1,23 @@
 """
 Lesson generation pipeline.
 
-Orchestrates the full lesson workflow through thirteen sequential steps:
+Orchestrates the full lesson workflow through fifteen sequential steps:
 
     step 1   retrieve_material  — optional retrieval with safe fallback
-    step 2   select_vocab       — pick fresh nouns/verbs from the vocab file
-    step 3   grammar_select     — LLM: pick 1-2 grammar points for this lesson
-    step 4   generate_sentences — LLM: produce practice sentences
-    step 5   review_sentences   — LLM: rate naturalness, rewrite awkward sentences
-    step 6   noun_practice      — LLM: enrich nouns with examples + memory tips
-    step 7   verb_practice      — LLM: enrich verbs with conjugations + memory tips
-    step 8   register_lesson    — add+complete the lesson in curriculum.json
-    step 9   persist_content    — save LessonContent to output/<id>/content.json
-    step 10  compile_assets     — render card images + TTS audio per item (Stage 2)
-    step 11  compile_touches    — profile-driven touch sequencing (Stage 3)
-    step 12  render_video       — assemble MP4 from touch sequence
-    step 13  save_report        — finalize and save Markdown lesson report
+    step 2   narrative_generator     — create block-by-block story progression
+    step 3   extract_narrative_vocab — extract block-level vocab targets
+    step 4   select_vocab            — pick fresh nouns/verbs from the vocab file
+    step 5   grammar_select          — LLM: pick grammar points for this lesson
+    step 6   narrative_grammar       — LLM: produce block-aware practice sentences
+    step 7   review_sentences        — LLM: rate naturalness, rewrite awkward sentences
+    step 8   noun_practice           — LLM: enrich nouns with examples + memory tips
+    step 9   verb_practice           — LLM: enrich verbs with conjugations + memory tips
+    step 10  register_lesson         — add+complete the lesson in curriculum.json
+    step 11  persist_content         — save LessonContent to output/<id>/content.json
+    step 12  compile_assets          — render card images + TTS audio per item (Stage 2)
+    step 13  compile_touches         — profile-driven touch sequencing (Stage 3)
+    step 14  render_video            — assemble MP4 from touch sequence
+    step 15  save_report             — finalize and save Markdown lesson report
 
 Each step is a PipelineStep subclass with an execute(ctx) method,
 making them individually testable and easy to extend.
@@ -42,8 +44,11 @@ from .pipeline_core import LessonConfig, LessonContext, PipelineStep, StepInfo
 _EXPORTS: dict[str, tuple[str, str]] = {
     "CompileAssetsStep": (".compile_assets", "CompileAssetsStep"),
     "CompileTouchesStep": (".compile_touches", "CompileTouchesStep"),
+    "ExtractNarrativeVocabStep": (".extract_narrative_vocab", "ExtractNarrativeVocabStep"),
     "GenerateSentencesStep": (".generate_sentences", "GenerateSentencesStep"),
     "GrammarSelectStep": (".grammar_select", "GrammarSelectStep"),
+    "NarrativeGeneratorStep": (".narrative_generator", "NarrativeGeneratorStep"),
+    "NarrativeGrammarStep": (".generate_sentences", "NarrativeGrammarStep"),
     "NounPracticeStep": (".noun_practice", "NounPracticeStep"),
     "PersistContentStep": (".persist_content", "PersistContentStep"),
     "PipelineGadgets": (".pipeline_gadgets", "PipelineGadgets"),
@@ -60,9 +65,11 @@ _EXPORTS: dict[str, tuple[str, str]] = {
 def _build_pipeline() -> list[PipelineStep]:
     return [
         __getattr__("RetrieveLessonMaterialStep")(),
+        __getattr__("NarrativeGeneratorStep")(),
+        __getattr__("ExtractNarrativeVocabStep")(),
         __getattr__("SelectVocabStep")(),
         __getattr__("GrammarSelectStep")(),
-        __getattr__("GenerateSentencesStep")(),
+        __getattr__("NarrativeGrammarStep")(),
         __getattr__("ReviewSentencesStep")(),
         __getattr__("NounPracticeStep")(),
         __getattr__("VerbPracticeStep")(),
@@ -126,10 +133,13 @@ def __dir__() -> list[str]:
 __all__ = [
     "CompileAssetsStep",
     "CompileTouchesStep",
+    "ExtractNarrativeVocabStep",
     "GenerateSentencesStep",
     "GrammarSelectStep",
     "LessonConfig",
     "LessonContext",
+    "NarrativeGeneratorStep",
+    "NarrativeGrammarStep",
     "NounPracticeStep",
     "PersistContentStep",
     "PIPELINE",

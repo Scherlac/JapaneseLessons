@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from jlesson.models import GeneralItem, Phase
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_llm import ask_llm
+from .pipeline_gadgets import PipelineGadgets
 
 
 class NounPracticeStep(PipelineStep):
@@ -17,7 +17,7 @@ class NounPracticeStep(PipelineStep):
             return ctx
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
         noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
-        result = ask_llm(
+        result = PipelineGadgets.ask_llm(
             ctx,
             ctx.language_config.prompts.build_noun_practice_prompt(noun_items, lesson_number),
         )

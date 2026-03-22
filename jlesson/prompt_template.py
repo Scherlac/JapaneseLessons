@@ -392,6 +392,7 @@ def build_grammar_select_prompt(
     available_verbs: list[GeneralItem],
     lesson_number: int,
     covered_grammar_ids: list[str],
+    selection_count: int = 2,
 ) -> str:
     """Level-1 grammar prompt: ask the LLM which grammar point to teach next.
 
@@ -430,7 +431,7 @@ UNLOCKED GRAMMAR STEPS (prerequisites met, not yet taught):
 {grammar_lines}
 
 TASK:
-Select 1 OR 2 grammar IDs from the unlocked list that are:
+Select between 1 and {selection_count} grammar IDs from the unlocked list that are:
 1. Appropriate difficulty for lesson {lesson_number} (prefer lower level first)
 2. Compatible with the available vocabulary (can form natural practice sentences)
 3. If this is an early lesson, prefer level-1 steps before level-2
@@ -439,6 +440,90 @@ Return ONLY a raw JSON object — no markdown fences, no commentary:
 {{
   "selected_ids": ["<id1>"],
   "rationale": "One sentence explaining why these grammar points were chosen."
+}}
+""".strip()
+
+
+def build_narrative_generator_prompt(
+        theme: str,
+        lesson_number: int,
+        lesson_blocks: int,
+        source_language_label: str,
+        seed_blocks: list[str] | None = None,
+) -> str:
+        seed_lines = "\n".join(
+                f"  - Block {index}: {text}"
+                for index, text in enumerate(seed_blocks or [], 1)
+                if text.strip()
+        ) or "  (none)"
+
+        return f"""\
+You are a curriculum writer planning a beginner-friendly lesson narrative.
+
+THEME:
+    {theme}
+
+LESSON NUMBER:
+    {lesson_number}
+
+TARGET BLOCK COUNT:
+    {lesson_blocks}
+
+WRITE THE BLOCK NARRATIVE IN:
+    {source_language_label}
+
+OPTIONAL USER-PROVIDED SEED BLOCKS:
+{seed_lines}
+
+TASK:
+Create a narrative progression with {lesson_blocks} blocks.
+Each block should be 2-4 short sentences of story context.
+Keep the overall situation coherent, but make each block meaningfully different.
+The progression should stay concrete and beginner-friendly.
+
+Return ONLY a raw JSON object:
+{{
+    "blocks": [
+        {{"index": 1, "narrative": "..."}}
+    ]
+}}
+""".strip()
+
+
+def build_narrative_vocab_extract_prompt(
+        narrative_blocks: list[str],
+        source_language_label: str,
+        nouns_per_block: int,
+        verbs_per_block: int,
+) -> str:
+        block_lines = "\n".join(
+                f"  [{index}] {text}"
+                for index, text in enumerate(narrative_blocks, 1)
+        )
+
+        return f"""\
+You are extracting teachable vocabulary from story blocks.
+
+SOURCE LANGUAGE OF THE STORY:
+    {source_language_label}
+
+BLOCKS:
+{block_lines}
+
+TASK:
+For each block, extract up to {nouns_per_block} concrete noun phrases and up to {verbs_per_block} verb phrases.
+Return the terms in their plain dictionary form in the source language.
+Prefer words that are central to the block and teachable for beginners.
+
+Return ONLY a raw JSON object:
+{{
+    "blocks": [
+        {{
+            "index": 1,
+            "nouns": ["..."],
+            "verbs": ["..."]
+        }}
+    ]
 }}
 """.strip()
 
@@ -992,6 +1077,7 @@ def hungarian_build_grammar_select_prompt(
     available_verbs: list[GeneralItem],
     lesson_number: int,
     covered_grammar_ids: list[str],
+    selection_count: int = 2,
 ) -> str:
     """Ask the LLM which Hungarian→English grammar point to teach next.
 
@@ -1027,7 +1113,7 @@ UNLOCKED GRAMMAR STEPS (prerequisites met, not yet taught):
 {grammar_lines}
 
 TASK:
-Select 1 OR 2 grammar IDs from the unlocked list that are:
+Select between 1 and {selection_count} grammar IDs from the unlocked list that are:
 1. Appropriate difficulty for lesson {lesson_number} (prefer lower level first)
 2. Compatible with the available vocabulary (can form natural practice sentences)
 3. If this is an early lesson, prefer level-1 steps before level-2
@@ -1242,8 +1328,30 @@ class PromptInterface(ABC):
         available_verbs: list[GeneralItem],
         lesson_number: int,
         covered_grammar_ids: list[str],
+        selection_count: int = 2,
     ) -> str:
         """Build prompt for selecting grammar points."""
+        ...
+
+    @abstractmethod
+    def build_narrative_generator_prompt(
+        self,
+        theme: str,
+        lesson_number: int,
+        lesson_blocks: int,
+        seed_blocks: list[str] | None = None,
+    ) -> str:
+        """Build prompt for generating a block-by-block narrative progression."""
+        ...
+
+    @abstractmethod
+    def build_narrative_vocab_extract_prompt(
+        self,
+        narrative_blocks: list[str],
+        nouns_per_block: int,
+        verbs_per_block: int,
+    ) -> str:
+        """Build prompt for extracting key vocabulary targets from narrative blocks."""
         ...
 
     @abstractmethod
@@ -1299,9 +1407,43 @@ class EngJapPrompts(PromptInterface):
         available_verbs: list[GeneralItem],
         lesson_number: int,
         covered_grammar_ids: list[str],
+        selection_count: int = 2,
     ) -> str:
         return build_grammar_select_prompt(
-            unlocked_grammar, available_nouns, available_verbs, lesson_number, covered_grammar_ids
+            unlocked_grammar,
+            available_nouns,
+            available_verbs,
+            lesson_number,
+            covered_grammar_ids,
+            selection_count,
+        )
+
+    def build_narrative_generator_prompt(
+        self,
+        theme: str,
+        lesson_number: int,
+        lesson_blocks: int,
+        seed_blocks: list[str] | None = None,
+    ) -> str:
+        return build_narrative_generator_prompt(
+            theme,
+            lesson_number,
+            lesson_blocks,
+            source_language_label="English",
+            seed_blocks=seed_blocks,
+        )
+
+    def build_narrative_vocab_extract_prompt(
+        self,
+        narrative_blocks: list[str],
+        nouns_per_block: int,
+        verbs_per_block: int,
+    ) -> str:
+        return build_narrative_vocab_extract_prompt(
+            narrative_blocks,
+            source_language_label="English",
+            nouns_per_block=nouns_per_block,
+            verbs_per_block=verbs_per_block,
         )
 
     def build_grammar_generate_prompt(
@@ -1356,9 +1498,43 @@ class HunEngPrompts(PromptInterface):
         available_verbs: list[GeneralItem],
         lesson_number: int,
         covered_grammar_ids: list[str],
+        selection_count: int = 2,
     ) -> str:
         return hungarian_build_grammar_select_prompt(
-            unlocked_grammar, available_nouns, available_verbs, lesson_number, covered_grammar_ids
+            unlocked_grammar,
+            available_nouns,
+            available_verbs,
+            lesson_number,
+            covered_grammar_ids,
+            selection_count,
+        )
+
+    def build_narrative_generator_prompt(
+        self,
+        theme: str,
+        lesson_number: int,
+        lesson_blocks: int,
+        seed_blocks: list[str] | None = None,
+    ) -> str:
+        return build_narrative_generator_prompt(
+            theme,
+            lesson_number,
+            lesson_blocks,
+            source_language_label="Hungarian",
+            seed_blocks=seed_blocks,
+        )
+
+    def build_narrative_vocab_extract_prompt(
+        self,
+        narrative_blocks: list[str],
+        nouns_per_block: int,
+        verbs_per_block: int,
+    ) -> str:
+        return build_narrative_vocab_extract_prompt(
+            narrative_blocks,
+            source_language_label="Hungarian",
+            nouns_per_block=nouns_per_block,
+            verbs_per_block=verbs_per_block,
         )
 
     def build_grammar_generate_prompt(
