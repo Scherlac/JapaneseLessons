@@ -5,7 +5,7 @@ import json
 import pytest
 
 from jlesson.lesson_store import load_lesson_content, save_lesson_content
-from jlesson.models import LessonContent, NounItem, Sentence, VerbItem, GeneralItem, PartialItem
+from jlesson.models import LessonContent, NounItem, Sentence, VerbItem, GeneralItem, PartialItem, Phase
 
 
 @pytest.fixture()
@@ -16,12 +16,12 @@ def sample_content() -> LessonContent:
         grammar_ids=["action_present_affirmative"],
         words=[
             GeneralItem(
-                item_type="noun",
+                phase=Phase.NOUNS,
                 source=PartialItem(display_text="water", extra={"english": "water"}),
                 target=PartialItem(display_text="みず", pronunciation="mizu", extra={"kanji": "水", "japanese": "みず", "romaji": "mizu", "example_sentence_jp": "水を飲みます。", "example_sentence_en": "I drink water.", "memory_tip": "Sounds like 'mizu'."}),
             ),
             GeneralItem(
-                item_type="verb",
+                phase=Phase.VERBS,
                 source=PartialItem(display_text="to drink", extra={"english": "to drink"}),
                 target=PartialItem(display_text="のむ", pronunciation="nomu", extra={"kanji": "飲む", "japanese": "のむ", "romaji": "nomu", "masu_form": "飲みます", "polite_forms": {"present_aff": "飲みます", "present_neg": "飲みません", "past_aff": "飲みました", "past_neg": "飲みませんでした"}, "memory_tip": "Rhymes with 'nome' in Italian."}),
             ),
@@ -29,6 +29,7 @@ def sample_content() -> LessonContent:
         sentences=[
             Sentence(
                 grammar_id="action_present_affirmative",
+                phase=Phase.GRAMMAR,
                 source=PartialItem(display_text="I drink water.", extra={"english": "I drink water."}),
                 target=PartialItem(display_text="私は水を飲みます。", pronunciation="watashi wa mizu wo nomimasu", extra={"japanese": "私は水を飲みます。", "romaji": "watashi wa mizu wo nomimasu"}),
                 grammar_parameters={"person": "I"},

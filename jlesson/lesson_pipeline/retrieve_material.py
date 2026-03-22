@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from jlesson.retrieval import get_retrieval_service
+from jlesson.models import Phase
 from .pipeline_core import LessonContext, LessonConfig, PipelineStep
 
 if TYPE_CHECKING:
@@ -101,17 +102,19 @@ class RetrieveLessonMaterialStep(PipelineStep):
                 for item in ctx.nouns
             ]
             for item in ctx.noun_items:
-                item.item_type = "noun"
+                item.phase = Phase.NOUNS
             ctx.verb_items = [
                 ctx.language_config.generator.convert_raw_verb(item)
                 for item in ctx.verbs
             ]
             for item in ctx.verb_items:
-                item.item_type = "verb"
+                item.phase = Phase.VERBS
             ctx.sentences = [
                 ctx.language_config.generator.convert_sentence(item)
                 for item in result.material.sentences
             ]
+            for item in ctx.sentences:
+                item.phase = Phase.GRAMMAR
             grammar_map = {
                 grammar.id: grammar for grammar in ctx.language_config.grammar_progression
             }

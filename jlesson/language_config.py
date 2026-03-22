@@ -18,12 +18,13 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from dataclasses import dataclass, field
 from typing import Any
 
 from jlesson.video import tts_engine
+from jlesson.item_generator import ItemGenerator
 
 
 @dataclass
@@ -151,10 +152,10 @@ class LanguageConfig:
     field_map: FieldMap = field(default_factory=lambda: FieldMap(source="", target=""))
 
     # ── Item generator ────────────────────────────────────────────────────
-    generator: Any = None  # ItemGenerator instance
+    generator: Optional[ItemGenerator] = None
 
-    # ── Prompt builders ────────────────────────────────────────────────────
-    prompts: PromptInterface = None
+    # ── Prompt builders ───────────────────────────────────────────────────
+    prompts: Optional[PromptInterface] = None
 
 
 # ── Pre-built configs ─────────────────────────────────────────────────────────

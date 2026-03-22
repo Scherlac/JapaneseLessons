@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from jlesson.models import GeneralItem
+from jlesson.models import GeneralItem, Phase
 from .pipeline_core import LessonContext, PipelineStep
 from .pipeline_llm import ask_llm
 
@@ -33,7 +33,7 @@ class VerbPracticeStep(PipelineStep):
             for verb_source in ctx.verbs:
                 ctx.verb_items.append(ctx.language_config.generator.convert_raw_verb(verb_source))
         for index, item in enumerate(ctx.verb_items):
-            item.item_type = "verb"
+            item.phase = Phase.VERBS
             item.block_index = index // max(1, ctx.config.num_verbs) + 1
         self._log(ctx, f"       {len(ctx.verb_items)} verb items")
         if ctx.language_config.code == "hun-eng":

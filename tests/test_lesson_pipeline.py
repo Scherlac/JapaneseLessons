@@ -1310,8 +1310,8 @@ def test_run_pipeline_uses_retrieval_hit_and_skips_vocab(config, tmp_path):
     assert ctx.retrieval_result.used_retrieval is True
     assert [noun["english"] for noun in ctx.nouns] == ["water", "bread"]
     assert [verb["english"] for verb in ctx.verbs] == ["to eat", "to drink"]
-    assert [item.item_type for item in ctx.noun_items] == ["noun", "noun"]
-    assert [item.item_type for item in ctx.verb_items] == ["verb", "verb"]
+    assert [item.phase for item in ctx.noun_items] == [Phase.NOUNS, Phase.NOUNS]
+    assert [item.phase for item in ctx.verb_items] == [Phase.VERBS, Phase.VERBS]
 
 
 def test_run_pipeline_retrieval_miss_falls_back_to_vocab(config, tmp_path):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from jlesson.models import GeneralItem
+from jlesson.models import GeneralItem, Phase
 from .pipeline_core import LessonContext, PipelineStep
 from .pipeline_llm import ask_llm
 
@@ -33,7 +33,7 @@ class NounPracticeStep(PipelineStep):
             for noun_source in ctx.nouns:
                 ctx.noun_items.append(ctx.language_config.generator.convert_raw_noun(noun_source))
         for index, item in enumerate(ctx.noun_items):
-            item.item_type = "noun"
+            item.phase = Phase.NOUNS
             item.block_index = index // max(1, ctx.config.num_nouns) + 1
         self._log(ctx, f"       {len(ctx.noun_items)} noun items")
         if ctx.language_config.code == "hun-eng":

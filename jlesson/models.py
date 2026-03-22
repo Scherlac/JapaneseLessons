@@ -58,9 +58,29 @@ class GeneralItem(_NullStrCoerce):
     """
     source: PartialItem = Field(default_factory=PartialItem)
     target: PartialItem = Field(default_factory=PartialItem)
+    assets: dict[str, Path] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional arbitrary metadata from the LLM, preserved for flexibility.")
     block_index: int = 1
-    phase: Phase | None = None  # Added for compilation pipeline
-    item_type: str = ""  # "noun", "verb", "sentence"
+    phase: Phase | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_legacy_item_type(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        if data.get("phase"):
+            return data
+        legacy_item_type = data.get("item_type")
+        legacy_phase_map = {
+            "noun": "nouns",
+            "verb": "verbs",
+            "sentence": "grammar",
+        }
+        if isinstance(legacy_item_type, str):
+            legacy_phase = legacy_phase_map.get(legacy_item_type.strip().lower())
+            if legacy_phase:
+                data["phase"] = legacy_phase
+        return data
 
 
 class NounItem(GeneralItem):
@@ -138,12 +158,12 @@ class LessonContent(BaseModel):
     @property
     def noun_items(self) -> list[GeneralItem]:
         """Nouns from the words list."""
-        return [w for w in self.words if w.item_type == "noun"]
+        return [w for w in self.words if w.phase == Phase.NOUNS]
 
     @property
     def verb_items(self) -> list[GeneralItem]:
         """Verbs from the words list."""
-        return [w for w in self.words if w.item_type == "verb"]
+        return [w for w in self.words if w.phase == Phase.VERBS]
 
 
 # ---------------------------------------------------------------------------

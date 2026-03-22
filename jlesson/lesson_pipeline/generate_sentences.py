@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from jlesson.models import Sentence
+from jlesson.models import Phase, Sentence
 from .pipeline_core import LessonContext, PipelineStep
 from .pipeline_grammar import coerce_grammar_items
 from .pipeline_llm import ask_llm
@@ -50,6 +50,7 @@ class GenerateSentencesStep(PipelineStep):
             for sentence_source in result.get("sentences", []):
                 sentence = ctx.language_config.generator.convert_sentence(sentence_source)
                 sentence.block_index = block_index + 1
+                sentence.phase = Phase.GRAMMAR
                 ctx.sentences.append(sentence)
         self._log(ctx, f"       {len(ctx.sentences)} sentences")
         if narrative:
