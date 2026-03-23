@@ -10,18 +10,22 @@ class NounPracticeStep(PipelineStep):
 
     name = "noun_practice"
     description = "LLM: enrich nouns with examples + memory tips"
+    BATCH_SIZE = 25
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         if ctx.noun_items:
             self._log(ctx, "       using retrieved noun items")
             return ctx
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
-        noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
-        result = PipelineGadgets.ask_llm(
-            ctx,
-            ctx.language_config.prompts.build_noun_practice_prompt(noun_items, lesson_number),
-        )
-        raw_items = result.get("noun_items", [])
+        noun_items_all = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
+        raw_items: list[dict] = []
+        for batch_start in range(0, len(noun_items_all), self.BATCH_SIZE):
+            batch = noun_items_all[batch_start : batch_start + self.BATCH_SIZE]
+            result = PipelineGadgets.ask_llm(
+                ctx,
+                ctx.language_config.prompts.build_noun_practice_prompt(batch, lesson_number),
+            )
+            raw_items.extend(result.get("noun_items", []))
         ctx.noun_items = []
         for noun_item in raw_items:
             source_item = next((n for n in ctx.nouns if n["english"] == noun_item["english"]), None)

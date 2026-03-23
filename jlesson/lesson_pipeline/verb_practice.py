@@ -10,18 +10,22 @@ class VerbPracticeStep(PipelineStep):
 
     name = "verb_practice"
     description = "LLM: enrich verbs with conjugations + memory tips"
+    BATCH_SIZE = 20
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         if ctx.verb_items:
             self._log(ctx, "       using retrieved verb items")
             return ctx
         lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
-        verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
-        result = PipelineGadgets.ask_llm(
-            ctx,
-            ctx.language_config.prompts.build_verb_practice_prompt(verb_items, lesson_number),
-        )
-        raw_items = result.get("verb_items", [])
+        verb_items_all = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
+        raw_items: list[dict] = []
+        for batch_start in range(0, len(verb_items_all), self.BATCH_SIZE):
+            batch = verb_items_all[batch_start : batch_start + self.BATCH_SIZE]
+            result = PipelineGadgets.ask_llm(
+                ctx,
+                ctx.language_config.prompts.build_verb_practice_prompt(batch, lesson_number),
+            )
+            raw_items.extend(result.get("verb_items", []))
         ctx.verb_items = []
         for verb_item in raw_items:
             source_item = next((v for v in ctx.verbs if v["english"] == verb_item["english"]), None)
