@@ -1019,6 +1019,52 @@ Now generate the complete JSON for theme "{theme}" with {num_nouns} nouns and {n
 """.strip()
 
 
+def hungarian_build_narrative_vocab_generate_prompt(
+    nouns: list[str],
+    verbs: list[str],
+    theme: str,
+) -> str:
+    """Build a prompt to generate Hungarian-English vocab entries for narrative terms.
+
+    The LLM returns a vocab JSON with exactly the requested nouns and verbs in the
+    hun-eng schema (english + hungarian + pronunciation for nouns; + past_tense for verbs).
+
+    Returns JSON matching the hun-eng vocab schema.
+    Use with ask_llm_json_free().
+    """
+    noun_lines = "\n".join(f"  {i + 1}. {n}" for i, n in enumerate(nouns))
+    verb_lines = "\n".join(f"  {i + 1}. {v}" for i, v in enumerate(verbs))
+    total = len(nouns) + len(verbs)
+    return f"""\
+You are an English language expert building vocabulary for a Hungarian children's lesson about "{theme}".
+
+Provide Hungarian translations and English pronunciations for the following English words.
+
+NOUNS ({len(nouns)}):
+{noun_lines}
+
+VERBS ({len(verbs)}):
+{verb_lines}
+
+Rules:
+- Output exactly {total} entries — one per word above, in the same order.
+- Each noun entry must have: english, hungarian, pronunciation (English IPA).
+- Each verb entry must have: english, hungarian, pronunciation (English IPA),
+  past_tense (the irregular or regular English past tense form, e.g. "loved" or "went").
+- Use beginner-appropriate vocabulary suitable for children aged 8-12.
+- Output ONLY a raw JSON object in this exact schema:
+{{
+  "theme": "{theme}",
+  "nouns": [
+    {{"english": "...", "hungarian": "...", "pronunciation": "..."}}
+  ],
+  "verbs": [
+    {{"english": "...", "hungarian": "...", "pronunciation": "...", "past_tense": "..."}}
+  ]
+}}
+""".strip()
+
+
 def hungarian_build_noun_practice_prompt(
     nouns: list[GeneralItem],
     lesson_number: int = 1,
@@ -1607,8 +1653,7 @@ class HunEngPrompts(PromptInterface):
         verbs: list[str],
         theme: str,
     ) -> str:
-        # Hungarian lessons reuse the same generic prompt — terms are already in English
-        return build_narrative_vocab_generate_prompt(nouns, verbs, theme)
+        return hungarian_build_narrative_vocab_generate_prompt(nouns, verbs, theme)
 
     def build_grammar_generate_prompt(
         self,

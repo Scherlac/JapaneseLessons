@@ -162,12 +162,36 @@ ACTIVE_FLASH_CARDS = Profile(
 
 
 # ---------------------------------------------------------------------------
+# Profile: Simple Listen  (1× source language, 1× target language)
+# ---------------------------------------------------------------------------
+
+_SIMPLE_LISTEN_CYCLE = [
+    RepetitionStep(touch_type=TouchType.LISTEN_DUAL_F, intent=TouchIntent.INTRODUCE),
+]
+
+SIMPLE_LISTEN = Profile(
+    name="simple_listen",
+    cycles={
+        Phase.NOUNS: _SIMPLE_LISTEN_CYCLE,
+        Phase.VERBS: _SIMPLE_LISTEN_CYCLE,
+        Phase.GRAMMAR: _SIMPLE_LISTEN_CYCLE,
+    },
+    batch_sizes={
+        Phase.NOUNS: 4,
+        Phase.VERBS: 4,
+        Phase.GRAMMAR: 6,
+    },
+)
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
 PROFILES: dict[str, Profile] = {
     PASSIVE_VIDEO.name: PASSIVE_VIDEO,
     ACTIVE_FLASH_CARDS.name: ACTIVE_FLASH_CARDS,
+    SIMPLE_LISTEN.name: SIMPLE_LISTEN,
 }
 
 

@@ -5,10 +5,11 @@ from .pipeline_gadgets import PipelineGadgets
 
 
 class GenerateNarrativeVocabStep(PipelineStep):
-    """Generate full Japanese vocab entries for terms extracted from the narrative."""
+    """Generate full vocab entries for terms extracted from the narrative."""
 
     name = "generate_narrative_vocab"
-    description = "LLM: generate Japanese vocab from narrative terms"
+    description = "LLM: generate vocab from narrative terms"
+    BATCH_SIZE = 60
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         if ctx.vocab:
@@ -34,15 +35,41 @@ class GenerateNarrativeVocabStep(PipelineStep):
                     all_verbs.append(term)
                     seen_verbs.add(key)
 
-        prompt = ctx.language_config.prompts.build_narrative_vocab_generate_prompt(
-            nouns=all_nouns,
-            verbs=all_verbs,
-            theme=ctx.config.theme,
+        # Determine target-language field name from the vocab schema.
+        # For eng-jap: vocab_noun_fields = {"english","japanese","kanji","romaji"} → "japanese"
+        # For hun-eng: vocab_noun_fields = {"english","hungarian","pronunciation"}  → "hungarian"
+        _aux = {"english", "pronunciation", "kanji", "romaji"}
+        target_field = next(
+            (f for f in ctx.language_config.vocab_noun_fields if f not in _aux),
+            "english",
         )
-        result = PipelineGadgets.ask_llm(ctx, prompt)
 
-        nouns = [n for n in result.get("nouns", []) if isinstance(n, dict) and n.get("english") and n.get("japanese")]
-        verbs = [v for v in result.get("verbs", []) if isinstance(v, dict) and v.get("english") and v.get("japanese")]
+        nouns: list[dict] = []
+        verbs: list[dict] = []
+
+        # Send nouns and verbs in paired batches so no single call is too large.
+        max_batches = max(
+            (len(all_nouns) + self.BATCH_SIZE - 1) // self.BATCH_SIZE,
+            (len(all_verbs) + self.BATCH_SIZE - 1) // self.BATCH_SIZE,
+            1,
+        )
+        for i in range(max_batches):
+            noun_batch = all_nouns[i * self.BATCH_SIZE : (i + 1) * self.BATCH_SIZE]
+            verb_batch = all_verbs[i * self.BATCH_SIZE : (i + 1) * self.BATCH_SIZE]
+            prompt = ctx.language_config.prompts.build_narrative_vocab_generate_prompt(
+                nouns=noun_batch,
+                verbs=verb_batch,
+                theme=ctx.config.theme,
+            )
+            result = PipelineGadgets.ask_llm(ctx, prompt)
+            nouns.extend(
+                n for n in result.get("nouns", [])
+                if isinstance(n, dict) and n.get("english") and n.get(target_field)
+            )
+            verbs.extend(
+                v for v in result.get("verbs", [])
+                if isinstance(v, dict) and v.get("english") and v.get(target_field)
+            )
 
         ctx.vocab = {
             "theme": ctx.config.theme,
