@@ -293,7 +293,7 @@ def lesson() -> None:
     "--profile",
     default="passive_video",
     show_default=True,
-    type=click.Choice(["passive_video", "active_flash_cards"]),
+    type=click.Choice(["passive_video", "active_flash_cards", "simple_listen"]),
     help="Touch profile for asset compilation and video rendering.",
 )
 @click.option(
@@ -422,7 +422,7 @@ def lesson_next(
     "--profile",
     default="passive_video",
     show_default=True,
-    type=click.Choice(["passive_video", "active_flash_cards"]),
+    type=click.Choice(["passive_video", "active_flash_cards", "simple_listen"]),
     help="Touch profile used to compile assets and render video.",
 )
 @LANGUAGE_OPTION
