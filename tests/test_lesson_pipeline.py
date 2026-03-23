@@ -177,7 +177,8 @@ def test_grammar_select_skips_unknown_ids(ctx):
     mock_result = {"selected_ids": ["nonexistent_grammar_id"]}
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_result):
         ctx = GrammarSelectStep().execute(ctx)
-    assert len(ctx.selected_grammar) == 0
+    # Unknown IDs are skipped, but the chain is still filled programmatically
+    assert all(g["id"] != "nonexistent_grammar_id" for g in ctx.selected_grammar)
 
 
 # ---------------------------------------------------------------------------

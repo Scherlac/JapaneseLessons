@@ -24,24 +24,19 @@ class GrammarSelectStep(PipelineStep):
         noun_items = [lang_cfg.generator.convert_raw_noun(n) for n in ctx.nouns]
         verb_items = [lang_cfg.generator.convert_raw_verb(v) for v in ctx.verbs]
 
-        # For multi-block lessons, project ahead: grammar covered in early blocks
-        # unlocks dependents for later blocks within the same lesson.
-        window = max(1, ctx.config.grammar_points_per_block)
-        needed = window + max(ctx.config.lesson_blocks - 1, 0)
-        effective_count = max(ctx.config.grammar_points_per_lesson, needed)
-        projected = self._project_grammar(progression, covered, effective_count)
-
+        # Ask LLM to pick only the starting grammar points from currently-unlocked items.
+        unlocked = self._project_grammar(progression, covered, ctx.config.grammar_points_per_lesson)
         prompt = lang_cfg.prompts.build_grammar_select_prompt(
-            projected,
+            unlocked,
             noun_items,
             verb_items,
             lesson_number,
             covered_grammar_ids=covered,
-            selection_count=effective_count,
+            selection_count=ctx.config.grammar_points_per_lesson,
         )
         result = PipelineGadgets.ask_llm(ctx, prompt)
         selected_ids: list[str] = result.get("selected_ids") or [
-            g.id for g in projected[:effective_count]
+            g.id for g in unlocked[: ctx.config.grammar_points_per_lesson]
         ]
         ctx.selected_grammar = []
         for selected_id in selected_ids:
@@ -51,6 +46,20 @@ class GrammarSelectStep(PipelineStep):
                 self._log(
                     ctx, f"       Warning: unknown grammar id {selected_id!r}, skipping"
                 )
+
+        # For multi-block lessons, extend the grammar chain programmatically so
+        # each block can introduce new grammar points instead of repeating the same ones.
+        window = max(1, ctx.config.grammar_points_per_block)
+        needed = window + max(ctx.config.lesson_blocks - 1, 0)
+        if len(ctx.selected_grammar) < needed:
+            selected_ids_set = {grammar_id(g) for g in ctx.selected_grammar}
+            already_covered = list(covered) + list(selected_ids_set)
+            additional = self._project_grammar(progression, already_covered, needed)
+            for g in additional:
+                if g.id not in selected_ids_set:
+                    ctx.selected_grammar.append(g.model_dump())
+                    selected_ids_set.add(g.id)
+
         ctx.selected_grammar_blocks = self._build_block_progression(ctx)
         self._log(
             ctx,

@@ -12,6 +12,7 @@ class ReviewSentencesStep(PipelineStep):
     description = "LLM: review sentence naturalness + rewrite"
 
     NATURALNESS_THRESHOLD = 3
+    BATCH_SIZE = 30  # max sentences per LLM call
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         if not ctx.sentences:
@@ -25,16 +26,24 @@ class ReviewSentencesStep(PipelineStep):
         noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
         verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
 
-        prompt = ctx.language_config.prompts.build_sentence_review_prompt(
-            ctx.sentences,
-            noun_items,
-            verb_items,
-            coerce_grammar_items(ctx.selected_grammar),
-        )
-        result = PipelineGadgets.ask_llm(ctx, prompt)
-        reviews = result.get("reviews", [])
+        all_reviews: list[dict] = []
+        for batch_start in range(0, len(ctx.sentences), self.BATCH_SIZE):
+            batch = ctx.sentences[batch_start: batch_start + self.BATCH_SIZE]
+            prompt = ctx.language_config.prompts.build_sentence_review_prompt(
+                batch,
+                noun_items,
+                verb_items,
+                coerce_grammar_items(ctx.selected_grammar),
+            )
+            result = PipelineGadgets.ask_llm(ctx, prompt)
+            for review in result.get("reviews", []):
+                # Offset review index back to global sentence index
+                if isinstance(review.get("index"), int):
+                    review = dict(review, index=review["index"] + batch_start)
+                all_reviews.append(review)
+
         revised_count = 0
-        for review in reviews:
+        for review in all_reviews:
             idx = review.get("index")
             score = review.get("score", 5)
             revised = review.get("revised_sentence")
@@ -56,7 +65,10 @@ class ReviewSentencesStep(PipelineStep):
                     f"       [{idx}] score {score} - revised: {original_en!r}",
                 )
 
-        overall = result.get("overall_naturalness", "?")
+        overall = "?"
+        if all_reviews:
+            scores = [r.get("score", 5) for r in all_reviews if isinstance(r.get("score"), (int, float))]
+            overall = f"{sum(scores) / len(scores):.1f}" if scores else "?"
         self._log(
             ctx,
             f"       {len(ctx.sentences)} sentences reviewed "
@@ -66,7 +78,7 @@ class ReviewSentencesStep(PipelineStep):
         if revised_count > 0:
             ctx.report.add(
                 "review_notes",
-                self._review_section(reviews, revised_count),
+                self._review_section(all_reviews, revised_count),
             )
         return ctx
 
