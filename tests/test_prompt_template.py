@@ -19,7 +19,7 @@ import pytest
 
 from jlesson.curriculum import GRAMMAR_PROGRESSION
 from jlesson.item_generator import EngJapItemGenerator
-from jlesson.models import GrammarItem, Sentence, TextSegment
+from jlesson.models import GrammarItem, PartialItem as TextSegment, Sentence
 from jlesson.prompt_template import (
     build_content_validate_prompt,
     build_grammar_generate_prompt,
@@ -59,8 +59,7 @@ def sample_verbs():
 
 @pytest.fixture
 def level1_grammar():
-    raw = [g for g in GRAMMAR_PROGRESSION if g["level"] == 1]
-    return [GrammarItem(**g) for g in raw]
+    return [g for g in GRAMMAR_PROGRESSION if g.level == 1]
 
 
 @pytest.fixture
@@ -82,12 +81,12 @@ class TestBuildNounPracticePrompt:
     def test_contains_each_noun_english(self, sample_nouns):
         prompt = build_noun_practice_prompt(sample_nouns)
         for noun in sample_nouns:
-            assert noun["english"] in prompt
+            assert noun.source.display_text in prompt
 
     def test_contains_each_noun_kanji(self, sample_nouns):
         prompt = build_noun_practice_prompt(sample_nouns)
         for noun in sample_nouns:
-            assert noun["kanji"] in prompt
+            assert noun.target.extra["kanji"] in prompt
 
     def test_contains_lesson_number(self, sample_nouns):
         prompt = build_noun_practice_prompt(sample_nouns, lesson_number=5)
@@ -118,12 +117,12 @@ class TestBuildVerbPracticePrompt:
     def test_contains_each_verb_english(self, sample_verbs):
         prompt = build_verb_practice_prompt(sample_verbs)
         for verb in sample_verbs:
-            assert verb["english"] in prompt
+            assert verb.source.display_text in prompt
 
     def test_contains_each_verb_masu_form(self, sample_verbs):
         prompt = build_verb_practice_prompt(sample_verbs)
         for verb in sample_verbs:
-            assert verb["masu_form"] in prompt
+            assert verb.target.extra["masu_form"] in prompt
 
     def test_json_skeleton_has_verb_items_key(self, sample_verbs):
         prompt = build_verb_practice_prompt(sample_verbs)
@@ -166,7 +165,7 @@ class TestBuildGrammarSelectPrompt:
             covered_grammar_ids=[],
         )
         for g in level1_grammar:
-            assert g["id"] in prompt
+            assert g.id in prompt
 
     def test_contains_noun_names(self, level1_grammar, sample_nouns, sample_verbs):
         prompt = build_grammar_select_prompt(
@@ -177,7 +176,7 @@ class TestBuildGrammarSelectPrompt:
             covered_grammar_ids=[],
         )
         for noun in sample_nouns:
-            assert noun["english"] in prompt
+            assert noun.source.display_text in prompt
 
     def test_contains_verb_names(self, level1_grammar, sample_nouns, sample_verbs):
         prompt = build_grammar_select_prompt(
@@ -188,7 +187,7 @@ class TestBuildGrammarSelectPrompt:
             covered_grammar_ids=[],
         )
         for verb in sample_verbs:
-            assert verb["english"] in prompt
+            assert verb.source.display_text in prompt
 
     def test_shows_covered_grammar_ids(self, level1_grammar, sample_nouns, sample_verbs):
         prompt = build_grammar_select_prompt(
@@ -240,7 +239,7 @@ class TestBuildGrammarGeneratePrompt:
             nouns=sample_nouns,
             verbs=sample_verbs,
         )
-        assert level1_grammar[0]["structure"] in prompt
+        assert level1_grammar[0].pattern in prompt
 
     def test_contains_noun_kanji(self, level1_grammar, sample_nouns, sample_verbs):
         prompt = build_grammar_generate_prompt(
@@ -249,7 +248,7 @@ class TestBuildGrammarGeneratePrompt:
             verbs=sample_verbs,
         )
         for noun in sample_nouns:
-            assert noun["kanji"] in prompt
+            assert noun.target.extra["kanji"] in prompt
 
     def test_contains_person_names(self, level1_grammar, sample_nouns, sample_verbs):
         persons = [("I", "私", "watashi"), ("You", "あなた", "anata")]
@@ -390,27 +389,27 @@ class TestBuildSentenceReviewPrompt:
     def test_contains_each_sentence_japanese(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
         prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
         for s in review_sentences:
-            assert s["japanese"] in prompt
+            assert s.target.display_text in prompt
 
     def test_contains_each_sentence_english(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
         prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
         for s in review_sentences:
-            assert s["english"] in prompt
+            assert s.source.display_text in prompt
 
     def test_contains_grammar_ids(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
         prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
         for g in sample_grammar_specs:
-            assert g["id"] in prompt
+            assert g.id in prompt
 
     def test_contains_noun_names(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
         prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
         for noun in sample_nouns:
-            assert noun["english"] in prompt
+            assert noun.source.display_text in prompt
 
     def test_contains_verb_names(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
         prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)
         for verb in sample_verbs:
-            assert verb["english"] in prompt
+            assert verb.source.display_text in prompt
 
     def test_contains_grammar_structure(self, review_sentences, sample_nouns, sample_verbs, sample_grammar_specs):
         prompt = build_sentence_review_prompt(review_sentences, sample_nouns, sample_verbs, sample_grammar_specs)

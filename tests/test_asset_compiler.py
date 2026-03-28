@@ -10,7 +10,9 @@ from jlesson.asset_compiler import (
     compile_assets,
     compile_assets_sync,
 )
+from jlesson.language_config import get_language_config
 from jlesson.lesson_pipeline import StepInfo
+from jlesson.models import GeneralItem, PartialItem, Sentence
 
 ENG_JAP = get_language_config("eng-jap")
 HUN_ENG = get_language_config("hun-eng")

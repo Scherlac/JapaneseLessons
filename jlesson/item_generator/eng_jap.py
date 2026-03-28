@@ -63,15 +63,23 @@ class EngJapItemGenerator(ItemGenerator):
     def convert_raw_noun(self, source_item: dict) -> GeneralItem:
         return GeneralItem(
             source=PartialItem(display_text=source_item["english"]),
-            target=PartialItem(display_text=source_item["japanese"], pronunciation=source_item["romaji"])
+            target=PartialItem(
+                display_text=source_item.get("japanese", ""),
+                pronunciation=source_item.get("romaji", ""),
+                extra={"kanji": source_item.get("kanji", "")},
+            ),
         )
 
     def convert_raw_verb(self, source_item: dict) -> GeneralItem:
         return GeneralItem(
             source=PartialItem(display_text=source_item["english"]),
             target=PartialItem(
-                display_text=source_item["japanese"],
-                pronunciation=source_item["romaji"],
-                extra={"masu_form": source_item.get("masu_form", "")}
-            )
+                display_text=source_item.get("japanese", ""),
+                pronunciation=source_item.get("romaji", ""),
+                extra={
+                    "kanji": source_item.get("kanji", ""),
+                    "type": source_item.get("type", ""),
+                    "masu_form": source_item.get("masu_form", ""),
+                },
+            ),
         )
