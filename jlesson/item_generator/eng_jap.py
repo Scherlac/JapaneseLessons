@@ -20,36 +20,35 @@ class EngJapItemGenerator(ItemGenerator):
             for block_index in range(1, block_count + 1)
         ]
 
-    def convert_noun(self, llm_item: dict, source_item: dict) -> GeneralItem:
-        n_item = {**source_item, **llm_item}  # Merge source with LLM overrides
+    def convert_noun(self, llm_item: dict, base_item: GeneralItem) -> GeneralItem:
         return GeneralItem(
             source=PartialItem(
-                display_text=n_item["english"],
-                extra={"example_sentence_en": n_item.get("example_sentence_en", "")}
+                display_text=base_item.source.display_text,
+                extra={**base_item.source.extra, "example_sentence_en": llm_item.get("example_sentence_en", "")},
             ),
             target=PartialItem(
-                display_text=n_item["japanese"],
-                pronunciation=n_item["romaji"],
+                display_text=base_item.target.display_text,
+                pronunciation=base_item.target.pronunciation,
                 extra={
-                    "kanji": n_item.get("kanji", ""),
-                    "example_sentence_jp": n_item.get("example_sentence_jp", ""),
-                    "memory_tip": n_item.get("memory_tip", "")
-                }
-            )
+                    **base_item.target.extra,
+                    "example_sentence_jp": llm_item.get("example_sentence_jp", ""),
+                    "memory_tip": llm_item.get("memory_tip", ""),
+                },
+            ),
         )
 
-    def convert_verb(self, llm_item: dict, source_item: dict) -> GeneralItem:
-        v_item = {**source_item, **llm_item}
+    def convert_verb(self, llm_item: dict, base_item: GeneralItem) -> GeneralItem:
         return GeneralItem(
-            source=PartialItem(display_text=v_item["english"]),
+            source=PartialItem(display_text=base_item.source.display_text),
             target=PartialItem(
-                display_text=v_item["japanese"],
-                pronunciation=v_item["romaji"],
+                display_text=base_item.target.display_text,
+                pronunciation=base_item.target.pronunciation,
                 extra={
-                    "masu_form": v_item.get("masu_form", ""),
-                    "kanji": v_item.get("kanji", "")
-                }
-            )
+                    **base_item.target.extra,
+                    "memory_tip": llm_item.get("memory_tip", ""),
+                    "polite_forms": llm_item.get("polite_forms", {}),
+                },
+            ),
         )
 
     def convert_sentence(self, llm_item: dict) -> Sentence:

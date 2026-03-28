@@ -22,13 +22,13 @@ class ItemGenerator(ABC):
         pass
 
     @abstractmethod
-    def convert_noun(self, llm_item: dict, source_item: dict) -> GeneralItem:
-        """Convert LLM noun response to GeneralItem."""
+    def convert_noun(self, llm_item: dict, base_item: GeneralItem) -> GeneralItem:
+        """Enrich base_item with LLM-generated content (examples, memory tips)."""
         pass
 
     @abstractmethod
-    def convert_verb(self, llm_item: dict, source_item: dict) -> GeneralItem:
-        """Convert LLM verb response to GeneralItem."""
+    def convert_verb(self, llm_item: dict, base_item: GeneralItem) -> GeneralItem:
+        """Enrich base_item with LLM-generated content (conjugations, memory tips)."""
         pass
 
     @abstractmethod

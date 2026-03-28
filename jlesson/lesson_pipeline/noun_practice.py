@@ -27,23 +27,17 @@ class NounPracticeStep(PipelineStep):
             )
             raw_items.extend(result.get("noun_items", []))
         ctx.noun_items = []
-        for noun_item in raw_items:
-            source_item = next((n for n in ctx.nouns if n["english"] == noun_item["english"]), None)
-            if source_item:
-                ctx.noun_items.append(ctx.language_config.generator.convert_noun(noun_item, source_item))
-            else:
-                ctx.noun_items.append(ctx.language_config.generator.convert_noun(noun_item, {}))
+        for noun_item, base_item in zip(raw_items, noun_items_all):
+            ctx.noun_items.append(ctx.language_config.generator.convert_noun(noun_item, base_item))
         if not ctx.noun_items:
-            for noun_source in ctx.nouns:
-                ctx.noun_items.append(ctx.language_config.generator.convert_raw_noun(noun_source))
+            ctx.noun_items = list(noun_items_all)
         for index, item in enumerate(ctx.noun_items):
             item.phase = Phase.NOUNS
             item.block_index = index // max(1, ctx.config.num_nouns) + 1
         self._log(ctx, f"       {len(ctx.noun_items)} noun items")
-        if ctx.language_config.code == "hun-eng":
-            src_lbl, tgt_lbl, ph_lbl, has_phonetic = "Magyar", "English", "Pronunciation", True
-        else:
-            src_lbl, tgt_lbl, ph_lbl, has_phonetic = "English", "Japanese", "Romaji", True
+        fm = ctx.language_config.field_map
+        src_lbl, tgt_lbl, ph_lbl = fm.source_label, fm.target_label, fm.phonetic_label
+        has_phonetic = bool(ph_lbl)
         ctx.report.add("vocabulary", self._vocab_table(ctx.noun_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic))
         ctx.report.add("noun_practice", self._practice_section(ctx.noun_items, tgt_lbl, ph_lbl))
         return ctx

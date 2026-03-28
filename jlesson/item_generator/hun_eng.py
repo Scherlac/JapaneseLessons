@@ -20,32 +20,34 @@ class HunEngItemGenerator(ItemGenerator):
             for block_index in range(1, block_count + 1)
         ]
 
-    def convert_noun(self, llm_item: dict, source_item: dict) -> GeneralItem:
-        n_item = {**source_item, **llm_item}
+    def convert_noun(self, llm_item: dict, base_item: GeneralItem) -> GeneralItem:
         return GeneralItem(
             source=PartialItem(
-                display_text=n_item.get("hungarian", ""),
-                extra={"example_sentence_hu": n_item.get("example_sentence_hu", "")}
+                display_text=base_item.source.display_text,
+                extra={**base_item.source.extra, "example_sentence_hu": llm_item.get("example_sentence_hu", "")},
             ),
             target=PartialItem(
-                display_text=n_item["english"],
-                pronunciation=n_item.get("pronunciation", ""),
+                display_text=base_item.target.display_text,
+                pronunciation=base_item.target.pronunciation,
                 extra={
-                    "example_sentence_en": n_item.get("example_sentence_en", ""),
-                    "memory_tip": n_item.get("memory_tip", "")
-                }
-            )
+                    **base_item.target.extra,
+                    "example_sentence_en": llm_item.get("example_sentence_en", ""),
+                    "memory_tip": llm_item.get("memory_tip", ""),
+                },
+            ),
         )
 
-    def convert_verb(self, llm_item: dict, source_item: dict) -> GeneralItem:
-        v_item = {**source_item, **llm_item}
+    def convert_verb(self, llm_item: dict, base_item: GeneralItem) -> GeneralItem:
         return GeneralItem(
-            source=PartialItem(display_text=v_item.get("hungarian", "")),
+            source=PartialItem(display_text=base_item.source.display_text),
             target=PartialItem(
-                display_text=v_item.get("english", ""),
-                pronunciation=v_item.get("pronunciation", ""),
-                extra={"past_tense": v_item.get("past_tense", "")}
-            )
+                display_text=base_item.target.display_text,
+                pronunciation=base_item.target.pronunciation,
+                extra={
+                    **base_item.target.extra,
+                    "memory_tip": llm_item.get("memory_tip", ""),
+                },
+            ),
         )
 
     def convert_sentence(self, llm_item: dict) -> Sentence:

@@ -27,23 +27,18 @@ class VerbPracticeStep(PipelineStep):
             )
             raw_items.extend(result.get("verb_items", []))
         ctx.verb_items = []
-        for verb_item in raw_items:
-            source_item = next((v for v in ctx.verbs if v["english"] == verb_item["english"]), None)
-            if source_item:
-                ctx.verb_items.append(ctx.language_config.generator.convert_verb(verb_item, source_item))
-            else:
-                ctx.verb_items.append(ctx.language_config.generator.convert_verb(verb_item, {}))
+        for verb_item, base_item in zip(raw_items, verb_items_all):
+            ctx.verb_items.append(ctx.language_config.generator.convert_verb(verb_item, base_item))
         if not ctx.verb_items:
-            for verb_source in ctx.verbs:
-                ctx.verb_items.append(ctx.language_config.generator.convert_raw_verb(verb_source))
+            ctx.verb_items = list(verb_items_all)
         for index, item in enumerate(ctx.verb_items):
             item.phase = Phase.VERBS
             item.block_index = index // max(1, ctx.config.num_verbs) + 1
         self._log(ctx, f"       {len(ctx.verb_items)} verb items")
-        if ctx.language_config.code == "hun-eng":
-            src_lbl, tgt_lbl, ph_lbl, has_phonetic, has_masu = "Magyar", "English", "Pronunciation", True, False
-        else:
-            src_lbl, tgt_lbl, ph_lbl, has_phonetic, has_masu = "English", "Japanese", "Romaji", True, True
+        fm = ctx.language_config.field_map
+        src_lbl, tgt_lbl, ph_lbl = fm.source_label, fm.target_label, fm.phonetic_label
+        has_phonetic = bool(ph_lbl)
+        has_masu = "masu_form" in ctx.language_config.field_map.target_special
         ctx.report.add("vocabulary", self._vocab_table(ctx.verb_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic, has_masu))
         ctx.report.add("verb_practice", self._practice_section(ctx.verb_items, tgt_lbl, ph_lbl, has_masu))
         return ctx
