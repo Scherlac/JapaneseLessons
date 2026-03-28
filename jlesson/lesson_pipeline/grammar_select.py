@@ -25,7 +25,12 @@ class GrammarSelectStep(PipelineStep):
         verb_items = [lang_cfg.generator.convert_raw_verb(v) for v in ctx.verbs]
 
         # Ask LLM to pick only the starting grammar points from currently-unlocked items.
+        # If the full progression has been covered, cycle back from the beginning.
         unlocked = self._project_grammar(progression, covered, ctx.config.grammar_points_per_lesson)
+        if not unlocked:
+            self._log(ctx, "       (grammar exhausted — cycling back from start)")
+            covered = []
+            unlocked = self._project_grammar(progression, covered, ctx.config.grammar_points_per_lesson)
         prompt = lang_cfg.prompts.build_grammar_select_prompt(
             unlocked,
             noun_items,
@@ -66,11 +71,11 @@ class GrammarSelectStep(PipelineStep):
             f"       selected : {[grammar_id(g) for g in ctx.selected_grammar]}",
         )
         if ctx.selected_grammar_blocks:
-            block_plan = [
-                [grammar_id(g) for g in block]
-                for block in ctx.selected_grammar_blocks
-            ]
-            self._log(ctx, f"       by block : {block_plan}")
+            block_lines = "\n".join(
+                f"         block {b + 1:>2}: {[grammar_id(g) for g in block]}"
+                for b, block in enumerate(ctx.selected_grammar_blocks)
+            )
+            self._log(ctx, f"       by block :\n{block_lines}")
         return ctx
 
     @staticmethod
