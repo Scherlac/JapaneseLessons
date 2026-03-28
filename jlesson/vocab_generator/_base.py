@@ -305,14 +305,13 @@ def generate_vocab(
 
     def _build_prompt(nouns_count: int, verbs_count: int, adjectives_count: int) -> str:
         if language == "hun-eng":
-            if adjectives_count > 0:
-                raise ValueError("--adjectives is currently supported only for --language eng-jap")
             from ..prompt_template import hungarian_build_vocab_prompt
 
             prompt = hungarian_build_vocab_prompt(
                 theme=theme,
                 num_nouns=nouns_count,
                 num_verbs=verbs_count,
+                num_adjectives=adjectives_count,
                 level=level,
             )
             if blocked_english:

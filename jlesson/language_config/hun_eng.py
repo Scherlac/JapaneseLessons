@@ -18,6 +18,8 @@ HUN_ENG_CONFIG = LanguageConfig(
     vocab_noun_fields=frozenset({"english", "hungarian", "pronunciation"}),
     vocab_verb_fields=frozenset({"english", "hungarian", "pronunciation", "past_tense"}),
     vocab_verb_types=frozenset(),  # English verbs don't use Japanese-style type classes
+    vocab_adj_fields=frozenset({"english", "hungarian", "pronunciation"}),
+    vocab_adj_types=frozenset(),   # English adjectives don't require type classification
 
     voices=tts_engine.VOICES,
 

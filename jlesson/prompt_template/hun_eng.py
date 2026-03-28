@@ -173,9 +173,22 @@ def hungarian_build_vocab_prompt(
     theme: str,
     num_nouns: int = 12,
     num_verbs: int = 10,
+    num_adjectives: int = 0,
     level: str = "beginner",
 ) -> str:
     """Build an LLM prompt that asks for a Hungarian-English vocabulary JSON file."""
+    adj_requirement = (
+        f"- Exactly {num_adjectives} adjectives.\n"
+        "- Each adjective must have: english, hungarian, pronunciation (English IPA).\n"
+        if num_adjectives > 0 else ""
+    )
+    count_line = f"{num_nouns} nouns and {num_verbs} verbs"
+    if num_adjectives > 0:
+        count_line += f" and {num_adjectives} adjectives"
+    adj_schema = (
+        ',\n  "adjectives": [\n    {"english": "big", "hungarian": "nagy", "pronunciation": "bɪɡ"}\n  ]'
+        if num_adjectives > 0 else ""
+    )
     return f"""\
 You are an English language teacher creating a vocabulary list for Hungarian children aged 8-12.
 
@@ -183,7 +196,7 @@ Generate a JSON vocabulary file for the theme: **{theme}**
 
 Requirements:
 - Exactly {num_nouns} nouns and {num_verbs} verbs.
-- All words should be common, practical, {level}-appropriate, and suitable for children.
+{adj_requirement}- All words should be common, practical, {level}-appropriate, and suitable for children.
 - Each noun must have: english, hungarian, pronunciation (English IPA).
 - Each verb must have: english, hungarian, pronunciation, past_tense (the English past tense form).
 - Output ONLY valid JSON, no commentary before or after.
@@ -198,11 +211,11 @@ Schema example:
   ],
   "verbs": [
     {{"english": "to eat", "hungarian": "enni", "pronunciation": "ˈiːt", "past_tense": "ate"}}
-  ]
+  ]{adj_schema}
 }}
 ```
 
-Now generate the complete JSON for theme "{theme}" with {num_nouns} nouns and {num_verbs} verbs.
+Now generate the complete JSON for theme "{theme}" with {count_line}.
 """.strip()
 
 
