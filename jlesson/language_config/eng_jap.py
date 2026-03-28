@@ -18,6 +18,8 @@ ENG_JAP_CONFIG = LanguageConfig(
     vocab_noun_fields=frozenset({"english", "japanese", "kanji", "romaji"}),
     vocab_verb_fields=frozenset({"english", "japanese", "kanji", "romaji", "type", "masu_form"}),
     vocab_verb_types=frozenset({"る-verb", "う-verb", "irregular", "な-adj"}),
+    vocab_adj_fields=frozenset({"english", "japanese", "kanji", "romaji", "type"}),
+    vocab_adj_types=frozenset({"い-adj", "な-adj"}),
 
     voices=tts_engine.VOICES,
 

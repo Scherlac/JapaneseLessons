@@ -14,6 +14,7 @@ from unittest.mock import patch
 import pytest
 
 from jlesson.vocab_generator import extend_vocab, generate_vocab, validate_vocab_schema
+from jlesson.language_config import ENG_JAP_CONFIG
 from jlesson.llm_client import ask_llm_json_free
 
 # ── Minimal valid vocab fixture ───────────────────────────────────────────────
@@ -51,50 +52,50 @@ def _vocab(**overrides) -> dict:
 
 class TestValidateVocabSchema:
     def test_valid_vocab_returns_no_errors(self):
-        assert validate_vocab_schema(_VALID_VOCAB) == []
+        assert validate_vocab_schema(_VALID_VOCAB, ENG_JAP_CONFIG) == []
 
     def test_missing_theme_field(self):
         vocab = _vocab()
         del vocab["theme"]
-        errors = validate_vocab_schema(vocab)
+        errors = validate_vocab_schema(vocab, ENG_JAP_CONFIG)
         assert any("theme" in e for e in errors)
 
     def test_missing_nouns_key(self):
         vocab = _vocab()
         del vocab["nouns"]
-        errors = validate_vocab_schema(vocab)
+        errors = validate_vocab_schema(vocab, ENG_JAP_CONFIG)
         assert any("nouns" in e for e in errors)
 
     def test_empty_nouns_list(self):
         vocab = _vocab(nouns=[])
-        errors = validate_vocab_schema(vocab)
+        errors = validate_vocab_schema(vocab, ENG_JAP_CONFIG)
         assert any("nouns" in e for e in errors)
 
     def test_missing_verbs_key(self):
         vocab = _vocab()
         del vocab["verbs"]
-        errors = validate_vocab_schema(vocab)
+        errors = validate_vocab_schema(vocab, ENG_JAP_CONFIG)
         assert any("verbs" in e for e in errors)
 
     def test_noun_missing_romaji_field(self):
         import copy
         vocab = copy.deepcopy(_VALID_VOCAB)
         del vocab["nouns"][0]["romaji"]
-        errors = validate_vocab_schema(vocab)
+        errors = validate_vocab_schema(vocab, ENG_JAP_CONFIG)
         assert any("romaji" in e for e in errors)
 
     def test_verb_missing_masu_form_field(self):
         import copy
         vocab = copy.deepcopy(_VALID_VOCAB)
         del vocab["verbs"][0]["masu_form"]
-        errors = validate_vocab_schema(vocab)
+        errors = validate_vocab_schema(vocab, ENG_JAP_CONFIG)
         assert any("masu_form" in e for e in errors)
 
     def test_verb_invalid_type(self):
         import copy
         vocab = copy.deepcopy(_VALID_VOCAB)
         vocab["verbs"][0]["type"] = "bad-type"
-        errors = validate_vocab_schema(vocab)
+        errors = validate_vocab_schema(vocab, ENG_JAP_CONFIG)
         assert any("bad-type" in e for e in errors)
 
     def test_all_valid_verb_types_accepted(self):
@@ -102,7 +103,7 @@ class TestValidateVocabSchema:
         for vtype in ("る-verb", "う-verb", "irregular", "な-adj"):
             vocab = copy.deepcopy(_VALID_VOCAB)
             vocab["verbs"][0]["type"] = vtype
-            errors = validate_vocab_schema(vocab)
+            errors = validate_vocab_schema(vocab, ENG_JAP_CONFIG)
             type_errors = [e for e in errors if "type" in e and vtype not in e]
             assert not type_errors, f"Valid type {vtype!r} was rejected: {errors}"
 
@@ -110,11 +111,11 @@ class TestValidateVocabSchema:
         import copy
         vocab = copy.deepcopy(_VALID_VOCAB)
         vocab["adjectives"][0]["type"] = "bad-type"
-        errors = validate_vocab_schema(vocab)
+        errors = validate_vocab_schema(vocab, ENG_JAP_CONFIG)
         assert any("adjectives" in e and "bad-type" in e for e in errors)
 
     def test_multiple_errors_reported_together(self):
-        errors = validate_vocab_schema({"nouns": [], "verbs": []})
+        errors = validate_vocab_schema({"nouns": [], "verbs": []}, ENG_JAP_CONFIG)
         assert len(errors) >= 2
 
 

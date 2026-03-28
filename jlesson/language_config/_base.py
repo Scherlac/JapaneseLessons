@@ -127,6 +127,10 @@ class LanguageConfig:
     target_font_path: str
     native_font_path: str
 
+    # ── Vocabulary schema — optional adjective section ───────────────────────
+    vocab_adj_fields: frozenset[str] = field(default_factory=frozenset)
+    vocab_adj_types: frozenset[str] = field(default_factory=frozenset)
+
     # ── Grammar & persons (may be populated later) ────────────────────────
     grammar_progression: tuple[GrammarItem, ...] = ()
     persons: tuple[tuple[str, str, str], ...] = ()

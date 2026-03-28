@@ -17,12 +17,79 @@ import json
 from pathlib import Path
 from typing import Optional
 
+from ..language_config import LanguageConfig, get_language_config
 from ..llm_client import ask_llm_json_free
 from ..prompt_template import build_vocab_prompt
-from .eng_jap import validate_vocab_schema
-from .hun_eng import validate_hungarian_vocab_schema
 
 VOCAB_DIR = Path(__file__).parent.parent.parent / "vocab"
+
+
+def validate_vocab_schema(vocab: dict, language_config: LanguageConfig) -> list[str]:
+    """Validate a vocab dict against the schema defined by *language_config*.
+
+    Uses ``language_config.vocab_noun_fields``, ``vocab_verb_fields``,
+    ``vocab_verb_types``, ``vocab_adj_fields``, and ``vocab_adj_types`` so
+    that no language-pair–specific branching is needed here.
+
+    Returns a list of human-readable error strings; empty means valid.
+    """
+    errors: list[str] = []
+
+    if "theme" not in vocab:
+        errors.append("Missing top-level 'theme' field")
+
+    nouns = vocab.get("nouns")
+    if not isinstance(nouns, list) or len(nouns) == 0:
+        errors.append("'nouns' must be a non-empty list")
+    else:
+        for i, noun in enumerate(nouns):
+            missing = language_config.vocab_noun_fields - set(noun.keys())
+            if missing:
+                errors.append(
+                    f"nouns[{i}] ({noun.get('english', '?')!r}): "
+                    f"missing fields {sorted(missing)}"
+                )
+
+    verbs = vocab.get("verbs")
+    if not isinstance(verbs, list) or len(verbs) == 0:
+        errors.append("'verbs' must be a non-empty list")
+    else:
+        for i, verb in enumerate(verbs):
+            missing = language_config.vocab_verb_fields - set(verb.keys())
+            if missing:
+                errors.append(
+                    f"verbs[{i}] ({verb.get('english', '?')!r}): "
+                    f"missing fields {sorted(missing)}"
+                )
+                continue
+            if language_config.vocab_verb_types and verb["type"] not in language_config.vocab_verb_types:
+                errors.append(
+                    f"verbs[{i}] ({verb['english']!r}): "
+                    f"invalid type {verb['type']!r} — "
+                    f"must be one of {sorted(language_config.vocab_verb_types)}"
+                )
+
+    adjectives = vocab.get("adjectives")
+    if adjectives is not None and language_config.vocab_adj_fields:
+        if not isinstance(adjectives, list):
+            errors.append("'adjectives' must be a list when provided")
+        else:
+            for i, adj in enumerate(adjectives):
+                missing = language_config.vocab_adj_fields - set(adj.keys())
+                if missing:
+                    errors.append(
+                        f"adjectives[{i}] ({adj.get('english', '?')!r}): "
+                        f"missing fields {sorted(missing)}"
+                    )
+                    continue
+                if language_config.vocab_adj_types and adj["type"] not in language_config.vocab_adj_types:
+                    errors.append(
+                        f"adjectives[{i}] ({adj['english']!r}): "
+                        f"invalid type {adj['type']!r} — "
+                        f"must be one of {sorted(language_config.vocab_adj_types)}"
+                    )
+
+    return errors
 
 _MAX_NOUNS_PER_REQUEST = 120
 _MAX_VERBS_PER_REQUEST = 60
@@ -407,7 +474,7 @@ def generate_vocab(
                     if isinstance(v, str):
                         item[k] = v.strip()
 
-    errors = validate_hungarian_vocab_schema(raw) if language == "hun-eng" else validate_vocab_schema(raw)
+    errors = validate_vocab_schema(raw, get_language_config(language))
     if errors:
         raise ValueError(
             f"LLM-generated vocab for '{theme}' failed schema validation:\n"
@@ -509,7 +576,7 @@ def extend_vocab(
         "others": merged_others,
     }
 
-    errors = validate_hungarian_vocab_schema(merged) if language == "hun-eng" else validate_vocab_schema(merged)
+    errors = validate_vocab_schema(merged, get_language_config(language))
     if errors:
         raise ValueError(
             f"Merged vocab for '{theme}' failed schema validation:\n"
