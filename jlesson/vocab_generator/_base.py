@@ -1,20 +1,14 @@
 """
-Vocabulary Generator
+Vocabulary Generator — shared orchestration and utilities.
 
 Calls the LLM to generate a complete vocabulary JSON file for a given theme.
-Validates the schema and saves the result to vocab/<theme>.json.
-
-This is the actual generation step — compare with build_vocab_prompt() in
-prompt_template.py, which only builds the text prompt without calling the LLM.
+Language-specific schema validation lives in the eng_jap / hun_eng sibling
+modules and is dispatched here by language code.
 
 Usage:
-    from vocab_generator import generate_vocab
+    from jlesson.vocab_generator import generate_vocab
     vocab = generate_vocab("animals")          # saves to vocab/animals.json
     vocab = generate_vocab("school", save=False)  # dry-run, no file written
-
-CLI (via generate_lesson.py):
-    python generate_lesson.py --create-vocab animals
-    python generate_lesson.py --create-vocab school --nouns 15 --verbs 12
 """
 
 from __future__ import annotations
@@ -23,19 +17,12 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from .llm_client import ask_llm_json_free
-from .prompt_template import build_vocab_prompt
+from ..llm_client import ask_llm_json_free
+from ..prompt_template import build_vocab_prompt
+from .eng_jap import validate_vocab_schema
+from .hun_eng import validate_hungarian_vocab_schema
 
-VOCAB_DIR = Path(__file__).parent.parent / "vocab"
-
-_REQUIRED_NOUN_FIELDS = {"english", "japanese", "kanji", "romaji"}
-_REQUIRED_VERB_FIELDS = {"english", "japanese", "kanji", "romaji", "type", "masu_form"}
-_VALID_VERB_TYPES = {"る-verb", "う-verb", "irregular", "な-adj"}
-_REQUIRED_ADJ_FIELDS = {"english", "japanese", "kanji", "romaji", "type"}
-_VALID_ADJ_TYPES = {"い-adj", "な-adj"}
-
-_REQUIRED_HUN_NOUN_FIELDS = {"english", "hungarian", "pronunciation"}
-_REQUIRED_HUN_VERB_FIELDS = {"english", "hungarian", "pronunciation", "past_tense"}
+VOCAB_DIR = Path(__file__).parent.parent.parent / "vocab"
 
 _MAX_NOUNS_PER_REQUEST = 120
 _MAX_VERBS_PER_REQUEST = 60
@@ -49,7 +36,6 @@ def _allocate_by_weights(total: int, weights: list[float]) -> list[int]:
         return [0 for _ in weights]
     weight_sum = sum(weights)
     if weight_sum <= 0:
-        # Even split fallback
         base = total // len(weights)
         extra = total % len(weights)
         return [base + (1 if i < extra else 0) for i in range(len(weights))]
@@ -65,113 +51,6 @@ def _allocate_by_weights(total: int, weights: list[float]) -> list[int]:
         floors[idx] += 1
     return floors
 
-
-# ── Schema validation ─────────────────────────────────────────────────────────
-
-def validate_vocab_schema(vocab: dict) -> list[str]:
-    """Validate a vocab dict against the required schema.
-
-    Returns a list of human-readable error strings.
-    An empty list means the vocab is valid.
-    """
-    errors: list[str] = []
-
-    if "theme" not in vocab:
-        errors.append("Missing top-level 'theme' field")
-
-    nouns = vocab.get("nouns")
-    if not isinstance(nouns, list) or len(nouns) == 0:
-        errors.append("'nouns' must be a non-empty list")
-    else:
-        for i, noun in enumerate(nouns):
-            missing = _REQUIRED_NOUN_FIELDS - set(noun.keys())
-            if missing:
-                errors.append(
-                    f"nouns[{i}] ({noun.get('english', '?')!r}): "
-                    f"missing fields {sorted(missing)}"
-                )
-
-    verbs = vocab.get("verbs")
-    if not isinstance(verbs, list) or len(verbs) == 0:
-        errors.append("'verbs' must be a non-empty list")
-    else:
-        for i, verb in enumerate(verbs):
-            missing = _REQUIRED_VERB_FIELDS - set(verb.keys())
-            if missing:
-                errors.append(
-                    f"verbs[{i}] ({verb.get('english', '?')!r}): "
-                    f"missing fields {sorted(missing)}"
-                )
-                continue  # can't check type if fields are missing
-            if verb["type"] not in _VALID_VERB_TYPES:
-                errors.append(
-                    f"verbs[{i}] ({verb['english']!r}): "
-                    f"invalid type {verb['type']!r} — "
-                    f"must be one of {sorted(_VALID_VERB_TYPES)}"
-                )
-
-    adjectives = vocab.get("adjectives")
-    if adjectives is not None:
-        if not isinstance(adjectives, list):
-            errors.append("'adjectives' must be a list when provided")
-        else:
-            for i, adj in enumerate(adjectives):
-                missing = _REQUIRED_ADJ_FIELDS - set(adj.keys())
-                if missing:
-                    errors.append(
-                        f"adjectives[{i}] ({adj.get('english', '?')!r}): "
-                        f"missing fields {sorted(missing)}"
-                    )
-                    continue
-                if adj["type"] not in _VALID_ADJ_TYPES:
-                    errors.append(
-                        f"adjectives[{i}] ({adj['english']!r}): "
-                        f"invalid type {adj['type']!r} — "
-                        f"must be one of {sorted(_VALID_ADJ_TYPES)}"
-                    )
-
-    return errors
-
-
-def validate_hungarian_vocab_schema(vocab: dict) -> list[str]:
-    """Validate a Hungarian vocab dict against the required schema.
-
-    Returns a list of human-readable error strings.
-    An empty list means the vocab is valid.
-    """
-    errors: list[str] = []
-
-    if "theme" not in vocab:
-        errors.append("Missing top-level 'theme' field")
-
-    nouns = vocab.get("nouns")
-    if not isinstance(nouns, list) or len(nouns) == 0:
-        errors.append("'nouns' must be a non-empty list")
-    else:
-        for i, noun in enumerate(nouns):
-            missing = _REQUIRED_HUN_NOUN_FIELDS - set(noun.keys())
-            if missing:
-                errors.append(
-                    f"nouns[{i}] ({noun.get('english', '?')!r}): "
-                    f"missing fields {sorted(missing)}"
-                )
-
-    verbs = vocab.get("verbs")
-    if not isinstance(verbs, list) or len(verbs) == 0:
-        errors.append("'verbs' must be a non-empty list")
-    else:
-        for i, verb in enumerate(verbs):
-            missing = _REQUIRED_HUN_VERB_FIELDS - set(verb.keys())
-            if missing:
-                errors.append(
-                    f"verbs[{i}] ({verb.get('english', '?')!r}): "
-                    f"missing fields {sorted(missing)}"
-                )
-
-    return errors
-
-
-# ── Main generator ────────────────────────────────────────────────────────────
 
 def _split_counts(total: int, buckets: int) -> list[int]:
     """Split total across buckets as evenly as possible."""
@@ -234,14 +113,7 @@ def _resolve_word_targets(
     default_verbs: int = 10,
     default_adjectives: int = 0,
 ) -> tuple[int, int, int]:
-    """Resolve final noun/verb/adjective targets from minimums and optional total count.
-
-    Rules:
-    - When total_count is None, use exact counts (with defaults).
-    - When total_count is provided, num_nouns/num_verbs/num_adjectives are treated as minimums.
-    - Any remaining words are distributed using the minimum ratio
-      (or split as evenly as possible if all minimums are zero).
-    """
+    """Resolve final noun/verb/adjective targets from minimums and optional total count."""
     if total_count is None:
         nouns = default_nouns if num_nouns is None else num_nouns
         verbs = default_verbs if num_verbs is None else num_verbs
@@ -275,7 +147,6 @@ def _resolve_word_targets(
             [1.0, 1.0, 1.0],
         )
     else:
-        # Unspecified categories still get some share via baseline weight 1.0.
         weights = [
             float(nouns_min) if num_nouns is not None else 1.0,
             float(verbs_min) if num_verbs is not None else 1.0,
@@ -287,6 +158,7 @@ def _resolve_word_targets(
     verbs = verbs_min + extra_verbs
     adjectives = adjectives_min + extra_adjectives
     return nouns, verbs, adjectives
+
 
 def generate_vocab(
     theme: str,
@@ -312,12 +184,10 @@ def generate_vocab(
         num_nouns: Target noun count (or minimum when total_count is set).
         num_verbs: Target verb count (or minimum when total_count is set).
         num_adjectives: Target adjective count (or minimum when total_count is set).
-        total_count: Optional total words target. When provided, nouns/verbs
-            are treated as minimum guarantees and the remainder is distributed.
+        total_count: Optional total words target.
         level: Difficulty — "beginner", "intermediate", "advanced".
         save: If True (default), write the result to vocab/<theme>.json.
         allow_overwrite: If True, permit replacing an existing vocab file.
-            Default False to prevent accidental data loss.
         avoid_english_words: Existing English words to avoid regenerating.
         avoid_target_words: Existing target-language words to avoid regenerating.
         output_dir: Directory to write the file (defaults to vocab/).
@@ -325,10 +195,6 @@ def generate_vocab(
 
     Returns:
         The validated vocab dict (always has 'theme', 'nouns', 'verbs').
-
-    Raises:
-        ValueError: If the LLM response fails schema validation.
-        Exception: Re-raises LLM connection/timeout errors.
     """
     target_nouns, target_verbs, target_adjectives = _resolve_word_targets(
         num_nouns=num_nouns,
@@ -374,7 +240,7 @@ def generate_vocab(
         if language == "hun-eng":
             if adjectives_count > 0:
                 raise ValueError("--adjectives is currently supported only for --language eng-jap")
-            from .prompt_template import hungarian_build_vocab_prompt
+            from ..prompt_template import hungarian_build_vocab_prompt
 
             prompt = hungarian_build_vocab_prompt(
                 theme=theme,
@@ -415,7 +281,6 @@ def generate_vocab(
 
     if not needs_batching:
         raw = _request_vocab_json(_build_prompt(target_nouns, target_verbs, target_adjectives))
-        # LLM sometimes omits the 'theme' field — inject it
         if "theme" not in raw:
             raw["theme"] = theme
     else:
@@ -469,7 +334,6 @@ def generate_vocab(
                 elif key:
                     repeat_hits.add(key)
 
-        # Top-up rounds: fill gaps caused by duplicates or malformed entries.
         for round_idx in range(1, 4):
             missing_n = target_nouns - len(raw["nouns"])
             missing_v = target_verbs - len(raw["verbs"])
@@ -532,12 +396,10 @@ def generate_vocab(
                 "Try smaller counts or run again."
             )
 
-        # Trim to requested counts after dedup merge
         raw["nouns"] = raw["nouns"][:target_nouns]
         raw["verbs"] = raw["verbs"][:target_verbs]
         raw["adjectives"] = raw["adjectives"][:target_adjectives]
 
-    # Strip leading/trailing whitespace from all string values (LLMs sometimes pad them)
     for group in ("nouns", "verbs", "adjectives", "others"):
         for item in raw.get(group, []):
             if isinstance(item, dict):

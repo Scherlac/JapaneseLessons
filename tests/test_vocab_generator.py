@@ -124,41 +124,41 @@ class TestGenerateVocab:
     """Mocks ask_llm_json_free so no LLM server is required."""
 
     def test_returns_valid_vocab_dict(self, tmp_path):
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()) as _:
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()) as _:
             result = generate_vocab("test", save=False)
         assert result["theme"] == "test"
         assert len(result["nouns"]) == 2
         assert len(result["verbs"]) == 1
 
     def test_saves_file_when_save_true(self, tmp_path):
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()):
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()):
             generate_vocab("testtheme", save=True, output_dir=tmp_path)
         assert (tmp_path / "testtheme.json").exists()
 
     def test_saved_file_content_matches_returned_dict(self, tmp_path):
         import json
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()):
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()):
             result = generate_vocab("testtheme", save=True, output_dir=tmp_path)
         saved = json.loads((tmp_path / "testtheme.json").read_text(encoding="utf-8"))
         assert saved["theme"] == result["theme"]
         assert len(saved["nouns"]) == len(result["nouns"])
 
     def test_no_file_written_when_save_false(self, tmp_path):
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()):
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()):
             generate_vocab("testtheme", save=False, output_dir=tmp_path)
         assert not (tmp_path / "testtheme.json").exists()
 
     def test_raises_if_theme_exists_without_allow_overwrite(self, tmp_path):
         existing_path = tmp_path / "testtheme.json"
         existing_path.write_text('{"theme":"testtheme","nouns":[],"verbs":[]}', encoding="utf-8")
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()):
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()):
             with pytest.raises(ValueError, match="already exists"):
                 generate_vocab("testtheme", save=True, output_dir=tmp_path)
 
     def test_overwrites_when_allow_overwrite_true(self, tmp_path):
         existing_path = tmp_path / "testtheme.json"
         existing_path.write_text('{"theme":"testtheme","nouns":[],"verbs":[]}', encoding="utf-8")
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()):
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()):
             result = generate_vocab(
                 "testtheme",
                 save=True,
@@ -174,32 +174,32 @@ class TestGenerateVocab:
         """LLM sometimes omits the 'theme' key — generate_vocab should inject it."""
         vocab_without_theme = _vocab()
         del vocab_without_theme["theme"]
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=vocab_without_theme):
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=vocab_without_theme):
             result = generate_vocab("animals", save=False)
         assert result["theme"] == "animals"
 
     def test_raises_value_error_on_schema_validation_failure(self):
         bad_response = {"theme": "bad", "nouns": "not-a-list", "verbs": []}
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=bad_response):
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=bad_response):
             with pytest.raises(ValueError, match="schema validation"):
                 generate_vocab("bad", save=False)
 
     def test_llm_uses_correct_theme_in_prompt(self):
         """Ask_llm_json_free should be called with a prompt mentioning the theme."""
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()) as mock_llm:
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()) as mock_llm:
             generate_vocab("animals", save=False)
         call_args = mock_llm.call_args[0][0]
         assert "animals" in call_args
 
     def test_llm_uses_correct_num_nouns_and_verbs_in_prompt(self):
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()) as mock_llm:
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()) as mock_llm:
             generate_vocab("animals", num_nouns=8, num_verbs=5, save=False)
         call_args = mock_llm.call_args[0][0]
         assert "8" in call_args
         assert "5" in call_args
 
     def test_count_distributes_remaining_with_minimum_ratio(self):
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()) as mock_llm:
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()) as mock_llm:
             generate_vocab(
                 "animals",
                 num_nouns=10,
@@ -213,7 +213,7 @@ class TestGenerateVocab:
         assert "1 adjectives" in call_args
 
     def test_count_distributes_with_adjectives_minimum(self):
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()) as mock_llm:
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()) as mock_llm:
             generate_vocab(
                 "animals",
                 num_nouns=50,
@@ -228,7 +228,7 @@ class TestGenerateVocab:
         assert "12 adjectives" in call_args
 
     def test_prompt_includes_avoid_words(self):
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()) as mock_llm:
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()) as mock_llm:
             generate_vocab(
                 "animals",
                 num_nouns=3,
@@ -245,7 +245,7 @@ class TestGenerateVocab:
         assert "みず" in call_args
 
     def test_count_only_splits_evenly_when_no_minimums(self):
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()) as mock_llm:
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()) as mock_llm:
             generate_vocab(
                 "animals",
                 num_nouns=None,
@@ -271,7 +271,7 @@ class TestGenerateVocab:
 
     def test_creates_output_directory_if_missing(self, tmp_path):
         nested = tmp_path / "deep" / "nested"
-        with patch("jlesson.vocab_generator.ask_llm_json_free", return_value=_vocab()):
+        with patch("jlesson.vocab_generator._base.ask_llm_json_free", return_value=_vocab()):
             generate_vocab("testtheme", save=True, output_dir=nested)
         assert (nested / "testtheme.json").exists()
 
@@ -302,9 +302,9 @@ class TestGenerateVocab:
                 }
             ],
         }
-        with patch("jlesson.vocab_generator._MAX_NOUNS_PER_REQUEST", 2), \
-             patch("jlesson.vocab_generator._MAX_VERBS_PER_REQUEST", 1), \
-             patch("jlesson.vocab_generator.ask_llm_json_free", side_effect=[batch_a, batch_b]):
+        with patch("jlesson.vocab_generator._base._MAX_NOUNS_PER_REQUEST", 2), \
+             patch("jlesson.vocab_generator._base._MAX_VERBS_PER_REQUEST", 1), \
+             patch("jlesson.vocab_generator._base.ask_llm_json_free", side_effect=[batch_a, batch_b]):
             result = generate_vocab("big", num_nouns=3, num_verbs=2, save=False)
         assert [n["english"] for n in result["nouns"]] == ["cat", "dog", "bird"]
         assert [v["english"] for v in result["verbs"]] == ["to eat", "to drink"]
@@ -328,10 +328,10 @@ class TestGenerateVocab:
             }],
         }
 
-        with patch("jlesson.vocab_generator._MAX_NOUNS_PER_REQUEST", 2), \
-             patch("jlesson.vocab_generator._MAX_VERBS_PER_REQUEST", 1), \
+        with patch("jlesson.vocab_generator._base._MAX_NOUNS_PER_REQUEST", 2), \
+             patch("jlesson.vocab_generator._base._MAX_VERBS_PER_REQUEST", 1), \
              patch(
-                 "jlesson.vocab_generator.ask_llm_json_free",
+                 "jlesson.vocab_generator._base.ask_llm_json_free",
                  side_effect=[first, duplicate, duplicate, duplicate, duplicate],
              ):
             with pytest.raises(ValueError, match="Partial output saved to"):
@@ -409,7 +409,7 @@ class TestExtendVocab:
             ],
         }
 
-        with patch("jlesson.vocab_generator.generate_vocab", return_value=generated):
+        with patch("jlesson.vocab_generator._base.generate_vocab", return_value=generated):
             merged = extend_vocab("testtheme", add_nouns=2, add_verbs=2, output_dir=tmp_path)
 
         assert len(merged["nouns"]) == 2
@@ -451,6 +451,6 @@ class TestExtendVocab:
                 "others": [],
             }
 
-        with patch("jlesson.vocab_generator.generate_vocab", side_effect=_fake_generate_vocab):
+        with patch("jlesson.vocab_generator._base.generate_vocab", side_effect=_fake_generate_vocab):
             merged = extend_vocab("testtheme", add_nouns=1, add_verbs=0, output_dir=tmp_path)
         assert any(n["english"] == "bread" for n in merged["nouns"])
