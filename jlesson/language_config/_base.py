@@ -1,8 +1,9 @@
 """
 Core language configuration types and registry.
 
-Defines the FieldMap and LanguageConfig dataclasses that every language-pair
-config must instantiate, plus the global registry and lookup function.
+Defines the FieldMap, PartialLanguageConfig, and LanguageConfig dataclasses
+used by language-specific and language-pair configuration modules, plus the
+global registry and lookup function.
 """
 
 from __future__ import annotations
@@ -17,56 +18,32 @@ from ..prompt_template import PromptInterface
 
 @dataclass
 class FieldMap:
-    """Maps generic semantic role names to language-specific model field names.
+    """Maps generic semantic roles to source/target roots on a lesson item.
 
-    The mapping is used by pipeline stages (report builder, asset compiler,
-    card renderer) so they can operate on ``source``/``target`` roles instead
-    of hard-coding language-specific field names such as ``japanese`` or
-    ``hungarian``.
+    Language-local field paths such as pronunciation, example sentence, or
+    target-side special fields belong on ``PartialLanguageConfig``. ``FieldMap``
+    only defines where the source and target objects live on the model being
+    viewed.
 
     Role semantics
     --------------
     source
-        The learner's *native* language text — the prompt side of a flash card.
-        e.g. ``"english"`` for eng-jap, ``"hungarian"`` for hun-eng.
+        Root path for the learner's native-language object.
+        e.g. ``"source"`` for ``GeneralItem`` or ``"english"`` for a flat dict.
     target
-        The *language being learned* — the reveal side of a flash card.
-        e.g. ``"japanese"`` for eng-jap, ``"english"`` for hun-eng.
-    target_phonetic
-        A phonetic / romanisation field for the target text (may be empty).
-        e.g. ``"romaji"`` for eng-jap, ``"pronunciation"`` (IPA) for hun-eng.
-    target_special
-        Additional named fields for the target language, accessed by role.
-        e.g. ``{"kanji": "kanji", "masu_form": "masu_form"}`` for eng-jap.
-    example_sentence_source / example_sentence_target
-        Field names for example sentences in source / target language.
-    source_label / target_label / phonetic_label
-        Human-readable display names used by the report builder.
+        Root path for the language-being-learned object.
+        e.g. ``"target"`` for ``GeneralItem`` or ``"japanese"`` for a flat dict.
     """
 
     source: str
     target: str
-    target_phonetic: str = ""
-    target_special: dict[str, str] = field(default_factory=dict)
-    example_sentence_source: str = ""
-    example_sentence_target: str = ""
-    source_label: str = ""
-    target_label: str = ""
-    phonetic_label: str = ""
-    # Voice key names (must match keys in LanguageConfig.voices)
-    source_voice: str = "english_female"          # audio_src asset
-    target_voice_female: str = "japanese_female"  # audio_tar_f asset
-    target_voice_male: str = "japanese_male"      # audio_tar_m asset
-    # Card rendering — target block layout
-    # extra_display_keys: ordered list of item.target.extra keys to show on cards.
-    #   Leave empty to show all extras in dict order.
-    # card_extra_font_keys: per-extra-key font mapping  {extra_key: font_key}.
-    #   font_key must match a key in CardRenderer.fonts.
-    #   If a key is absent, falls back to "en_small".
-    extra_display_keys: list = field(default_factory=list)
-    card_extra_font_keys: dict = field(default_factory=dict)
 
-    def view(self, item: Any) -> dict[str, Any]:
+    def view(
+        self,
+        item: Any,
+        source_fields: PartialFieldMap | None = None,
+        target_fields: PartialFieldMap | None = None,
+    ) -> dict[str, Any]:
         """Return a generic-keyed dict extracted from *item*.
 
         *item* may be a Pydantic model (extra fields accessible via
@@ -90,19 +67,61 @@ class FieldMap:
                     return ""
             return obj or ""
 
+        def _resolve(root: str, relative_path: str) -> str:
+            if not root:
+                return ""
+            if not relative_path:
+                return _get(root)
+            return _get(f"{root}.{relative_path}")
+
+        source_fields = source_fields or PartialFieldMap(text_path="")
+        target_fields = target_fields or PartialFieldMap(text_path="")
+
         return {
-            "source": _get(self.source),
-            "target": _get(self.target),
-            "target_phonetic": _get(self.target_phonetic),
+            "source": _resolve(self.source, source_fields.text_path),
+            "target": _resolve(self.target, target_fields.text_path),
+            "target_phonetic": _resolve(self.target, target_fields.phonetic_path),
             "target_special": {
-                role: _get(fname) for role, fname in self.target_special.items()
+                role: _resolve(self.target, fname) for role, fname in target_fields.special_paths.items()
             },
-            "example_sentence_source": _get(self.example_sentence_source),
-            "example_sentence_target": _get(self.example_sentence_target),
-            "source_label": self.source_label,
-            "target_label": self.target_label,
-            "phonetic_label": self.phonetic_label,
+            "example_sentence_source": _resolve(self.source, source_fields.example_sentence_path),
+            "example_sentence_target": _resolve(self.target, target_fields.example_sentence_path),
         }
+
+
+@dataclass(frozen=True)
+class PartialFieldMap:
+    """Language-local field mapping relative to a source or target root."""
+
+    text_path: str = "display_text"
+    phonetic_path: str = ""
+    example_sentence_path: str = ""
+    special_paths: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class PartialLanguageConfig:
+    """Immutable configuration shared by both source and target languages.
+
+    This type holds per-language facts only. Direction-specific behavior stays
+    on the pair-level LanguageConfig.
+    """
+
+    code: str
+    display_name: str
+    field_map: PartialFieldMap = field(default_factory=PartialFieldMap)
+    label: str = ""
+    phonetic_label: str = ""
+    font_path: str = ""
+    noun_fields: frozenset[str] = field(default_factory=frozenset)
+    verb_fields: frozenset[str] = field(default_factory=frozenset)
+    verb_types: frozenset[str] = field(default_factory=frozenset)
+    adj_fields: frozenset[str] = field(default_factory=frozenset)
+    adj_types: frozenset[str] = field(default_factory=frozenset)
+    primary_voice: str = ""
+    alternate_voice: str = ""
+    extra_display_keys: tuple[str, ...] = ()
+    card_extra_font_keys: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -112,24 +131,11 @@ class LanguageConfig:
     # ── Identity ──────────────────────────────────────────────────────────
     code: str
     display_name: str
-    target_language: str
-    native_language: str
-
-    # ── Vocabulary schema ─────────────────────────────────────────────────
-    vocab_noun_fields: frozenset[str]
-    vocab_verb_fields: frozenset[str]
-    vocab_verb_types: frozenset[str]
+    source: PartialLanguageConfig
+    target: PartialLanguageConfig
 
     # ── TTS voices ────────────────────────────────────────────────────────
     voices: dict[str, str]
-
-    # ── Font paths (Windows, see TD-05 for cross-platform) ───────────────
-    target_font_path: str
-    native_font_path: str
-
-    # ── Vocabulary schema — optional adjective section ───────────────────────
-    vocab_adj_fields: frozenset[str] = field(default_factory=frozenset)
-    vocab_adj_types: frozenset[str] = field(default_factory=frozenset)
 
     # ── Grammar & persons (may be populated later) ────────────────────────
     grammar_progression: tuple[GrammarItem, ...] = ()
@@ -147,6 +153,104 @@ class LanguageConfig:
 
     # ── Prompt builders ───────────────────────────────────────────────────
     prompts: Optional[PromptInterface] = None
+
+    @property
+    def native_language(self) -> str:
+        """Backward-compatible alias for the learner's source language."""
+        return self.source.display_name
+
+    @property
+    def target_language(self) -> str:
+        """Backward-compatible alias for the lesson target language."""
+        return self.target.display_name
+
+    @property
+    def native_font_path(self) -> str:
+        """Backward-compatible alias for the source language font path."""
+        return self.source.font_path
+
+    @property
+    def target_font_path(self) -> str:
+        """Backward-compatible alias for the target language font path."""
+        return self.target.font_path
+
+    @property
+    def vocab_noun_fields(self) -> frozenset[str]:
+        """Combined noun schema used by current vocab validation code."""
+        return self.source.noun_fields | self.target.noun_fields
+
+    @property
+    def vocab_verb_fields(self) -> frozenset[str]:
+        """Combined verb schema used by current vocab validation code."""
+        return self.source.verb_fields | self.target.verb_fields
+
+    @property
+    def vocab_verb_types(self) -> frozenset[str]:
+        """Combined verb type set kept for backward compatibility."""
+        return self.source.verb_types | self.target.verb_types
+
+    @property
+    def vocab_adj_fields(self) -> frozenset[str]:
+        """Combined adjective schema used by current vocab validation code."""
+        return self.source.adj_fields | self.target.adj_fields
+
+    @property
+    def vocab_adj_types(self) -> frozenset[str]:
+        """Combined adjective type set kept for backward compatibility."""
+        return self.source.adj_types | self.target.adj_types
+
+    @property
+    def source_label(self) -> str:
+        """Preferred source label for reports and rendering."""
+        return self.source.label
+
+    @property
+    def target_label(self) -> str:
+        """Preferred target label for reports and rendering."""
+        return self.target.label
+
+    @property
+    def phonetic_label(self) -> str:
+        """Preferred phonetic label for reports and rendering."""
+        return self.target.phonetic_label
+
+    @property
+    def source_voice(self) -> str:
+        """Voice used for source-language audio assets."""
+        return self.source.primary_voice
+
+    @property
+    def target_voice_female(self) -> str:
+        """Primary target-language voice used for audio assets."""
+        return self.target.primary_voice
+
+    @property
+    def target_voice_male(self) -> str:
+        """Alternate target-language voice used for audio assets."""
+        return self.target.alternate_voice or self.target.primary_voice
+
+    @property
+    def target_extra_display_keys(self) -> list[str]:
+        """Ordered target extra keys to show on cards."""
+        return list(self.target.extra_display_keys)
+
+    @property
+    def target_card_extra_font_keys(self) -> dict[str, str]:
+        """Font selection for target extras rendered on cards."""
+        return dict(self.target.card_extra_font_keys)
+
+    @property
+    def target_special_paths(self) -> dict[str, str]:
+        """Target-only extra fields exposed by the lesson data model."""
+        return dict(self.target.field_map.special_paths)
+
+    def view(self, item: Any) -> dict[str, Any]:
+        """Return a generic role-based view of *item* using split role config."""
+        view = self.field_map.view(item, self.source.field_map, self.target.field_map)
+        view["source_label"] = self.source_label
+        view["target_label"] = self.target_label
+        view["phonetic_label"] = self.phonetic_label
+        return view
 
 
 # ── Registry ──────────────────────────────────────────────────────────────────

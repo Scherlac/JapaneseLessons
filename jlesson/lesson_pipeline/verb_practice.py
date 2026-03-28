@@ -35,10 +35,11 @@ class VerbPracticeStep(PipelineStep):
             item.phase = Phase.VERBS
             item.block_index = index // max(1, ctx.config.num_verbs) + 1
         self._log(ctx, f"       {len(ctx.verb_items)} verb items")
-        fm = ctx.language_config.field_map
-        src_lbl, tgt_lbl, ph_lbl = fm.source_label, fm.target_label, fm.phonetic_label
+        src_lbl = ctx.language_config.source_label
+        tgt_lbl = ctx.language_config.target_label
+        ph_lbl = ctx.language_config.phonetic_label
         has_phonetic = bool(ph_lbl)
-        has_masu = "masu_form" in ctx.language_config.field_map.target_special
+        has_masu = "masu_form" in ctx.language_config.target_special_paths
         ctx.report.add("vocabulary", self._vocab_table(ctx.verb_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic, has_masu))
         ctx.report.add("verb_practice", self._practice_section(ctx.verb_items, tgt_lbl, ph_lbl, has_masu))
         return ctx

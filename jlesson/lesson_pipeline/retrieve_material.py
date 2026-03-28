@@ -25,8 +25,8 @@ class RetrieveLessonMaterialStep(PipelineStep):
 
     @staticmethod
     def _get_non_english_branch_language(ctx: LessonContext) -> str:
-        native = ctx.language_config.native_language.lower()
-        target = ctx.language_config.target_language.lower()
+        native = ctx.language_config.source.display_name.lower()
+        target = ctx.language_config.target.display_name.lower()
         if native != "english":
             return native
         return target

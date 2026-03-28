@@ -35,8 +35,9 @@ class NounPracticeStep(PipelineStep):
             item.phase = Phase.NOUNS
             item.block_index = index // max(1, ctx.config.num_nouns) + 1
         self._log(ctx, f"       {len(ctx.noun_items)} noun items")
-        fm = ctx.language_config.field_map
-        src_lbl, tgt_lbl, ph_lbl = fm.source_label, fm.target_label, fm.phonetic_label
+        src_lbl = ctx.language_config.source_label
+        tgt_lbl = ctx.language_config.target_label
+        ph_lbl = ctx.language_config.phonetic_label
         has_phonetic = bool(ph_lbl)
         ctx.report.add("vocabulary", self._vocab_table(ctx.noun_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic))
         ctx.report.add("noun_practice", self._practice_section(ctx.noun_items, tgt_lbl, ph_lbl))

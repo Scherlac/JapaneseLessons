@@ -172,10 +172,10 @@ class CardRenderer:
 
         if intent.show_target():
             extra_keys = (
-                lang_cfg.field_map.extra_display_keys if lang_cfg else []
+                lang_cfg.target_extra_display_keys if lang_cfg else []
             )
             extra_font_keys = (
-                lang_cfg.field_map.card_extra_font_keys if lang_cfg else {}
+                lang_cfg.target_card_extra_font_keys if lang_cfg else {}
             )
             self._draw_target_block(
                 draw, cx, 440, item,

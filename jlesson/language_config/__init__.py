@@ -9,7 +9,7 @@ Usage:
     print(cfg.display_name)  # "English-Japanese"
 """
 
-from ._base import FieldMap, LanguageConfig, _CONFIGS, get_language_config
+from ._base import FieldMap, LanguageConfig, PartialFieldMap, PartialLanguageConfig, _CONFIGS, get_language_config
 from .eng_jap import ENG_JAP_CONFIG
 from .hun_eng import HUN_ENG_CONFIG
 
@@ -21,6 +21,8 @@ _CONFIGS[HUN_ENG_CONFIG.code] = HUN_ENG_CONFIG
 __all__ = [
     "FieldMap",
     "LanguageConfig",
+    "PartialFieldMap",
+    "PartialLanguageConfig",
     "get_language_config",
     "ENG_JAP_CONFIG",
     "HUN_ENG_CONFIG",

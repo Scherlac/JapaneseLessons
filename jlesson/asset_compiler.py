@@ -97,9 +97,9 @@ async def _render_item_audio(
     target_text = item.target.tts_text or item.target.display_text
 
     voice_map = {
-        "audio_src": (lang_cfg.field_map.source_voice, source_text),
-        "audio_tar_f": (lang_cfg.field_map.target_voice_female, target_text),
-        "audio_tar_m": (lang_cfg.field_map.target_voice_male, target_text),
+        "audio_src": (lang_cfg.source_voice, source_text),
+        "audio_tar_f": (lang_cfg.target_voice_female, target_text),
+        "audio_tar_m": (lang_cfg.target_voice_male, target_text),
     }
 
     for asset_key, (voice_key, text) in voice_map.items():
