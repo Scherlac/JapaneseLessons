@@ -5,8 +5,19 @@ from datetime import datetime, timezone
 from jlesson.models import LessonContent
 from .pipeline_core import LessonContext, PipelineStep
 from .pipeline_grammar import grammar_id
-from .pipeline_paths import resolve_output_dir
-from jlesson.lesson_store import save_lesson_content
+from .pipeline_paths import resolve_lesson_dir, resolve_vocab_dir
+from jlesson.lesson_store import save_lesson_content, save_shared_vocab
+
+
+def _item_to_vocab_dict(item) -> dict:
+    if isinstance(item, dict):
+        return item
+    d = {**item.source.extra, **item.target.extra}
+    if "english" not in d:
+        d["english"] = item.source.display_text
+    if "pronunciation" not in d and item.target.pronunciation:
+        d["pronunciation"] = item.target.pronunciation
+    return d
 
 
 class PersistContentStep(PipelineStep):
@@ -41,8 +52,16 @@ class PersistContentStep(PipelineStep):
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         content = self.build_content(ctx)
-        output_dir = resolve_output_dir(ctx.config)
-        ctx.content_path = save_lesson_content(content, output_dir)
+        lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
+        ctx.content_path = save_lesson_content(content, lesson_dir)
         ctx.report.add_artifact("Content JSON", ctx.content_path)
         self._log(ctx, f"       {ctx.content_path}")
+
+        vocab_path = save_shared_vocab(
+            resolve_vocab_dir(ctx.config),
+            ctx.config.theme,
+            [_item_to_vocab_dict(n) for n in ctx.noun_items],
+            [_item_to_vocab_dict(v) for v in ctx.verb_items],
+        )
+        self._log(ctx, f"       vocab  {vocab_path}")
         return ctx

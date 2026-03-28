@@ -11,7 +11,7 @@ Usage:
     result = ask_llm_cached("Your prompt text...")
 
 Cache controls:
-    - Default cache dir: output/.cache/ (relative to project root)
+    - Default cache dir: ~/.jlesson/cache/ (user home directory)
     - Override via LLM_CACHE_DIR env var
     - Clear with: from jlesson.llm_cache import clear_cache; clear_cache()
 """
@@ -25,7 +25,7 @@ from pathlib import Path
 
 from .llm_client import ask_llm_json_free
 
-_DEFAULT_CACHE_DIR = Path(__file__).parent.parent / "output" / ".cache"
+_DEFAULT_CACHE_DIR = Path.home() / ".jlesson" / "cache"
 
 
 def _resolve_cache_dir(cache_dir: Path | None) -> Path:
@@ -51,7 +51,7 @@ def ask_llm_cached(
 
     Args:
         prompt:    The exact prompt string sent to the LLM.
-        cache_dir: Override the cache directory (default: output/.cache/).
+        cache_dir: Override the cache directory (default: ~/.jlesson/cache/).
 
     Returns:
         Parsed JSON dict from the LLM (or cache).

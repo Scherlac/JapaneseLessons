@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import jlesson.video.builder as video_builder_module
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_paths import resolve_output_dir
+from .pipeline_paths import resolve_lesson_dir
 
 
 class RenderVideoStep(PipelineStep):
@@ -54,8 +54,8 @@ class RenderVideoStep(PipelineStep):
             self._log(ctx, f"       ({reason})")
             return ctx
 
-        output_dir = resolve_output_dir(ctx.config)
-        video_path = output_dir / f"lesson_{ctx.lesson_id:03d}_{ctx.config.theme}.mp4"
+        lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
+        video_path = lesson_dir / "lesson.mp4"
 
         video_builder = video_builder_module.VideoBuilder()
         clips = []
@@ -76,7 +76,6 @@ class RenderVideoStep(PipelineStep):
             self._log(ctx, f"       OK  ({size_kb} KB)")
             ctx.report.add_artifact("Video", video_path)
 
-        lesson_dir = output_dir / f"lesson_{ctx.lesson_id:03d}"
         cards_dir = lesson_dir / "cards"
         audio_dir = lesson_dir / "audio"
         if cards_dir.exists():

@@ -12,7 +12,7 @@ from jlesson.touch_compiler import compile_touches
 from jlesson.video.builder import VideoBuilder
 
 from .pipeline_core import LessonConfig
-from .pipeline_paths import resolve_output_dir
+from .pipeline_paths import resolve_lesson_dir, resolve_output_dir
 
 
 def render_existing_lesson(
@@ -32,7 +32,7 @@ def render_existing_lesson(
         verbose=verbose,
     )
     resolved_output_dir = resolve_output_dir(config)
-    content = load_lesson_content(lesson_id, resolved_output_dir)
+    content = load_lesson_content(lesson_id, resolve_lesson_dir(config, lesson_id))
     lang_cfg = get_language_config(content.language or language)
     profile_obj = get_profile(profile)
 
@@ -42,7 +42,7 @@ def render_existing_lesson(
         Phase.GRAMMAR: content.sentences,
     }
 
-    lesson_dir = resolved_output_dir / f"lesson_{lesson_id:03d}"
+    lesson_dir = resolve_lesson_dir(config, lesson_id)
     compiled_items = asyncio.run(
         compile_assets(
             items_by_phase,
@@ -63,7 +63,7 @@ def render_existing_lesson(
         clip = video_builder.create_multi_audio_clip(card_path, audio_paths)
         clips.append(clip)
 
-    video_path = resolved_output_dir / f"lesson_{lesson_id:03d}_{content.theme}.mp4"
+    video_path = resolve_lesson_dir(config, lesson_id) / "lesson.mp4"
     if not clips:
         raise ValueError(
             f"No renderable clips found for lesson {lesson_id}. "

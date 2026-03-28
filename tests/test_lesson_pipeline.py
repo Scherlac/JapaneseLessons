@@ -690,8 +690,9 @@ def test_persist_content_is_loadable(ctx, tmp_path):
     ctx.sentences = []
     PersistContentStep().execute(ctx)
     from jlesson.lesson_store import load_lesson_content
+    from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
 
-    loaded = load_lesson_content(7, output_dir=tmp_path)
+    loaded = load_lesson_content(7, resolve_lesson_dir(ctx.config, 7))
     assert loaded.lesson_id == 7
     assert loaded.theme == "food"
 
@@ -847,8 +848,9 @@ def test_run_pipeline_persists_correct_theme(config, tmp_path):
         result = run_pipeline(config)
 
     from jlesson.lesson_store import load_lesson_content
+    from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
 
-    loaded = load_lesson_content(result.lesson_id, output_dir=tmp_path)
+    loaded = load_lesson_content(result.lesson_id, resolve_lesson_dir(config, result.lesson_id))
     assert loaded.theme == "food"
 
 
