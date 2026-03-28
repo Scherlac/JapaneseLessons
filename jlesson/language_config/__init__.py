@@ -1,0 +1,27 @@
+"""language_config — facade for language-pair configuration registry.
+
+Defines the shared FieldMap/LanguageConfig types and registers all
+known language pairs so callers can resolve a config by code.
+
+Usage:
+    from jlesson.language_config import get_language_config, LanguageConfig
+    cfg = get_language_config("eng-jap")
+    print(cfg.display_name)  # "English-Japanese"
+"""
+
+from ._base import FieldMap, LanguageConfig, _CONFIGS, get_language_config
+from .eng_jap import ENG_JAP_CONFIG
+from .hun_eng import HUN_ENG_CONFIG
+
+# Populate the registry — order determines the error message when an unknown
+# code is supplied (sorted anyway, so order doesn't matter functionally).
+_CONFIGS[ENG_JAP_CONFIG.code] = ENG_JAP_CONFIG
+_CONFIGS[HUN_ENG_CONFIG.code] = HUN_ENG_CONFIG
+
+__all__ = [
+    "FieldMap",
+    "LanguageConfig",
+    "get_language_config",
+    "ENG_JAP_CONFIG",
+    "HUN_ENG_CONFIG",
+]
