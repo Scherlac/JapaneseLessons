@@ -192,10 +192,10 @@ class TestFieldMapVoices:
         assert HUN_ENG.field_map.source_voice == "hungarian_female"
 
     def test_hun_eng_target_voice_female(self):
-        assert HUN_ENG.field_map.target_voice_female == "english_female"
+        assert HUN_ENG.field_map.target_voice_female == "english_uk_female"
 
     def test_hun_eng_target_voice_male(self):
-        assert HUN_ENG.field_map.target_voice_male == "english_male"
+        assert HUN_ENG.field_map.target_voice_male == "english_uk_male"
 
     def test_source_voice_key_in_config_voices(self):
         for cfg in (ENG_JAP, HUN_ENG):

@@ -50,6 +50,8 @@ def _render_item_cards(
     """
 
     for asset_key in required:
+        if not asset_key.startswith("card_"):
+            continue
         suffix = asset_key.split('_', 1)[1]  # src, tar, src_tar
         path = cards_dir / f"{item_index:03d}_{suffix}.png"
         card = renderer.render_card(
@@ -103,7 +105,7 @@ async def _render_item_audio(
     for asset_key, (voice_key, text) in voice_map.items():
         if asset_key not in required or not text or not voice_key:
             continue
-        engine = create_engine_fn(voice_key, rate="-20%")
+        engine = create_engine_fn(lang_cfg.voices.get(voice_key, voice_key), rate="-20%")
         path = audio_dir / f"{item_index:03d}_{asset_key}.mp3"
         for attempt in range(3):
             try:

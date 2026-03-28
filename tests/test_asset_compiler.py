@@ -12,7 +12,8 @@ from jlesson.asset_compiler import (
 )
 from jlesson.language_config import get_language_config
 from jlesson.lesson_pipeline import StepInfo
-from jlesson.models import GeneralItem, PartialItem, Sentence
+from jlesson.models import GeneralItem, PartialItem, Phase, Sentence
+from jlesson.profiles import ACTIVE_FLASH_CARDS, PASSIVE_VIDEO
 
 ENG_JAP = get_language_config("eng-jap")
 HUN_ENG = get_language_config("hun-eng")
@@ -69,6 +70,11 @@ def _mock_engine_factory():
     return MagicMock(return_value=engine)
 
 
+def _mock_step_info():
+    """Return None — step_info is accepted but ignored by asset compilation functions."""
+    return None
+
+
 
 # ---------------------------------------------------------------------------
 # _render_item_cards
@@ -79,32 +85,28 @@ class TestRenderItemCards:
     def test_renders_src_card_when_required(self, tmp_path):
         renderer = _mock_renderer()
         item = _noun()
-        step_info = _mock_step_info()
-        _render_item_cards(item, {"card_src"}, step_info, tmp_path, 1, renderer)
+        _render_item_cards(item, {"card_src"}, tmp_path, 1, renderer)
         renderer.render_card.assert_called_once()
         assert "card_src" in item.source.assets
 
     def test_renders_tar_card_when_required(self, tmp_path):
         renderer = _mock_renderer()
         item = _noun()
-        step_info = _mock_step_info()
-        _render_item_cards(item, {"card_tar"}, step_info, tmp_path, 1, renderer)
+        _render_item_cards(item, {"card_tar"}, tmp_path, 1, renderer)
         renderer.render_card.assert_called_once()
         assert "card_tar" in item.target.assets
 
     def test_renders_src_tar_card_when_required(self, tmp_path):
         renderer = _mock_renderer()
         item = _noun()
-        step_info = _mock_step_info()
-        _render_item_cards(item, {"card_src_tar"}, step_info, tmp_path, 1, renderer)
+        _render_item_cards(item, {"card_src_tar"}, tmp_path, 1, renderer)
         renderer.render_card.assert_called_once()
         assert "card_src_tar" in item.target.assets
 
     def test_skips_unrequired_cards(self, tmp_path):
         renderer = _mock_renderer()
         item = _noun()
-        step_info = _mock_step_info()
-        _render_item_cards(item, {"card_src"}, step_info, tmp_path, 1, renderer)
+        _render_item_cards(item, {"card_src"}, tmp_path, 1, renderer)
         # Only one call for card_src
         assert renderer.render_card.call_count == 1
         assert "card_tar" not in item.target.assets
@@ -112,9 +114,8 @@ class TestRenderItemCards:
     def test_file_naming_convention(self, tmp_path):
         renderer = _mock_renderer()
         item = _noun()
-        step_info = _mock_step_info()
         _render_item_cards(
-            item, {"card_src", "card_tar", "card_src_tar"}, step_info, tmp_path, 5, renderer,
+            item, {"card_src", "card_tar", "card_src_tar"}, tmp_path, 5, renderer,
         )
         assert renderer.render_card.call_count == 3
         assert item.source.assets["card_src"].name == "005_src.png"
@@ -132,8 +133,7 @@ class TestRenderItemCardsHungarian:
         """card_src in hun-eng mode should render."""
         renderer = _mock_renderer()
         item = _hun_noun()
-        step_info = _mock_step_info()
-        _render_item_cards(item, {"card_src"}, step_info, tmp_path, 1, renderer, lang_cfg=HUN_ENG)
+        _render_item_cards(item, {"card_src"}, tmp_path, 1, renderer, lang_cfg=HUN_ENG)
         renderer.render_card.assert_called_once()
         assert "card_src" in item.source.assets
 
@@ -141,8 +141,7 @@ class TestRenderItemCardsHungarian:
         """card_tar in hun-eng mode should render."""
         renderer = _mock_renderer()
         item = _hun_noun()
-        step_info = _mock_step_info()
-        _render_item_cards(item, {"card_tar"}, step_info, tmp_path, 1, renderer, lang_cfg=HUN_ENG)
+        _render_item_cards(item, {"card_tar"}, tmp_path, 1, renderer, lang_cfg=HUN_ENG)
         renderer.render_card.assert_called_once()
         assert "card_tar" in item.target.assets
 
@@ -150,19 +149,17 @@ class TestRenderItemCardsHungarian:
         """card_src_tar in hun-eng mode should render."""
         renderer = _mock_renderer()
         item = _hun_noun()
-        step_info = _mock_step_info()
-        _render_item_cards(item, {"card_src_tar"}, step_info, tmp_path, 1, renderer, lang_cfg=HUN_ENG)
+        _render_item_cards(item, {"card_src_tar"}, tmp_path, 1, renderer, lang_cfg=HUN_ENG)
         renderer.render_card.assert_called_once()
         assert "card_src_tar" in item.target.assets
 
     def test_japanese_renderers_not_called_for_hungarian(self, tmp_path):
         renderer = _mock_renderer()
         item = _hun_noun()
-        step_info = _mock_step_info()
         _render_item_cards(
             item,
             {"card_src", "card_tar", "card_src_tar"},
-            step_info, tmp_path, 1, renderer, lang_cfg=HUN_ENG,
+            tmp_path, 1, renderer, lang_cfg=HUN_ENG,
         )
         # Only render_card is called, no specific ones
         assert renderer.render_card.call_count == 3
@@ -170,11 +167,8 @@ class TestRenderItemCardsHungarian:
     def test_eng_jap_still_uses_japanese_renderers_when_lang_cfg_provided(self, tmp_path):
         renderer = _mock_renderer()
         item = _noun()
-        step_info = _mock_step_info()
-        _render_item_cards(item, {"card_src", "card_tar", "card_src_tar"}, step_info, tmp_path, 1, renderer, lang_cfg=ENG_JAP)
-        renderer.render_card.assert_called_once()
-        renderer.render_card.assert_called_once()
-        renderer.render_card.assert_called_once()
+        _render_item_cards(item, {"card_src", "card_tar", "card_src_tar"}, tmp_path, 1, renderer, lang_cfg=ENG_JAP)
+        assert renderer.render_card.call_count == 3
         renderer.render_hun_card.assert_not_called()
 
 
@@ -255,7 +249,7 @@ class TestCompileAssetsSync:
 
 
 class TestCompileAssetsAsync:
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_passive_noun_generates_three_audio_files(self, tmp_path):
         renderer = _mock_renderer()
         engine_fn = _mock_engine_factory()
@@ -272,7 +266,7 @@ class TestCompileAssetsAsync:
         assert compiled[0].target.assets["audio_tar_f"] is not None
         assert compiled[0].target.assets["audio_tar_m"] is not None
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_active_noun_generates_one_audio_file(self, tmp_path):
         renderer = _mock_renderer()
         engine_fn = _mock_engine_factory()
@@ -289,7 +283,7 @@ class TestCompileAssetsAsync:
         assert compiled[0].source.assets.get("audio_src") is None
         assert compiled[0].target.assets.get("audio_tar_m") is None
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_engine_called_with_correct_voices(self, tmp_path):
         renderer = _mock_renderer()
         engine_fn = _mock_engine_factory()
@@ -306,7 +300,7 @@ class TestCompileAssetsAsync:
         assert "ja-JP-NanamiNeural" in voice_keys
         assert "ja-JP-KeitaNeural" in voice_keys
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_hungarian_uses_correct_voices(self, tmp_path):
         """hun-eng: source=hungarian_female, target=english_female/male."""
         renderer = _mock_renderer()
@@ -320,12 +314,12 @@ class TestCompileAssetsAsync:
 
         voice_keys = [c.args[0] for c in engine_fn.call_args_list]
         assert "hu-HU-NoemiNeural" in voice_keys
-        assert "en-US-AriaNeural" in voice_keys
-        assert "en-US-ZiraNeural" in voice_keys
+        assert "en-GB-SoniaNeural" in voice_keys
+        assert "en-GB-RyanNeural" in voice_keys
         assert "ja-JP-NanamiNeural" not in voice_keys
         assert "ja-JP-KeitaNeural" not in voice_keys
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_multiple_items_indexed_correctly(self, tmp_path):
         renderer = _mock_renderer()
         engine_fn = _mock_engine_factory()
@@ -351,7 +345,7 @@ class TestCompileAssetsAsync:
         assert "001" in compiled[0].source.assets["card_src"].name
         assert "002" in compiled[1].source.assets["card_src"].name
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_creates_audio_directory(self, tmp_path):
         renderer = _mock_renderer()
         engine_fn = _mock_engine_factory()
@@ -362,7 +356,7 @@ class TestCompileAssetsAsync:
         await compile_assets(items, ACTIVE_FLASH_CARDS, step_info, out, renderer, engine_fn)
         assert (out / "audio").is_dir()
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_full_pipeline_noun_verb_grammar(self, tmp_path):
         renderer = _mock_renderer()
         engine_fn = _mock_engine_factory()
