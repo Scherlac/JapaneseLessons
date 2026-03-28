@@ -35,6 +35,10 @@ class GenerateNarrativeVocabStep(PipelineStep):
                     all_verbs.append(term)
                     seen_verbs.add(key)
 
+        if not ctx.language_config:
+            self._log(ctx, "       (no language config for generating vocab — skipping)")
+            return ctx
+
         # Determine target-language field name from the vocab schema.
         # For eng-jap: vocab_noun_fields = {"english","japanese","kanji","romaji"} → "japanese"
         # For hun-eng: vocab_noun_fields = {"english","hungarian","pronunciation"}  → "hungarian"
@@ -56,6 +60,9 @@ class GenerateNarrativeVocabStep(PipelineStep):
         for i in range(max_batches):
             noun_batch = all_nouns[i * self.BATCH_SIZE : (i + 1) * self.BATCH_SIZE]
             verb_batch = all_verbs[i * self.BATCH_SIZE : (i + 1) * self.BATCH_SIZE]
+            if not ctx.language_config.prompts:
+                self._log(ctx, "       (no prompt template for generating vocab — skipping)")
+                break
             prompt = ctx.language_config.prompts.build_narrative_vocab_generate_prompt(
                 nouns=noun_batch,
                 verbs=verb_batch,

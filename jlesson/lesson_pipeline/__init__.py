@@ -40,6 +40,23 @@ from pathlib import Path
 from importlib import import_module
 from typing import Any
 
+from jlesson.lesson_pipeline.compile_assets import CompileAssetsStep
+from jlesson.lesson_pipeline.compile_touches import CompileTouchesStep
+from jlesson.lesson_pipeline.extract_narrative_vocab import ExtractNarrativeVocabStep
+from jlesson.lesson_pipeline.generate_narrative_vocab import GenerateNarrativeVocabStep
+from jlesson.lesson_pipeline.generate_sentences import NarrativeGrammarStep
+from jlesson.lesson_pipeline.grammar_select import GrammarSelectStep
+from jlesson.lesson_pipeline.narrative_generator import NarrativeGeneratorStep
+from jlesson.lesson_pipeline.noun_practice import NounPracticeStep
+from jlesson.lesson_pipeline.persist_content import PersistContentStep
+from jlesson.lesson_pipeline.register_lesson import RegisterLessonStep
+from jlesson.lesson_pipeline.render_video import RenderVideoStep
+from jlesson.lesson_pipeline.retrieve_material import RetrieveLessonMaterialStep
+from jlesson.lesson_pipeline.review_sentences import ReviewSentencesStep
+from jlesson.lesson_pipeline.save_report import SaveReportStep
+from jlesson.lesson_pipeline.select_vocab import SelectVocabStep
+from jlesson.lesson_pipeline.verb_practice import VerbPracticeStep
+
 from .pipeline_core import LessonConfig, LessonContext, PipelineStep, StepInfo
 
 _EXPORTS: dict[str, tuple[str, str]] = {
@@ -66,24 +83,24 @@ _EXPORTS: dict[str, tuple[str, str]] = {
 
 def _build_pipeline() -> list[PipelineStep]:
     return [
-        __getattr__("RetrieveLessonMaterialStep")(),
-        __getattr__("NarrativeGeneratorStep")(),
-        __getattr__("ExtractNarrativeVocabStep")(),
-        __getattr__("GenerateNarrativeVocabStep")(),
-        __getattr__("SelectVocabStep")(),
-        __getattr__("GrammarSelectStep")(),
-        __getattr__("NarrativeGrammarStep")(),
-        __getattr__("ReviewSentencesStep")(),
-        __getattr__("NounPracticeStep")(),
-        __getattr__("VerbPracticeStep")(),
-        __getattr__("RegisterLessonStep")(),
-        __getattr__("PersistContentStep")(),
-        __getattr__("CompileAssetsStep")(),
-        __getattr__("CompileTouchesStep")(),
-        __getattr__("RenderVideoStep")(),
-        __getattr__("SaveReportStep")(),
+        RetrieveLessonMaterialStep(),
+        NarrativeGeneratorStep(),
+        ExtractNarrativeVocabStep(),
+        GenerateNarrativeVocabStep(),
+        SelectVocabStep(),
+        GrammarSelectStep(),
+        NarrativeGrammarStep(),
+        ReviewSentencesStep(),
+        NounPracticeStep(),
+        VerbPracticeStep(),
+        RegisterLessonStep(),
+        PersistContentStep(),
+        CompileAssetsStep(),
+        CompileTouchesStep(),
+        RenderVideoStep(),
+        SaveReportStep(),
     ]
-
+        
 
 def run_pipeline(config: LessonConfig) -> LessonContext:
     """Run the full lesson generation pipeline."""
