@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from jlesson.runtime import PipelineGadgets
+from jlesson.runtime import PipelineRuntime
 from .pipeline_core import LessonContext, PipelineStep
 
 
@@ -34,7 +34,7 @@ class ReviewSentencesStep(PipelineStep):
                 verb_items,
                 ctx.selected_grammar,
             )
-            result = PipelineGadgets.ask_llm(ctx, prompt)
+            result = PipelineRuntime.ask_llm(ctx, prompt)
             for review in result.get("reviews", []):
                 # Offset review index back to global sentence index
                 if isinstance(review.get("index"), int):

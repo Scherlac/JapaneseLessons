@@ -159,7 +159,7 @@ def test_extract_narrative_vocab_stores_block_terms(tmp_path: Path):
         "build_narrative_vocab_extract_prompt",
         return_value="PROMPT",
     ), patch(
-        "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
+        "jlesson.runtime.PipelineRuntime.ask_llm",
         return_value={
             "blocks": [
                 {"index": 1, "nouns": ["Kiki", "Jiji"], "verbs": ["meet"]},
@@ -202,7 +202,7 @@ def test_grammar_select_builds_block_progression(tmp_path: Path):
         "existence_arimasu",
     ]
     with patch(
-        "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
+        "jlesson.runtime.PipelineRuntime.ask_llm",
         return_value={"selected_ids": selected_ids},
     ):
         GrammarSelectStep().execute(ctx)

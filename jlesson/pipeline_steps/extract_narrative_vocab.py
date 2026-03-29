@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from jlesson.models import NarrativeVocabBlock
-from jlesson.runtime import PipelineGadgets
+from jlesson.runtime import PipelineRuntime
 from .pipeline_core import LessonContext, PipelineStep
 
 
@@ -24,7 +24,7 @@ class ExtractNarrativeVocabStep(PipelineStep):
             nouns_per_block=ctx.config.num_nouns,
             verbs_per_block=ctx.config.num_verbs,
         )
-        result = PipelineGadgets.ask_llm(ctx, prompt)
+        result = PipelineRuntime.ask_llm(ctx, prompt)
         blocks: list[NarrativeVocabBlock] = []
         for block in result.get("blocks", []):
             if not isinstance(block, dict):

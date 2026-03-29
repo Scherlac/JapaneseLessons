@@ -61,7 +61,7 @@ from jlesson.pipeline_steps import (
     VerbPracticeStep,
 )
 from jlesson.pipeline_steps.generate_sentences import GenerateSentencesStep, NarrativeGrammarStep
-from jlesson.runtime import PipelineGadgets, PipelineRuntime
+from jlesson.runtime import PipelineRuntime
 
 
 def _build_pipeline() -> list[PipelineStep]:
@@ -139,7 +139,6 @@ __all__ = [
     "NounPracticeStep",
     "PersistContentStep",
     "PIPELINE",
-    "PipelineGadgets",
     "PipelineRuntime",
     "PipelineStep",
     "RegisterLessonStep",

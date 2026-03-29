@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from jlesson.models import GrammarItem
-from jlesson.runtime import PipelineGadgets
+from jlesson.runtime import PipelineRuntime
 from .pipeline_core import LessonContext, PipelineStep
 
 
@@ -38,7 +38,7 @@ class GrammarSelectStep(PipelineStep):
             covered_grammar_ids=covered,
             selection_count=ctx.config.grammar_points_per_lesson,
         )
-        result = PipelineGadgets.ask_llm(ctx, prompt)
+        result = PipelineRuntime.ask_llm(ctx, prompt)
         selected_ids: list[str] = result.get("selected_ids") or [
             g.id for g in unlocked[: ctx.config.grammar_points_per_lesson]
         ]

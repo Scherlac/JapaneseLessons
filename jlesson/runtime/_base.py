@@ -4,9 +4,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+from jlesson.llm_cache import ask_llm_cached
+from jlesson.llm_client import ask_llm_json_free
 from jlesson.models import VocabFile
 from jlesson.vocab_generator import generate_vocab, VOCAB_DIR
-from .pipeline_llm import ask_llm
 
 _DEFAULT_VOCAB_DIR = VOCAB_DIR
 
@@ -21,7 +22,9 @@ class PipelineRuntime:
     @staticmethod
     def ask_llm(ctx, prompt: str) -> dict[str, Any]:
         """Invoke the configured LLM path (cached or direct)."""
-        return ask_llm(ctx, prompt)
+        if ctx.config.use_cache:
+            return ask_llm_cached(prompt)
+        return ask_llm_json_free(prompt)
 
     @staticmethod
     def load_vocab(theme: str, vocab_dir: Path | None = None) -> VocabFile:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from jlesson.models import GeneralItem, Phase
-from jlesson.runtime import PipelineGadgets
+from jlesson.runtime import PipelineRuntime
 from .pipeline_core import LessonContext, PipelineStep
 
 
@@ -21,7 +21,7 @@ class NounPracticeStep(PipelineStep):
         raw_items: list[dict] = []
         for batch_start in range(0, len(noun_items_all), self.BATCH_SIZE):
             batch = noun_items_all[batch_start : batch_start + self.BATCH_SIZE]
-            result = PipelineGadgets.ask_llm(
+            result = PipelineRuntime.ask_llm(
                 ctx,
                 ctx.language_config.prompts.build_noun_practice_prompt(batch, lesson_number),
             )
