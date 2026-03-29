@@ -68,3 +68,58 @@ class PipelineRuntime:
             json.dumps(payload, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+
+
+class ContextRuntime:
+    """``RuntimeServices`` implementation backed by a live ``LessonContext``.
+
+    Wraps an existing ``LessonContext`` so ``ActionStep`` subclasses can pass a
+    ``RuntimeServices``-typed object to their ``StepAction`` without the action
+    needing to know about the full pipeline context.
+
+    Only ``call_llm`` is fully wired; the remaining operations raise
+    ``NotImplementedError`` until the corresponding step migrations land.
+    Migrate each operation by replacing its ``raise`` with a real
+    implementation delegating to the appropriate existing service.
+    """
+
+    def __init__(self, ctx: Any) -> None:
+        self._ctx = ctx
+
+    # ── LLM ──────────────────────────────────────────────────────────────────
+
+    def call_llm(self, prompt: str) -> dict[str, Any]:
+        """Route to the cached or direct LLM path based on ``ctx.config.use_cache``."""
+        return PipelineRuntime.ask_llm(self._ctx, prompt)
+
+    # ── Retrieval / vector store ──────────────────────────────────────────────
+
+    def query_retrieval(self, theme: str, **kwargs: Any) -> Any:
+        raise NotImplementedError("query_retrieval not yet migrated to ContextRuntime")
+
+    def update_retrieval(self, theme: str, items: list[Any]) -> None:
+        raise NotImplementedError("update_retrieval not yet migrated to ContextRuntime")
+
+    # ── Lesson content storage ────────────────────────────────────────────────
+
+    def read_content(self, lesson_id: int) -> dict[str, Any]:
+        raise NotImplementedError("read_content not yet migrated to ContextRuntime")
+
+    def write_content(self, lesson_id: int, data: dict[str, Any]) -> None:
+        raise NotImplementedError("write_content not yet migrated to ContextRuntime")
+
+    # ── Curriculum storage ────────────────────────────────────────────────────
+
+    def read_curriculum(self) -> Any:
+        raise NotImplementedError("read_curriculum not yet migrated to ContextRuntime")
+
+    def write_curriculum(self, data: Any) -> None:
+        raise NotImplementedError("write_curriculum not yet migrated to ContextRuntime")
+
+    # ── LLM response cache ────────────────────────────────────────────────────
+
+    def query_cache(self, key: str) -> dict[str, Any] | None:
+        raise NotImplementedError("query_cache not yet migrated to ContextRuntime")
+
+    def update_cache(self, key: str, value: dict[str, Any]) -> None:
+        raise NotImplementedError("update_cache not yet migrated to ContextRuntime")

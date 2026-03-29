@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from jlesson.runtime import PipelineRuntime
-from jlesson.models import GeneralItem, GrammarItem, Phase, Sentence
-from ..pipeline_core import LessonContext, PipelineStep
-from .config import build_narrative_grammar_language_config
-from .prompt import build_grammar_sentences_prompt
+from jlesson.models import GeneralItem, GrammarItem, Sentence
+from ..pipeline_core import ActionStep, BlockChunk, LessonContext
+from .action import GenerateSentencesAction
 
 
-class NarrativeGrammarStep(PipelineStep):
+class NarrativeGrammarStep(ActionStep[BlockChunk, list[Sentence]]):
     """Generate block-aware grammar sentences aligned to the narrative progression.
 
     Inputs (from ``LessonContext``)
@@ -29,20 +27,29 @@ class NarrativeGrammarStep(PipelineStep):
     -------
     sentences   list[Sentence]
         Grammar practice sentences with ``block_index`` and ``phase`` set.
+
+    Implementation
+    --------------
+    The iteration loop (one ``BlockChunk`` per lesson block) is handled by the
+    inherited ``ActionStep.execute``.  The step only declares the chunk shape
+    (``build_chunks``) and how to write results back to context
+    (``merge_outputs``).  The actual LLM call lives in ``GenerateSentencesAction``.
     """
 
     name = "narrative_grammar"
     description = "LLM: generate grammar sentences for each narrative block"
 
-    def execute(self, ctx: LessonContext) -> LessonContext:
+    @property
+    def action(self) -> GenerateSentencesAction:
+        return GenerateSentencesAction()
+
+    def should_skip(self, ctx: LessonContext) -> bool:
         if ctx.sentences:
             self._log(ctx, "       using retrieved sentences")
-            return ctx
+            return True
+        return False
 
-        step_config = build_narrative_grammar_language_config(ctx.language_config)
-        persons = list(step_config.persons)
-
-        ctx.sentences = []
+    def build_chunks(self, ctx: LessonContext) -> list[BlockChunk]:
         noun_blocks = self._chunk(ctx.nouns, ctx.config.num_nouns)
         verb_blocks = self._chunk(ctx.verbs, ctx.config.num_verbs)
         total_blocks = max(
@@ -51,44 +58,31 @@ class NarrativeGrammarStep(PipelineStep):
             len(ctx.narrative_blocks),
             ctx.config.lesson_blocks,
         )
-
+        chunks: list[BlockChunk] = []
         for block_index in range(total_blocks):
-            block_nouns: list[GeneralItem] = (
-                noun_blocks[block_index] if block_index < len(noun_blocks) else []
-            )
-            block_verbs: list[GeneralItem] = (
-                verb_blocks[block_index] if block_index < len(verb_blocks) else []
-            )
-            block_narrative = (
-                ctx.narrative_blocks[block_index]
-                if block_index < len(ctx.narrative_blocks)
-                else ""
-            )
             block_grammar: list[GrammarItem] = (
                 ctx.selected_grammar_blocks[block_index]
                 if block_index < len(ctx.selected_grammar_blocks)
                 and ctx.selected_grammar_blocks[block_index]
                 else ctx.selected_grammar
             )
-            prompt = build_grammar_sentences_prompt(
-                block_grammar,
-                block_nouns,
-                block_verbs,
-                persons=persons,
-                sentences_per_grammar=ctx.config.sentences_per_grammar,
-                narrative=block_narrative,
-                teacher_description=step_config.teacher_description,
-                output_source_field=step_config.output_source_field,
-                output_target_field=step_config.output_target_field,
-                output_phonetic_field=step_config.output_phonetic_field,
-            )
-            result = PipelineRuntime.ask_llm(ctx, prompt)
-            for sentence_source in result.get("sentences", []):
-                sentence = ctx.language_config.generator.convert_sentence(sentence_source)
-                sentence.block_index = block_index + 1
-                sentence.phase = Phase.GRAMMAR
-                ctx.sentences.append(sentence)
+            chunks.append(BlockChunk(
+                block_index=block_index,
+                narrative=(
+                    ctx.narrative_blocks[block_index]
+                    if block_index < len(ctx.narrative_blocks)
+                    else ""
+                ),
+                nouns=noun_blocks[block_index] if block_index < len(noun_blocks) else [],
+                verbs=verb_blocks[block_index] if block_index < len(verb_blocks) else [],
+                grammar=block_grammar,
+            ))
+        return chunks
 
+    def merge_outputs(
+        self, ctx: LessonContext, outputs: list[list[Sentence]]
+    ) -> LessonContext:
+        ctx.sentences = [s for block_sentences in outputs for s in block_sentences]
         self._log(ctx, f"       {len(ctx.sentences)} sentences")
         if ctx.sentences:
             src_lbl = ctx.language_config.source_label
@@ -151,5 +145,3 @@ class NarrativeGrammarStep(PipelineStep):
             return [items] if items else []
         return [items[index : index + size] for index in range(0, len(items), size)]
 
-
-GenerateSentencesStep = NarrativeGrammarStep

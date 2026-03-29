@@ -6,7 +6,7 @@ from jlesson.item_generator import EngJapItemGenerator
 from jlesson.models import NarrativeVocabBlock
 from jlesson.lesson_pipeline import (
     ExtractNarrativeVocabStep,
-    GenerateSentencesStep,
+    NarrativeGrammarStep,
     GrammarSelectStep,
     LessonConfig,
     LessonContext,
@@ -78,13 +78,13 @@ def test_generate_sentences_passes_explicit_narrative_to_prompt(tmp_path: Path):
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
 
     with patch(
-        "jlesson.pipeline_steps.generate_sentences.step.build_grammar_sentences_prompt",
+        "jlesson.pipeline_steps.generate_sentences.action.build_grammar_sentences_prompt",
         return_value="PROMPT",
     ) as mock_builder, patch(
-        "jlesson.pipeline_steps.generate_sentences.step.PipelineRuntime.ask_llm",
+        "jlesson.runtime._base.PipelineRuntime.ask_llm",
         return_value={"sentences": []},
     ):
-        GenerateSentencesStep().execute(ctx)
+        NarrativeGrammarStep().execute(ctx)
 
     assert mock_builder.call_args.kwargs["narrative"] == "Introduce Kiki and her neighborhood."
 
@@ -254,13 +254,13 @@ def test_generate_sentences_uses_block_specific_grammar_plan(tmp_path: Path):
     ctx.selected_grammar_blocks = [[grammar_a], [grammar_b]]
 
     with patch(
-        "jlesson.pipeline_steps.generate_sentences.step.build_grammar_sentences_prompt",
+        "jlesson.pipeline_steps.generate_sentences.action.build_grammar_sentences_prompt",
         return_value="PROMPT",
     ) as mock_builder, patch(
-        "jlesson.pipeline_steps.generate_sentences.step.PipelineRuntime.ask_llm",
+        "jlesson.runtime._base.PipelineRuntime.ask_llm",
         return_value={"sentences": []},
     ):
-        GenerateSentencesStep().execute(ctx)
+        NarrativeGrammarStep().execute(ctx)
 
     first_call = mock_builder.call_args_list[0].args[0]
     second_call = mock_builder.call_args_list[1].args[0]

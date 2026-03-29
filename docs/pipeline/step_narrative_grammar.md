@@ -1,7 +1,7 @@
 # Step: `narrative_grammar`
 
 **File:** `jlesson/lesson_pipeline/generate_sentences/`  
-**Class:** `NarrativeGrammarStep` (alias: `GenerateSentencesStep`)  
+**Class:** `NarrativeGrammarStep` (alias: `NarrativeGrammarStep`)  
 **Pipeline position:** Step 7 (after grammar selection, before sentence review)
 
 ---

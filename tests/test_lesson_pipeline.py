@@ -9,7 +9,7 @@ from jlesson.curriculum import create_curriculum, get_grammar_by_id
 from jlesson.lesson_pipeline import (
     CompileAssetsStep,
     CompileTouchesStep,
-    GenerateSentencesStep,
+    NarrativeGrammarStep,
     GrammarSelectStep,
     LessonConfig,
     LessonContext,
@@ -191,7 +191,7 @@ def test_grammar_select_skips_unknown_ids(ctx):
 
 
 # ---------------------------------------------------------------------------
-# GenerateSentencesStep
+# NarrativeGrammarStep
 # ---------------------------------------------------------------------------
 
 
@@ -210,8 +210,8 @@ def test_generate_sentences_stores_sentences(ctx):
             }
         ]
     }
-    with patch("jlesson.pipeline_steps.generate_sentences.step.PipelineRuntime.ask_llm", return_value=mock):
-        ctx = GenerateSentencesStep().execute(ctx)
+    with patch("jlesson.runtime._base.PipelineRuntime.ask_llm", return_value=mock):
+        ctx = NarrativeGrammarStep().execute(ctx)
     assert len(ctx.sentences) == 1
     assert ctx.sentences[0].source.display_text == "I eat bread."
 
@@ -229,8 +229,8 @@ def test_generate_sentences_adds_grammar_to_report(ctx):
             }
         ]
     }
-    with patch("jlesson.pipeline_steps.generate_sentences.step.PipelineRuntime.ask_llm", return_value=mock):
-        ctx = GenerateSentencesStep().execute(ctx)
+    with patch("jlesson.runtime._base.PipelineRuntime.ask_llm", return_value=mock):
+        ctx = NarrativeGrammarStep().execute(ctx)
     md = ctx.report.render()
     assert "## Phase 3" in md
     assert "action_present_affirmative" in md
@@ -240,8 +240,8 @@ def test_generate_sentences_empty_llm_response(ctx):
     ctx.nouns = _NOUN_ITEMS[:2]
     ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
-    with patch("jlesson.pipeline_steps.generate_sentences.step.PipelineRuntime.ask_llm", return_value={}):
-        ctx = GenerateSentencesStep().execute(ctx)
+    with patch("jlesson.runtime._base.PipelineRuntime.ask_llm", return_value={}):
+        ctx = NarrativeGrammarStep().execute(ctx)
     assert ctx.sentences == []
 
 

@@ -60,7 +60,7 @@ from jlesson.pipeline_steps import (
     StepInfo,
     VerbPracticeStep,
 )
-from jlesson.pipeline_steps.generate_sentences import GenerateSentencesStep, NarrativeGrammarStep
+from jlesson.pipeline_steps.generate_sentences import NarrativeGrammarStep
 from jlesson.runtime import PipelineRuntime
 
 
@@ -130,7 +130,7 @@ __all__ = [
     "CompileTouchesStep",
     "ExtractNarrativeVocabStep",
     "GenerateNarrativeVocabStep",
-    "GenerateSentencesStep",
+    "NarrativeGrammarStep",
     "GrammarSelectStep",
     "LessonConfig",
     "LessonContext",

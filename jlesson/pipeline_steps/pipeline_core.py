@@ -3,11 +3,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Generic, TypeVar
 
 from jlesson.language_config import LanguageConfig, get_language_config
 from jlesson.lesson_report import ReportBuilder
 from jlesson.models import CompiledItem, GeneralItem, GrammarItem, NarrativeVocabBlock, Sentence, Touch, VocabFile
 from jlesson.retrieval import RetrievalResult
+from jlesson.runtime.interfaces import RuntimeServices
 from jlesson.curriculum import CurriculumData, create_curriculum
 
 
@@ -105,3 +107,167 @@ class PipelineStep(ABC):
     def _log(ctx: LessonContext, msg: str) -> None:
         if ctx.config.verbose:
             print(msg)
+
+
+# ---------------------------------------------------------------------------
+# Typed chunk types
+# ---------------------------------------------------------------------------
+
+@dataclass
+class BlockChunk:
+    """Input snapshot for a single lesson block.
+
+    This is the standard chunk type for steps that iterate **per block** —
+    e.g. sentence generation, narrative generation, coherence review.
+
+    Fields map directly to the per-block slices assembled from ``LessonContext``
+    by the enclosing ``ActionStep.build_chunks`` implementation.
+    """
+
+    block_index: int
+    narrative: str
+    nouns: list[GeneralItem]
+    verbs: list[GeneralItem]
+    grammar: list[GrammarItem]
+
+
+_T = TypeVar("_T")
+
+
+@dataclass
+class ItemBatch(Generic[_T]):
+    """A fixed-size batch of homogeneous items for enrichment steps.
+
+    This is the standard chunk type for steps that iterate **per batch** —
+    e.g. noun/verb enrichment, sentence review.
+
+    ``block_index`` is ``-1`` when items span multiple blocks (e.g. review
+    steps that process all sentences regardless of their block origin).
+    """
+
+    batch_index: int
+    block_index: int
+    items: list[_T]
+
+
+# ---------------------------------------------------------------------------
+# Per-invocation action configuration
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ActionConfig:
+    """Immutable per-invocation scope passed to every ``StepAction``.
+
+    Carries the three configuration dimensions visible to a single action call:
+
+    lesson
+        Full lesson-level settings (num_nouns, sentences_per_grammar, etc.).
+    block_index
+        Which block this invocation handles (0-based).
+    language
+        Language-pair specific prompts, generators, and labels.
+    runtime
+        I/O facade for LLM calls, retrieval, storage, and cache.
+    """
+
+    lesson: LessonConfig
+    block_index: int
+    language: LanguageConfig
+    runtime: RuntimeServices
+
+
+# ---------------------------------------------------------------------------
+# Step action and action step abstractions
+# ---------------------------------------------------------------------------
+
+_I = TypeVar("_I")
+_O = TypeVar("_O")
+
+
+class StepAction(ABC, Generic[_I, _O]):
+    """Single, stateless transformation: ``(ActionConfig, chunk: I) → O``.
+
+    A ``StepAction`` encapsulates one logical transformation for one chunk of
+    work — one block, one batch, one item.  It has no knowledge of
+    ``LessonContext`` and no iteration logic.  All I/O is done through
+    ``config.runtime`` (a ``RuntimeServices`` instance).
+
+    This makes actions independently testable: supply a mock ``RuntimeServices``
+    and a typed chunk, and inspect the output without a live pipeline context.
+    """
+
+    @abstractmethod
+    def run(self, config: ActionConfig, chunk: _I) -> _O:
+        """Execute the action for one *chunk*; return the output."""
+        ...
+
+
+class ActionStep(PipelineStep, Generic[_I, _O]):
+    """``PipelineStep`` that drives a ``StepAction`` over typed input chunks.
+
+    Subclasses implement four declarative methods; ``execute`` handles the rest:
+
+    ``action``
+        The ``StepAction`` to invoke for each chunk.
+    ``should_skip(ctx)``
+        Return ``True`` when this step's output is already present in *ctx*
+        (idempotency guard, e.g. when retrieval pre-populated the field).
+    ``build_chunks(ctx)``
+        Decompose *ctx* into the ordered list of typed input chunks.
+    ``merge_outputs(ctx, outputs)``
+        Write the collected action outputs back to *ctx* and return it.
+
+    The iteration contract
+    ----------------------
+    ``execute`` calls ``build_chunks``, then for each chunk it constructs an
+    ``ActionConfig`` (binding the current ``LessonContext`` into a
+    ``ContextRuntime``) and invokes ``action.run(config, chunk)``.  After all
+    chunks are processed, ``merge_outputs`` is called once with the full list
+    of outputs.
+
+    ``block_index`` is read from ``chunk.block_index`` when the attribute
+    exists (``BlockChunk``, ``ItemBatch``); it falls back to the loop index
+    for custom chunk types that omit the attribute.
+    """
+
+    @property
+    @abstractmethod
+    def action(self) -> StepAction[_I, _O]:
+        """The ``StepAction`` to invoke for each chunk."""
+        ...
+
+    @abstractmethod
+    def should_skip(self, ctx: LessonContext) -> bool:
+        """Return ``True`` when this step's output is already populated."""
+        ...
+
+    @abstractmethod
+    def build_chunks(self, ctx: LessonContext) -> list[_I]:
+        """Decompose *ctx* into the ordered list of input chunks."""
+        ...
+
+    @abstractmethod
+    def merge_outputs(self, ctx: LessonContext, outputs: list[_O]) -> LessonContext:
+        """Apply the collected *outputs* back to *ctx* and return it."""
+        ...
+
+    def execute(self, ctx: LessonContext) -> LessonContext:
+        if self.should_skip(ctx):
+            return ctx
+
+        from jlesson.runtime._base import ContextRuntime  # local import avoids circularity
+
+        rt = ContextRuntime(ctx)
+        chunks = self.build_chunks(ctx)
+        outputs: list[_O] = []
+        for loop_index, chunk in enumerate(chunks):
+            block_index = getattr(chunk, "block_index", loop_index)
+            cfg = ActionConfig(
+                lesson=ctx.config,
+                block_index=block_index,
+                language=ctx.language_config,
+                runtime=rt,
+            )
+            outputs.append(self.action.run(cfg, chunk))
+
+        return self.merge_outputs(ctx, outputs)

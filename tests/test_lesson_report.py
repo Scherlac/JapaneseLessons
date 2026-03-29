@@ -189,7 +189,7 @@ def _build_full_report() -> str:
         ),
     )
 
-    # GenerateSentencesStep: grammar practice section
+    # NarrativeGrammarStep: grammar practice section
     rb.add(
         "grammar_practice",
         "\n".join(
