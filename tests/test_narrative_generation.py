@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from jlesson.curriculum import create_curriculum, get_grammar_by_id
+from jlesson.models import NarrativeVocabBlock
 from jlesson.lesson_pipeline import (
     ExtractNarrativeVocabStep,
     GenerateSentencesStep,
@@ -171,8 +172,8 @@ def test_extract_narrative_vocab_stores_block_terms(tmp_path: Path):
         ExtractNarrativeVocabStep().execute(ctx)
 
     assert ctx.narrative_vocab_terms == [
-        {"nouns": ["Kiki", "Jiji"], "verbs": ["meet"]},
-        {"nouns": ["bakery"], "verbs": ["fly"]},
+        NarrativeVocabBlock(nouns=["Kiki", "Jiji"], verbs=["meet"]),
+        NarrativeVocabBlock(nouns=["bakery"], verbs=["fly"]),
     ]
 
 

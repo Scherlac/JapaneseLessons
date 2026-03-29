@@ -5,19 +5,25 @@ from pathlib import Path
 from typing import Any
 
 from .pipeline_llm import ask_llm
+from .pipeline_vocab import load_vocab as _load_vocab_file
 
 
 class PipelineRuntime:
     """Shared runtime services used by pipeline steps.
 
-    This centralizes recurring operational concerns such as LLM calls and
-    lightweight JSON persistence helpers.
+    This centralizes recurring operational concerns such as LLM calls,
+    vocab file loading, and lightweight JSON persistence helpers.
     """
 
     @staticmethod
     def ask_llm(ctx, prompt: str) -> dict[str, Any]:
         """Invoke the configured LLM path (cached or direct)."""
         return ask_llm(ctx, prompt)
+
+    @staticmethod
+    def load_vocab(theme: str, vocab_dir: Path | None = None) -> dict[str, Any]:
+        """Load vocab JSON for *theme*, generating via LLM if the file is absent."""
+        return _load_vocab_file(theme, vocab_dir)
 
     @staticmethod
     def read_json(path: Path, default: dict[str, Any] | None = None) -> dict[str, Any]:

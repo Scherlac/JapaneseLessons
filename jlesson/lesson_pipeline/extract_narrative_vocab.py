@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from jlesson.models import NarrativeVocabBlock
 from .pipeline_core import LessonContext, PipelineStep
 from .pipeline_gadgets import PipelineGadgets
 
@@ -24,16 +25,16 @@ class ExtractNarrativeVocabStep(PipelineStep):
             verbs_per_block=ctx.config.num_verbs,
         )
         result = PipelineGadgets.ask_llm(ctx, prompt)
-        blocks: list[dict[str, list[str]]] = []
+        blocks: list[NarrativeVocabBlock] = []
         for block in result.get("blocks", []):
             if not isinstance(block, dict):
                 continue
             nouns = self._normalize_terms(block.get("nouns", []), ctx.config.num_nouns)
             verbs = self._normalize_terms(block.get("verbs", []), ctx.config.num_verbs)
-            blocks.append({"nouns": nouns, "verbs": verbs})
+            blocks.append(NarrativeVocabBlock(nouns=nouns, verbs=verbs))
 
         while len(blocks) < ctx.config.lesson_blocks:
-            blocks.append({"nouns": [], "verbs": []})
+            blocks.append(NarrativeVocabBlock())
         ctx.narrative_vocab_terms = blocks[: ctx.config.lesson_blocks]
         self._log(ctx, f"       {len(ctx.narrative_vocab_terms)} block vocab plans")
         return ctx

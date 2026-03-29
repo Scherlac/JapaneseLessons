@@ -25,12 +25,12 @@ class GenerateNarrativeVocabStep(PipelineStep):
         seen_nouns: set[str] = set()
         seen_verbs: set[str] = set()
         for block in ctx.narrative_vocab_terms:
-            for term in block.get("nouns", []):
+            for term in block.nouns:
                 key = term.lower()
                 if key not in seen_nouns:
                     all_nouns.append(term)
                     seen_nouns.add(key)
-            for term in block.get("verbs", []):
+            for term in block.verbs:
                 key = term.lower()
                 if key not in seen_verbs:
                     all_verbs.append(term)

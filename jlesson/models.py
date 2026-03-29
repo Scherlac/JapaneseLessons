@@ -130,6 +130,19 @@ class Sentence(GeneralItem):
         return data
 
 
+class NarrativeVocabBlock(BaseModel):
+    """Vocabulary terms extracted from one narrative block.
+
+    Produced by ``ExtractNarrativeVocabStep`` and consumed by ``SelectVocabStep``.
+    Replaces the raw ``dict[str, list[str]]`` representation so that downstream
+    steps get proper attribute access and Pydantic validation instead of
+    silent key-miss fallbacks.
+    """
+
+    nouns: list[str] = Field(default_factory=list)
+    verbs: list[str] = Field(default_factory=list)
+
+
 class GrammarItem(BaseModel):
     """A grammar progression item with generalized fields.
 

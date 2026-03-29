@@ -182,28 +182,28 @@ def get_grammar_by_id(grammar_id: str) -> GrammarItem:
     return _GRAMMAR_BY_ID[grammar_id]
 
 
-def summary(curriculum: dict) -> str:
+def summary(curriculum: CurriculumData) -> str:
     """Return a human-readable curriculum summary string (eng-jap grammar)."""
     lines = [
-        f"Curriculum: {curriculum['name']}",
-        f"  Total lessons : {len(curriculum['lessons'])}",
-        f"  Covered nouns : {len(curriculum['covered_nouns'])}",
-        f"  Covered verbs : {len(curriculum['covered_verbs'])}",
-        f"  Grammar done  : {len(curriculum['covered_grammar_ids'])}",
+        f"Curriculum: {curriculum.name}",
+        f"  Total lessons : {len(curriculum.lessons)}",
+        f"  Covered nouns : {len(curriculum.covered_nouns)}",
+        f"  Covered verbs : {len(curriculum.covered_verbs)}",
+        f"  Grammar done  : {len(curriculum.covered_grammar_ids)}",
     ]
 
-    if curriculum["lessons"]:
+    if curriculum.lessons:
         lines.append("")
         lines.append("  Lessons:")
-        for lesson in curriculum["lessons"]:
-            icon = "✅" if lesson["status"] == "completed" else "📝"
-            grammar_str = ", ".join(lesson["grammar_ids"]) or "—"
+        for lesson in curriculum.lessons:
+            icon = "✅" if lesson.status == "completed" else "📝"
+            grammar_str = ", ".join(lesson.grammar_ids) or "—"
             lines.append(
-                f"    {icon} #{lesson['id']:02d}  {lesson['title']}"
-                f"  ({lesson['items_count']} items | grammar: {grammar_str})"
+                f"    {icon} #{lesson.id:02d}  {lesson.title}"
+                f"  ({lesson.items_count} items | grammar: {grammar_str})"
             )
 
-    unlocked = get_next_grammar(curriculum["covered_grammar_ids"])
+    unlocked = get_next_grammar(curriculum.covered_grammar_ids)
     if unlocked:
         lines.append("")
         lines.append(f"  Next available grammar ({len(unlocked)} steps unlocked):")
