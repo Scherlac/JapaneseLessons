@@ -101,7 +101,7 @@ class BlockChunk:
     grammar: list[GrammarItem]
 ```
 
-Example steps: `generate_sentences`, `review_sentences` (future), `narrative_generator` (future).
+Example steps: `generate_sentences`.
 
 #### `ItemBatch[T]` — batched-item iteration
 
@@ -115,8 +115,25 @@ class ItemBatch(Generic[T]):
     items: list[T]
 ```
 
-Example steps (future): `noun_practice` (25-item batches), `verb_practice` (20-item batches),
+Example steps: `noun_practice` (25-item batches), `verb_practice` (20-item batches),
 `review_sentences` (30-item batches).
+
+#### Composite chunk types — when one action needs more than one input
+
+The standard chunk types are intentionally small, but an aligned step does not
+need to depend on exactly one upstream field.  When a step needs multiple
+inputs, define a custom `@dataclass` chunk that preserves the main predecessor
+artifact while carrying the extra context needed for the action.
+
+Examples:
+
+- `GrammarSelectChunk` keeps the lesson-wide grammar selection call explicit while carrying nouns, verbs, unlocked grammar, and lesson number.
+- `SentenceReviewBatch` extends `ItemBatch[Sentence]` so the successor step still advertises that it consumes `Sentence`, even though the prompt also needs nouns, verbs, and grammar context.
+- `BlockChunk` is already a composite setup artifact: narrative + nouns + verbs + grammar for one block.
+
+Rule of thumb: keep the predecessor artifact visible in the chunk's type
+signature, and add the other dependencies as fields on the chunk rather than
+reading them imperatively from `LessonContext` inside the action.
 
 ---
 
