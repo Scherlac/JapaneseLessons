@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import anyio
 from pathlib import Path
 
 from jlesson.language_config import LanguageConfig
@@ -113,7 +114,7 @@ async def _render_item_audio(
                 break
             except Exception as exc:
                 if attempt < 2:
-                    await asyncio.sleep(2**attempt)
+                    await anyio.sleep(2**attempt)
                 else:
                     raise RuntimeError(
                         f"TTS failed for asset '{asset_key}' after 3 attempts.\n"
@@ -126,7 +127,7 @@ async def _render_item_audio(
             item.source.assets[asset_key] = path
         else:
             item.target.assets[asset_key] = path
-        await asyncio.sleep(0.5)
+        await anyio.sleep(0.5)
 
 
 # ---------------------------------------------------------------------------

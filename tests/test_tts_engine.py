@@ -86,9 +86,10 @@ class TestCreateEngine:
         engine = create_engine("english_female")
         assert engine.voice == VOICES["english_female"]
 
-    def test_unknown_key_falls_back_to_japanese_female(self):
+    def test_unknown_key_is_used_as_raw_voice_name(self):
+        # create_engine accepts both symbolic keys and raw Edge-TTS voice names
         engine = create_engine("nonexistent_key")
-        assert engine.voice == VOICES["japanese_female"]
+        assert engine.voice == "nonexistent_key"
 
     def test_custom_rate_applied(self):
         engine = create_engine(rate="-30%")

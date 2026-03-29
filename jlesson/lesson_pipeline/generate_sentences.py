@@ -51,11 +51,10 @@ class NarrativeGrammarStep(PipelineStep):
                 ctx.sentences.append(sentence)
         self._log(ctx, f"       {len(ctx.sentences)} sentences")
         if ctx.sentences:
-            fm = ctx.language_config.field_map
-            src_lbl = fm.source_label
-            tgt_lbl = fm.target_label
-            ph_lbl = fm.phonetic_label
-            has_phonetic = bool(fm.phonetic_label)
+            src_lbl = ctx.language_config.source_label
+            tgt_lbl = ctx.language_config.target_label
+            ph_lbl = ctx.language_config.phonetic_label
+            has_phonetic = bool(ctx.language_config.phonetic_label)
             ctx.report.add(
                 "grammar_practice",
                 self._grammar_section(ctx.sentences, src_lbl, tgt_lbl, ph_lbl, has_phonetic),

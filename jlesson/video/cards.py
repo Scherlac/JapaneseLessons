@@ -99,7 +99,6 @@ class CardRenderer:
             "en_medium": ImageFont.truetype(en_font_path, 40),
             "en_small": ImageFont.truetype(en_font_path, 28),
             "label": ImageFont.truetype(en_bold_font_path, 24),
-            "jp_small": ImageFont.truetype(jp_font_path, 40),
             # Hungarian-English cards — Segoe UI for both (Latin script)
             "hun_target_large": ImageFont.truetype(en_bold_font_path, 80),
             "hun_native_medium": ImageFont.truetype(en_font_path, 48),
@@ -250,6 +249,153 @@ class CardRenderer:
                 font_extra = all_fonts.get(fk, _fallback)
                 y = _draw_line(y, str(val), font_extra, dim_color)
                 y += gap_after_line
+
+    # ── Convenience render methods ──────────────────────────────────────────
+
+    def render_introduce_card(
+        self,
+        english: str,
+        japanese: str,
+        kana: str,
+        romaji: str,
+        label: str,
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Introduce card: show English prompt with full Japanese reveal."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+        if label:
+            draw.text((cx, 60), label, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
+        draw.text((cx, 280), english, font=self.fonts["en_large"], anchor="mm", fill=self.accent_color)
+        draw.line([(cx - 200, 380), (cx + 200, 380)], fill="#333333", width=2)
+        draw.text((cx, 480), japanese, font=self.fonts["jp_large"], anchor="mm", fill=self.text_color)
+        if kana and kana != japanese:
+            draw.text((cx, 600), kana, font=self.fonts["jp_medium"], anchor="mm", fill=self.dim_color)
+        if romaji:
+            draw.text((cx, 700), romaji, font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color)
+        if progress > 0:
+            self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
+    def render_recall_card(
+        self,
+        japanese: str,
+        kana: str,
+        romaji: str,
+        english: str,
+        label: str,
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Recall card: show Japanese prompt, English translation below."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+        if label:
+            draw.text((cx, 60), label, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
+        draw.text((cx, 280), japanese, font=self.fonts["jp_large"], anchor="mm", fill=self.accent_color)
+        if kana and kana != japanese:
+            draw.text((cx, 400), kana, font=self.fonts["jp_medium"], anchor="mm", fill=self.dim_color)
+        if romaji:
+            draw.text((cx, 480), romaji, font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color)
+        draw.line([(cx - 200, 560), (cx + 200, 560)], fill="#333333", width=2)
+        draw.text((cx, 650), english, font=self.fonts["en_large"], anchor="mm", fill=self.text_color)
+        if progress > 0:
+            self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
+    def render_translate_card(
+        self,
+        english: str,
+        japanese: str,
+        romaji: str,
+        context: str,
+        label: str,
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Translate card: English sentence to translate into Japanese."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+        if label:
+            draw.text((cx, 60), label, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
+        if context:
+            draw.text((cx, 160), context, font=self.fonts["en_small"], anchor="mm", fill=self.dim_color)
+        draw.text((cx, 300), english, font=self.fonts["en_large"], anchor="mm", fill=self.accent_color)
+        draw.line([(cx - 200, 400), (cx + 200, 400)], fill="#333333", width=2)
+        draw.text((cx, 520), japanese, font=self.fonts["jp_large"], anchor="mm", fill=self.text_color)
+        if romaji:
+            draw.text((cx, 660), romaji, font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color)
+        if progress > 0:
+            self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
+    def render_en_card(
+        self,
+        english: str,
+        label: str = "",
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Card showing only the English (source) word."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+        if label:
+            draw.text((cx, 60), label, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
+        draw.text((cx, self.height // 2), english, font=self.fonts["en_large"], anchor="mm", fill=self.accent_color)
+        if progress > 0:
+            self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
+    def render_jp_card(
+        self,
+        japanese: str,
+        kana: str = "",
+        romaji: str = "",
+        label: str = "",
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Card showing only the Japanese (target) content."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+        if label:
+            draw.text((cx, 60), label, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
+        y = self.height // 2 - 80
+        draw.text((cx, y), japanese, font=self.fonts["jp_large"], anchor="mm", fill=self.text_color)
+        if kana and kana != japanese:
+            draw.text((cx, y + 140), kana, font=self.fonts["jp_medium"], anchor="mm", fill=self.dim_color)
+        if romaji:
+            draw.text((cx, y + 220), romaji, font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color)
+        if progress > 0:
+            self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
+
+    def render_bilingual_card(
+        self,
+        english: str,
+        japanese: str,
+        kana: str = "",
+        romaji: str = "",
+        label: str = "",
+        progress: float = 0.0,
+    ) -> Image.Image:
+        """Card showing both English and Japanese content side-by-side vertically."""
+        img = Image.new("RGB", (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(img)
+        cx = self.width // 2
+        if label:
+            draw.text((cx, 60), label, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
+        draw.text((cx, 240), english, font=self.fonts["en_large"], anchor="mm", fill=self.accent_color)
+        draw.line([(cx - 200, 340), (cx + 200, 340)], fill="#333333", width=2)
+        draw.text((cx, 460), japanese, font=self.fonts["jp_large"], anchor="mm", fill=self.text_color)
+        if kana and kana != japanese:
+            draw.text((cx, 580), kana, font=self.fonts["jp_medium"], anchor="mm", fill=self.dim_color)
+        if romaji:
+            draw.text((cx, 660), romaji, font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color)
+        if progress > 0:
+            self._draw_progress_bar(draw, self.height - 80, progress)
+        return img
 
     def save_card(self, img: Image.Image, path: Path) -> None:
         """Save a rendered card image to disk.

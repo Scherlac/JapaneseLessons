@@ -68,10 +68,8 @@ class FieldMap:
             return obj or ""
 
         def _resolve(root: str, relative_path: str) -> str:
-            if not root:
+            if not root or not relative_path:
                 return ""
-            if not relative_path:
-                return _get(root)
             return _get(f"{root}.{relative_path}")
 
         source_fields = source_fields or PartialFieldMap(text_path="")

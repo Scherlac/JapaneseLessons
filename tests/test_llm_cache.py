@@ -56,7 +56,7 @@ class TestResolveCacheDir:
     def test_default_when_no_env(self, monkeypatch):
         monkeypatch.delenv("LLM_CACHE_DIR", raising=False)
         result = _resolve_cache_dir(None)
-        assert result.parts[-2:] == ("output", ".cache")
+        assert result.parts[-2:] == (".jlesson", "cache")
 
 
 # ---------------------------------------------------------------------------
