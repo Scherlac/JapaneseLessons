@@ -12,23 +12,23 @@ class RenderVideoStep(PipelineStep):
     description = "Assemble MP4 from touch sequence"
 
     @staticmethod
-    def build_video_items(noun_items: list[dict], sentences: list[dict]) -> list[dict]:
+    def build_video_items(noun_items: list[dict], sentences: list[dict], tts_voice: str = "") -> list[dict]:
         items = []
         total = len(noun_items) + len(sentences)
 
         for index, noun in enumerate(noun_items, 1):
-            japanese = noun.get("japanese", "")
-            romaji = noun.get("romaji", "")
-            reveal = f"{japanese}  ({romaji})" if romaji else japanese
+            target = noun.get("target", "")
+            phonetic = noun.get("phonetic", "")
+            reveal = f"{target}  ({phonetic})" if phonetic else target
             items.append(
                 {
                     "phase": "Nouns",
                     "step": "INTRODUCE",
                     "counter": f"{index}/{total}",
-                    "prompt": noun.get("english", ""),
+                    "prompt": noun.get("source", ""),
                     "reveal": reveal,
-                    "tts_text": japanese,
-                    "tts_voice": "ja-JP-NanamiNeural",
+                    "tts_text": target,
+                    "tts_voice": tts_voice,
                 }
             )
 
@@ -39,10 +39,10 @@ class RenderVideoStep(PipelineStep):
                     "phase": "Grammar",
                     "step": "TRANSLATE",
                     "counter": f"{offset + index}/{total}",
-                    "prompt": sentence.get("english", ""),
-                    "reveal": sentence.get("japanese", ""),
-                    "tts_text": sentence.get("japanese", ""),
-                    "tts_voice": "ja-JP-NanamiNeural",
+                    "prompt": sentence.get("source", ""),
+                    "reveal": sentence.get("target", ""),
+                    "tts_text": sentence.get("target", ""),
+                    "tts_voice": tts_voice,
                 }
             )
 

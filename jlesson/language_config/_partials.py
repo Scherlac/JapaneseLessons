@@ -21,6 +21,7 @@ ENGLISH_LANGUAGE = PartialLanguageConfig(
     adj_fields=frozenset({"english"}),
     primary_voice="english_female",
     alternate_voice="english_male",
+    vocab_source_key="english",
 )
 
 
@@ -37,6 +38,7 @@ HUNGARIAN_LANGUAGE = PartialLanguageConfig(
     verb_fields=frozenset({"hungarian"}),
     adj_fields=frozenset({"hungarian"}),
     primary_voice="hungarian_female",
+    vocab_source_key="hungarian",
 )
 
 
@@ -48,6 +50,7 @@ JAPANESE_LANGUAGE = PartialLanguageConfig(
         phonetic_path="pronunciation",
         example_sentence_path="extra.example_sentence_jp",
         special_paths={"kanji": "extra.kanji", "masu_form": "extra.masu_form"},
+        special_labels={"masu_form": "Polite form"},
     ),
     label="Japanese",
     phonetic_label="Romaji",
@@ -61,4 +64,6 @@ JAPANESE_LANGUAGE = PartialLanguageConfig(
     alternate_voice="japanese_male",
     extra_display_keys=("kana", "masu_form"),
     card_extra_font_keys={"kana": "jp_small", "masu_form": "jp_small"},
+    vocab_source_key="japanese",
+    vocab_phonetic_key="romaji",
 )

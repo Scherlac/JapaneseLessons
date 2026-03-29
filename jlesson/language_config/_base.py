@@ -95,6 +95,7 @@ class PartialFieldMap:
     phonetic_path: str = ""
     example_sentence_path: str = ""
     special_paths: dict[str, str] = field(default_factory=dict)
+    special_labels: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -120,6 +121,8 @@ class PartialLanguageConfig:
     alternate_voice: str = ""
     extra_display_keys: tuple[str, ...] = ()
     card_extra_font_keys: dict[str, str] = field(default_factory=dict)
+    vocab_source_key: str = ""
+    vocab_phonetic_key: str = ""
 
 
 @dataclass(frozen=True)
@@ -241,6 +244,11 @@ class LanguageConfig:
     def target_special_paths(self) -> dict[str, str]:
         """Target-only extra fields exposed by the lesson data model."""
         return dict(self.target.field_map.special_paths)
+
+    @property
+    def target_special_labels(self) -> dict[str, str]:
+        """Display labels for target-special fields (role -> label)."""
+        return dict(self.target.field_map.special_labels)
 
     def view(self, item: Any) -> dict[str, Any]:
         """Return a generic role-based view of *item* using split role config."""

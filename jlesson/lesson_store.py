@@ -73,13 +73,13 @@ def save_shared_vocab(
         except (json.JSONDecodeError, OSError):
             existing = {}
 
-    seen_nouns = {n["english"] for n in existing.get("nouns", [])}
-    seen_verbs = {v["english"] for v in existing.get("verbs", [])}
+    seen_nouns = {n.get("id", "") for n in existing.get("nouns", []) if n.get("id")}
+    seen_verbs = {v.get("id", "") for v in existing.get("verbs", []) if v.get("id")}
 
     merged_nouns = list(existing.get("nouns", []))
     merged_verbs = list(existing.get("verbs", []))
-    merged_nouns.extend(n for n in nouns if n.get("english") not in seen_nouns)
-    merged_verbs.extend(v for v in verbs if v.get("english") not in seen_verbs)
+    merged_nouns.extend(n for n in nouns if n.get("id") not in seen_nouns)
+    merged_verbs.extend(v for v in verbs if v.get("id") not in seen_verbs)
 
     payload = {"theme": theme, "nouns": merged_nouns, "verbs": merged_verbs}
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

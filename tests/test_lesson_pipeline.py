@@ -57,14 +57,15 @@ def ctx(config: LessonConfig) -> LessonContext:
 
 
 _NOUNS = [
-    {"english": "water", "japanese": "\u307f\u305a", "kanji": "\u6c34", "romaji": "mizu"},
-    {"english": "bread", "japanese": "\u30d1\u30f3", "kanji": "\u30d1\u30f3", "romaji": "pan"},
-    {"english": "rice", "japanese": "\u3054\u306f\u3093", "kanji": "\u3054\u98ef", "romaji": "gohan"},
-    {"english": "tea", "japanese": "\u304a\u3061\u3083", "kanji": "\u304a\u8336", "romaji": "ocha"},
+    {"id": "water", "source": "water", "target": "\u307f\u305a", "phonetic": "mizu", "english": "water", "japanese": "\u307f\u305a", "kanji": "\u6c34", "romaji": "mizu"},
+    {"id": "bread", "source": "bread", "target": "\u30d1\u30f3", "phonetic": "pan", "english": "bread", "japanese": "\u30d1\u30f3", "kanji": "\u30d1\u30f3", "romaji": "pan"},
+    {"id": "rice", "source": "rice", "target": "\u3054\u306f\u3093", "phonetic": "gohan", "english": "rice", "japanese": "\u3054\u306f\u3093", "kanji": "\u3054\u98ef", "romaji": "gohan"},
+    {"id": "tea", "source": "tea", "target": "\u304a\u3061\u3083", "phonetic": "ocha", "english": "tea", "japanese": "\u304a\u3061\u3083", "kanji": "\u304a\u8336", "romaji": "ocha"},
 ]
 
 _VERBS = [
     {
+        "id": "eat", "source": "to eat", "target": "\u305f\u3079\u308b", "phonetic": "taberu",
         "english": "to eat",
         "japanese": "\u305f\u3079\u308b",
         "kanji": "\u98df\u3079\u308b",
@@ -73,6 +74,7 @@ _VERBS = [
         "masu_form": "\u98df\u3079\u307e\u3059",
     },
     {
+        "id": "drink", "source": "to drink", "target": "\u306e\u3080", "phonetic": "nomu",
         "english": "to drink",
         "japanese": "\u306e\u3080",
         "kanji": "\u98f2\u3080",
@@ -81,6 +83,7 @@ _VERBS = [
         "masu_form": "\u98f2\u307f\u307e\u3059",
     },
     {
+        "id": "buy", "source": "to buy", "target": "\u304b\u3046", "phonetic": "kau",
         "english": "to buy",
         "japanese": "\u304b\u3046",
         "kanji": "\u8cb7\u3046",
@@ -89,6 +92,7 @@ _VERBS = [
         "masu_form": "\u8cb7\u3044\u307e\u3059",
     },
     {
+        "id": "go", "source": "to go", "target": "\u3044\u304f", "phonetic": "iku",
         "english": "to go",
         "japanese": "\u3044\u304f",
         "kanji": "\u884c\u304f",
@@ -703,27 +707,27 @@ def test_persist_content_is_loadable(ctx, tmp_path):
 
 
 def test_build_video_items_noun_step_is_introduce():
-    nouns = [{"english": "water", "japanese": "\u307f\u305a", "romaji": "mizu"}]
+    nouns = [{"source": "water", "target": "\u307f\u305a", "phonetic": "mizu"}]
     items = RenderVideoStep.build_video_items(nouns, [])
     assert items[0]["step"] == "INTRODUCE"
 
 
 def test_build_video_items_sentence_step_is_translate():
-    sentences = [{"english": "I eat.", "japanese": "\u98df\u3079\u307e\u3059\u3002"}]
+    sentences = [{"source": "I eat.", "target": "\u98df\u3079\u307e\u3059\u3002"}]
     items = RenderVideoStep.build_video_items([], sentences)
     assert items[0]["step"] == "TRANSLATE"
 
 
 def test_build_video_items_counter_format():
-    nouns = [{"english": "water", "japanese": "\u307f\u305a", "romaji": "mizu"}]
-    sentences = [{"english": "I eat.", "japanese": "\u98df\u3079\u307e\u3059\u3002"}]
+    nouns = [{"source": "water", "target": "\u307f\u305a", "phonetic": "mizu"}]
+    sentences = [{"source": "I eat.", "target": "\u98df\u3079\u307e\u3059\u3002"}]
     items = RenderVideoStep.build_video_items(nouns, sentences)
     assert items[0]["counter"] == "1/2"
     assert items[1]["counter"] == "2/2"
 
 
 def test_build_video_items_reveal_includes_romaji():
-    nouns = [{"english": "water", "japanese": "\u307f\u305a", "romaji": "mizu"}]
+    nouns = [{"source": "water", "target": "\u307f\u305a", "phonetic": "mizu"}]
     items = RenderVideoStep.build_video_items(nouns, [])
     assert "mizu" in items[0]["reveal"]
 
@@ -733,8 +737,8 @@ def test_build_video_items_empty_inputs():
 
 
 def test_build_video_items_total_count():
-    nouns = [{"english": "w", "japanese": "j", "romaji": "r"}] * 3
-    sents = [{"english": "e", "japanese": "j"}] * 2
+    nouns = [{"source": "w", "target": "j", "phonetic": "r"}] * 3
+    sents = [{"source": "e", "target": "j"}] * 2
     assert len(RenderVideoStep.build_video_items(nouns, sents)) == 5
 
 

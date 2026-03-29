@@ -24,12 +24,8 @@ class RetrieveLessonMaterialStep(PipelineStep):
         return Path(__file__).parent.parent.parent / "output" / "retrieval" / "material_index.json"
 
     @staticmethod
-    def _get_non_english_branch_language(ctx: LessonContext) -> str:
-        native = ctx.language_config.source.display_name.lower()
-        target = ctx.language_config.target.display_name.lower()
-        if native != "english":
-            return native
-        return target
+    def _get_target_language_code(ctx: LessonContext) -> str:
+        return ctx.language_config.target.display_name.lower()
 
     @staticmethod
     def _estimate_retrieval_coverage(
@@ -82,7 +78,7 @@ class RetrieveLessonMaterialStep(PipelineStep):
         )
         result = service.search(
             ctx.config.theme,
-            requested_language=self._get_non_english_branch_language(ctx),
+            requested_language=self._get_target_language_code(ctx),
             filters={"theme": ctx.config.theme},
             limit=ctx.config.retrieval_limit,
         )

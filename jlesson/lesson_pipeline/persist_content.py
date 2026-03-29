@@ -12,11 +12,12 @@ from jlesson.lesson_store import save_lesson_content, save_shared_vocab
 def _item_to_vocab_dict(item) -> dict:
     if isinstance(item, dict):
         return item
+    source_text = item.source.display_text or ""
     d = {**item.source.extra, **item.target.extra}
-    if "english" not in d:
-        d["english"] = item.source.display_text
-    if "pronunciation" not in d and item.target.pronunciation:
-        d["pronunciation"] = item.target.pronunciation
+    d["id"] = source_text.strip().lower()
+    d["source"] = source_text
+    d["target"] = item.target.display_text or ""
+    d["phonetic"] = item.target.pronunciation or ""
     return d
 
 

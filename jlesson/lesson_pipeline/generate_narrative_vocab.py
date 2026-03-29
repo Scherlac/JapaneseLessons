@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from jlesson.vocab_generator._base import _normalize_vocab_item
 from .pipeline_core import LessonContext, PipelineStep
 from .pipeline_gadgets import PipelineGadgets
 
@@ -39,15 +40,7 @@ class GenerateNarrativeVocabStep(PipelineStep):
             self._log(ctx, "       (no language config for generating vocab — skipping)")
             return ctx
 
-        # Determine target-language field name from the vocab schema.
-        # For eng-jap: vocab_noun_fields = {"english","japanese","kanji","romaji"} → "japanese"
-        # For hun-eng: vocab_noun_fields = {"english","hungarian","pronunciation"}  → "hungarian"
-        _aux = {"english", "pronunciation", "kanji", "romaji"}
-        target_field = next(
-            (f for f in ctx.language_config.vocab_noun_fields if f not in _aux),
-            "english",
-        )
-
+        lc = ctx.language_config
         nouns: list[dict] = []
         verbs: list[dict] = []
 
@@ -70,12 +63,14 @@ class GenerateNarrativeVocabStep(PipelineStep):
             )
             result = PipelineGadgets.ask_llm(ctx, prompt)
             nouns.extend(
-                n for n in result.get("nouns", [])
-                if isinstance(n, dict) and n.get("english") and n.get(target_field)
+                _normalize_vocab_item(n, lc)
+                for n in result.get("nouns", [])
+                if isinstance(n, dict) and n.get(lc.source.vocab_source_key) and n.get(lc.target.vocab_source_key)
             )
             verbs.extend(
-                v for v in result.get("verbs", [])
-                if isinstance(v, dict) and v.get("english") and v.get(target_field)
+                _normalize_vocab_item(v, lc)
+                for v in result.get("verbs", [])
+                if isinstance(v, dict) and v.get(lc.source.vocab_source_key) and v.get(lc.target.vocab_source_key)
             )
 
         ctx.vocab = {

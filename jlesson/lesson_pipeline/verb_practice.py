@@ -39,21 +39,20 @@ class VerbPracticeStep(PipelineStep):
         tgt_lbl = ctx.language_config.target_label
         ph_lbl = ctx.language_config.phonetic_label
         has_phonetic = bool(ph_lbl)
-        has_masu = "masu_form" in ctx.language_config.target_special_paths
-        ctx.report.add("vocabulary", self._vocab_table(ctx.verb_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic, has_masu))
-        ctx.report.add("verb_practice", self._practice_section(ctx.verb_items, tgt_lbl, ph_lbl, has_masu))
+        special_labels = ctx.language_config.target_special_labels
+        ctx.report.add("vocabulary", self._vocab_table(ctx.verb_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic, special_labels))
+        ctx.report.add("verb_practice", self._practice_section(ctx.verb_items, tgt_lbl, ph_lbl, special_labels))
         return ctx
 
     @staticmethod
-    def _vocab_table(items: list[GeneralItem], src_lbl: str, tgt_lbl: str, ph_lbl: str, has_phonetic: bool, has_masu: bool) -> str:
-        masu_lbl = "Polite form"
+    def _vocab_table(items: list[GeneralItem], src_lbl: str, tgt_lbl: str, ph_lbl: str, has_phonetic: bool, special_labels: dict[str, str]) -> str:
         header = f"| # | {src_lbl} | {tgt_lbl} |"
         sep = "|---|---------|----------|"
         if has_phonetic:
             header += f" {ph_lbl} |"
             sep += "--------|"
-        if has_masu:
-            header += f" {masu_lbl} |"
+        for label in special_labels.values():
+            header += f" {label} |"
             sep += "-------------|"
         lines = ["### Verbs", ""]
         by_block: dict[int, list[GeneralItem]] = {}
@@ -67,14 +66,14 @@ class VerbPracticeStep(PipelineStep):
                 row = f"| {index} | {item.source.display_text} | {item.target.display_text} |"
                 if has_phonetic and item.target.pronunciation:
                     row += f" {item.target.pronunciation} |"
-                if has_masu and item.target.extra.get("masu_form"):
-                    row += f" {item.target.extra['masu_form']} |"
+                for role in special_labels:
+                    row += f" {item.target.extra.get(role, '')} |"
                 lines.append(row)
             lines.append("")
         return "\n".join(lines)
 
     @staticmethod
-    def _practice_section(items: list[GeneralItem], tgt_lbl: str, ph_lbl: str, has_masu: bool) -> str:
+    def _practice_section(items: list[GeneralItem], tgt_lbl: str, ph_lbl: str, special_labels: dict[str, str]) -> str:
         lines: list[str] = ["## Phase 2 - Verb Practice", ""]
         by_block: dict[int, list[GeneralItem]] = {}
         for item in items:
@@ -87,8 +86,10 @@ class VerbPracticeStep(PipelineStep):
                 lines.append(f"- **{tgt_lbl}:** {item.target.display_text}")
                 if item.target.pronunciation:
                     lines.append(f"- **{ph_lbl}:** {item.target.pronunciation}")
-                if has_masu and item.target.extra.get("masu_form"):
-                    lines.append(f"- **Polite form:** {item.target.extra['masu_form']}")
+                for role, label in special_labels.items():
+                    value = item.target.extra.get(role)
+                    if value:
+                        lines.append(f"- **{label}:** {value}")
                 polite = item.target.extra.get("polite_forms", {})
                 if polite:
                     for form_name, form_value in polite.items():

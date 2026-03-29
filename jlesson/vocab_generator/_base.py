@@ -153,22 +153,43 @@ def _collect_items(raw: dict, key: str) -> list[dict]:
     return []
 
 
-def _merge_unique_by_english(existing: list[dict], new_items: list[dict]) -> tuple[list[dict], int]:
-    """Merge items while keeping only the first occurrence per English key."""
+def _merge_unique_by_id(existing: list[dict], new_items: list[dict]) -> tuple[list[dict], int]:
+    """Merge items while keeping only the first occurrence per 'id' key."""
     merged = list(existing)
     seen = {
-        str(item.get("english", "")).strip().lower()
+        str(item.get("id", "")).strip().lower()
         for item in existing
-        if isinstance(item, dict) and str(item.get("english", "")).strip()
+        if isinstance(item, dict) and str(item.get("id", "")).strip()
     }
     added = 0
     for item in new_items:
-        key = str(item.get("english", "")).strip().lower()
+        key = str(item.get("id", "")).strip().lower()
         if key and key not in seen:
             seen.add(key)
             merged.append(item)
             added += 1
     return merged, added
+
+
+def _normalize_vocab_item(item: dict, lc: "LanguageConfig") -> dict:
+    """Convert a language-specific LLM vocab dict to generic field names.
+
+    Adds ``id``, ``source``, ``target``, and ``phonetic`` keys.
+    Language-specific keys are kept as-is so callers can still access them.
+    """
+    src_key = lc.source.vocab_source_key
+    tgt_key = lc.target.vocab_source_key
+    ph_key = lc.target.vocab_phonetic_key
+    source_text = item.get(src_key, "") if src_key else ""
+    target_text = item.get(tgt_key, "") if tgt_key else ""
+    phonetic_text = item.get(ph_key, "") if ph_key else ""
+    return {
+        "id": source_text.strip().lower(),
+        "source": source_text,
+        "target": target_text,
+        "phonetic": phonetic_text,
+        **item,
+    }
 
 
 def _resolve_word_targets(
@@ -289,6 +310,8 @@ def generate_vocab(
     out_dir = Path(output_dir) if output_dir else VOCAB_DIR
     out_path = out_dir / f"{theme}.json"
     partial_out_path = out_dir / f"{theme}.partial.json"
+    lc = get_language_config(language)
+    src_key = lc.source.vocab_source_key or "source"
     blocked_english = {
         str(w).strip().lower()
         for w in (avoid_english_words or [])
@@ -377,7 +400,7 @@ def generate_vocab(
             batch = _request_vocab_json(_build_prompt(n_target, v_target, a_target))
 
             for noun in _collect_items(batch, "nouns"):
-                key = str(noun.get("english", "")).strip().lower()
+                key = str(noun.get(src_key, "")).strip().lower()
                 if key and key not in seen_nouns:
                     seen_nouns.add(key)
                     raw["nouns"].append(noun)
@@ -385,7 +408,7 @@ def generate_vocab(
                     repeat_hits.add(key)
 
             for verb in _collect_items(batch, "verbs"):
-                key = str(verb.get("english", "")).strip().lower()
+                key = str(verb.get(src_key, "")).strip().lower()
                 if key and key not in seen_verbs:
                     seen_verbs.add(key)
                     raw["verbs"].append(verb)
@@ -393,7 +416,7 @@ def generate_vocab(
                     repeat_hits.add(key)
 
             for adj in _collect_items(batch, "adjectives"):
-                key = str(adj.get("english", "")).strip().lower()
+                key = str(adj.get(src_key, "")).strip().lower()
                 if key and key not in seen_adjectives:
                     seen_adjectives.add(key)
                     raw["adjectives"].append(adj)
@@ -417,7 +440,7 @@ def generate_vocab(
             batch = _request_vocab_json(_build_prompt(req_n, req_v, req_a))
 
             for noun in _collect_items(batch, "nouns"):
-                key = str(noun.get("english", "")).strip().lower()
+                key = str(noun.get(src_key, "")).strip().lower()
                 if key and key not in seen_nouns and len(raw["nouns"]) < target_nouns:
                     seen_nouns.add(key)
                     raw["nouns"].append(noun)
@@ -425,7 +448,7 @@ def generate_vocab(
                     repeat_hits.add(key)
 
             for verb in _collect_items(batch, "verbs"):
-                key = str(verb.get("english", "")).strip().lower()
+                key = str(verb.get(src_key, "")).strip().lower()
                 if key and key not in seen_verbs and len(raw["verbs"]) < target_verbs:
                     seen_verbs.add(key)
                     raw["verbs"].append(verb)
@@ -433,7 +456,7 @@ def generate_vocab(
                     repeat_hits.add(key)
 
             for adj in _collect_items(batch, "adjectives"):
-                key = str(adj.get("english", "")).strip().lower()
+                key = str(adj.get(src_key, "")).strip().lower()
                 if key and key not in seen_adjectives and len(raw["adjectives"]) < target_adjectives:
                     seen_adjectives.add(key)
                     raw["adjectives"].append(adj)
@@ -479,7 +502,10 @@ def generate_vocab(
             f"LLM-generated vocab for '{theme}' failed schema validation:\n"
             + "\n".join(f"  • {e}" for e in errors)
         )
-
+    # Normalize items to generic field names (id / source / target / phonetic)
+    lc_norm = get_language_config(language)
+    for group in ("nouns", "verbs", "adjectives", "others"):
+        raw[group] = [_normalize_vocab_item(item, lc_norm) for item in raw.get(group, []) if isinstance(item, dict)]
     if save:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path.write_text(
@@ -518,7 +544,9 @@ def extend_vocab(
         )
 
     existing = json.loads(out_path.read_text(encoding="utf-8"))
-    target_key = "hungarian" if language == "hun-eng" else "japanese"
+    lc_norm = get_language_config(language)
+    src_key = lc_norm.source.vocab_source_key or "source"
+    tgt_key = lc_norm.target.vocab_source_key or "target"
 
     existing_english_words: list[str] = []
     existing_target_words: list[str] = []
@@ -529,8 +557,8 @@ def extend_vocab(
         for item in items:
             if not isinstance(item, dict):
                 continue
-            eng = str(item.get("english", "")).strip()
-            tgt = str(item.get(target_key, "")).strip()
+            eng = str(item.get("source", item.get(src_key, ""))).strip()
+            tgt = str(item.get("target", item.get(tgt_key, ""))).strip()
             if eng:
                 existing_english_words.append(eng)
             if tgt:
@@ -555,16 +583,20 @@ def extend_vocab(
     existing_adjectives = existing.get("adjectives", []) if isinstance(existing.get("adjectives", []), list) else []
     existing_others = existing.get("others", []) if isinstance(existing.get("others", []), list) else []
 
-    merged_nouns, added_nouns = _merge_unique_by_english(existing_nouns, generated.get("nouns", []))
-    merged_verbs, added_verbs = _merge_unique_by_english(existing_verbs, generated.get("verbs", []))
-    merged_adjectives, added_adjectives = _merge_unique_by_english(
-        existing_adjectives,
-        generated.get("adjectives", []),
-    )
-    merged_others, added_others = _merge_unique_by_english(
-        existing_others,
-        generated.get("others", []),
-    )
+    # Normalize both existing and newly generated items to generic keys before merging
+    existing_nouns = [_normalize_vocab_item(i, lc_norm) for i in existing_nouns if isinstance(i, dict)]
+    existing_verbs = [_normalize_vocab_item(i, lc_norm) for i in existing_verbs if isinstance(i, dict)]
+    existing_adjectives = [_normalize_vocab_item(i, lc_norm) for i in existing_adjectives if isinstance(i, dict)]
+    existing_others = [_normalize_vocab_item(i, lc_norm) for i in existing_others if isinstance(i, dict)]
+    gen_nouns = [_normalize_vocab_item(i, lc_norm) for i in generated.get("nouns", []) if isinstance(i, dict)]
+    gen_verbs = [_normalize_vocab_item(i, lc_norm) for i in generated.get("verbs", []) if isinstance(i, dict)]
+    gen_adjectives = [_normalize_vocab_item(i, lc_norm) for i in generated.get("adjectives", []) if isinstance(i, dict)]
+    gen_others = [_normalize_vocab_item(i, lc_norm) for i in generated.get("others", []) if isinstance(i, dict)]
+
+    merged_nouns, added_nouns = _merge_unique_by_id(existing_nouns, gen_nouns)
+    merged_verbs, added_verbs = _merge_unique_by_id(existing_verbs, gen_verbs)
+    merged_adjectives, added_adjectives = _merge_unique_by_id(existing_adjectives, gen_adjectives)
+    merged_others, added_others = _merge_unique_by_id(existing_others, gen_others)
 
     merged = {
         **existing,

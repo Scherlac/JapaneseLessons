@@ -32,6 +32,8 @@ HUN_ENG_CONFIG = LanguageConfig(
         alternate_voice="english_uk_male",
         extra_display_keys=ENGLISH_LANGUAGE.extra_display_keys,
         card_extra_font_keys=dict(ENGLISH_LANGUAGE.card_extra_font_keys),
+        vocab_source_key="english",
+        vocab_phonetic_key="pronunciation",
     ),
 
     voices=tts_engine.VOICES,

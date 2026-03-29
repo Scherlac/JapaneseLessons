@@ -51,8 +51,8 @@ class SelectVocabStep(PipelineStep):
                 num_verbs=requested_verbs,
                 seed=ctx.config.seed,
             )
-        self._log(ctx, f"       nouns : {[n['english'] for n in ctx.nouns]}")
-        self._log(ctx, f"       verbs : {[v['english'] for v in ctx.verbs]}")
+        self._log(ctx, f"       nouns : {[n['source'] for n in ctx.nouns]}")
+        self._log(ctx, f"       verbs : {[v['source'] for v in ctx.verbs]}")
         return ctx
 
     @classmethod
@@ -70,7 +70,7 @@ class SelectVocabStep(PipelineStep):
         covered = {cls._normalize_term(item, is_verb=is_verb) for item in covered_items}
         fresh_items = [
             item for item in items
-            if cls._normalize_term(item.get("english", ""), is_verb=is_verb) not in covered
+            if cls._normalize_term(item.get("id", ""), is_verb=is_verb) not in covered
         ]
         used: set[str] = set()
         selected: list[dict] = []
@@ -86,7 +86,7 @@ class SelectVocabStep(PipelineStep):
                 if match is None:
                     continue
                 block_selected.append(match)
-                used.add(cls._normalize_term(match.get("english", ""), is_verb=is_verb))
+                used.add(cls._normalize_term(match.get("id", ""), is_verb=is_verb))
                 if len(block_selected) >= requested_per_block:
                     break
 
@@ -111,7 +111,7 @@ class SelectVocabStep(PipelineStep):
     ) -> list[dict]:
         picked: list[dict] = []
         for item in items:
-            key = cls._normalize_term(item.get("english", ""), is_verb=is_verb)
+            key = cls._normalize_term(item.get("id", ""), is_verb=is_verb)
             if key in used:
                 continue
             picked.append(item)
@@ -131,7 +131,7 @@ class SelectVocabStep(PipelineStep):
     ) -> dict | None:
         normalized = cls._normalize_term(term, is_verb=is_verb)
         for item in items:
-            candidate = cls._normalize_term(item.get("english", ""), is_verb=is_verb)
+            candidate = cls._normalize_term(item.get("id", ""), is_verb=is_verb)
             if candidate == normalized and candidate not in used:
                 return item
         return None
