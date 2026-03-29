@@ -14,7 +14,6 @@ from __future__ import annotations
 from ..models import GeneralItem, GrammarItem, Sentence
 from ._base import (
     PromptInterface,
-    build_narrative_generator_prompt,
     build_narrative_vocab_extract_prompt,
 )
 
@@ -573,19 +572,6 @@ class HunEngPrompts(PromptInterface):
         return hungarian_build_grammar_select_prompt(
             unlocked_grammar, available_nouns, available_verbs,
             lesson_number, covered_grammar_ids, selection_count,
-        )
-
-    def build_narrative_generator_prompt(
-        self,
-        theme: str,
-        lesson_number: int,
-        lesson_blocks: int,
-        seed_blocks: list[str] | None = None,
-    ) -> str:
-        return build_narrative_generator_prompt(
-            theme, lesson_number, lesson_blocks,
-            source_language_label="Hungarian",
-            seed_blocks=seed_blocks,
         )
 
     def build_narrative_vocab_extract_prompt(

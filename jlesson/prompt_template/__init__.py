@@ -11,7 +11,6 @@ continue to work unchanged:
 # Shared / language-agnostic
 from ._base import (
     PromptInterface,
-    build_narrative_generator_prompt,
     build_narrative_vocab_extract_prompt,
 )
 
@@ -50,7 +49,6 @@ from .hun_eng import (
 __all__ = [
     # base
     "PromptInterface",
-    "build_narrative_generator_prompt",
     "build_narrative_vocab_extract_prompt",
     # eng-jap
     "PERSONS_BEGINNER",

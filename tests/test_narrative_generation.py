@@ -10,12 +10,11 @@ from jlesson.lesson_pipeline import (
     LessonContext,
     NarrativeGeneratorStep,
 )
-from jlesson.models import GrammarItem
 from jlesson.prompt_template import build_grammar_generate_prompt
 
 
 def test_build_grammar_generate_prompt_includes_narrative():
-    grammar = [GrammarItem(**get_grammar_by_id("action_present_affirmative"))]
+    grammar = [get_grammar_by_id("action_present_affirmative")]
     nouns = [
         {
             "english": "cat",
@@ -121,12 +120,8 @@ def test_narrative_generator_falls_back_to_default_blocks_when_llm_empty(tmp_pat
         ctx.language_config.generator,
         "build_default_narrative_blocks",
         return_value=["Auto block 1", "Auto block 2"],
-    ) as mock_default, patch.object(
-        ctx.language_config.prompts,
-        "build_narrative_generator_prompt",
-        return_value="PROMPT",
-    ), patch(
-        "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
+    ) as mock_default, patch(
+        "jlesson.lesson_pipeline.narrative_generator.step.PipelineRuntime.ask_llm",
         return_value={"blocks": []},
     ):
         NarrativeGeneratorStep().execute(ctx)
@@ -201,7 +196,7 @@ def test_grammar_select_builds_block_progression(tmp_path: Path):
     ):
         GrammarSelectStep().execute(ctx)
 
-    assert [[g["id"] for g in block] for block in ctx.selected_grammar_blocks] == [
+    assert [[g.id for g in block] for block in ctx.selected_grammar_blocks] == [
         ["identity_present_affirmative"],
         ["action_present_affirmative"],
         ["existence_arimasu"],
