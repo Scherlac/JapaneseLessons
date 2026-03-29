@@ -184,6 +184,22 @@ class NarrativeFrame:
     blocks: list[str]
 
 
+@dataclass
+class NarrativeVocabPlan:
+    """Typed output of ``ExtractNarrativeVocabStep``.
+
+    Also serves as the input chunk for ``GenerateNarrativeVocabStep``,
+    continuing the typed inter-step dependency chain:
+
+        NarrativeFrame → ExtractNarrativeVocabStep → NarrativeVocabPlan
+                      → GenerateNarrativeVocabStep → VocabFile
+
+    Context field: ``LessonContext.narrative_vocab_terms``
+    """
+
+    blocks: list[NarrativeVocabBlock]
+
+
 # ---------------------------------------------------------------------------
 # Per-invocation action configuration
 # ---------------------------------------------------------------------------

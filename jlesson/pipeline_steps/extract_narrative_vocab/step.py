@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from jlesson.models import NarrativeVocabBlock
-
-from ..pipeline_core import ActionStep, LessonContext, NarrativeFrame
+from ..pipeline_core import ActionStep, LessonContext, NarrativeFrame, NarrativeVocabPlan
 from .action import ExtractNarrativeVocabAction
 
 
-class ExtractNarrativeVocabStep(ActionStep[NarrativeFrame, list[NarrativeVocabBlock]]):
+class ExtractNarrativeVocabStep(ActionStep[NarrativeFrame, NarrativeVocabPlan]):
     """Extract per-block vocabulary targets from the narrative progression.
 
     Inputs (from ``LessonContext``)
@@ -14,13 +12,15 @@ class ExtractNarrativeVocabStep(ActionStep[NarrativeFrame, list[NarrativeVocabBl
     narrative_blocks    list[str]
         Produced by ``NarrativeGeneratorStep`` and written to
         ``LessonContext.narrative_blocks``.  ``build_chunks`` wraps these in a
-        ``NarrativeFrame`` — the same type that ``NarrativeGeneratorStep``
-        emits — making the inter-step dependency typed rather than implicit.
+        ``NarrativeFrame`` — the same type ``NarrativeGeneratorStep`` emits —
+        making the inter-step dependency typed rather than implicit.
 
     Output
     ------
-    narrative_vocab_terms   list[NarrativeVocabBlock]
-        Per-block noun/verb vocabulary hints consumed by ``SelectVocabStep``.
+    narrative_vocab_terms   list[NarrativeVocabBlock]  (via ``NarrativeVocabPlan``)
+        Per-block noun/verb vocabulary hints.  The action emits a
+        ``NarrativeVocabPlan`` which is also the direct input chunk for the
+        successor step ``GenerateNarrativeVocabStep``.
     """
 
     name = "extract_narrative_vocab"
@@ -42,11 +42,11 @@ class ExtractNarrativeVocabStep(ActionStep[NarrativeFrame, list[NarrativeVocabBl
         return [NarrativeFrame(blocks=ctx.narrative_blocks)]
 
     def merge_outputs(
-        self, ctx: LessonContext, outputs: list[list[NarrativeVocabBlock]]
+        self, ctx: LessonContext, outputs: list[NarrativeVocabPlan]
     ) -> LessonContext:
         if not outputs:
             self._log(ctx, "       (no narrative blocks — skipping vocab extraction)")
             return ctx
-        ctx.narrative_vocab_terms = outputs[0]
+        ctx.narrative_vocab_terms = outputs[0].blocks
         self._log(ctx, f"       {len(ctx.narrative_vocab_terms)} block vocab plans")
         return ctx

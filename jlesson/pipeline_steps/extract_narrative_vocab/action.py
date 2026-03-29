@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from jlesson.models import NarrativeVocabBlock
 
-from ..pipeline_core import ActionConfig, NarrativeFrame, StepAction
+from ..pipeline_core import ActionConfig, NarrativeFrame, NarrativeVocabPlan, StepAction
 
 
-class ExtractNarrativeVocabAction(StepAction[NarrativeFrame, list[NarrativeVocabBlock]]):
+class ExtractNarrativeVocabAction(StepAction[NarrativeFrame, NarrativeVocabPlan]):
     """Extract per-block vocabulary targets from the narrative progression.
 
     Input
@@ -25,12 +25,14 @@ class ExtractNarrativeVocabAction(StepAction[NarrativeFrame, list[NarrativeVocab
 
     Output
     ------
-    list[NarrativeVocabBlock]
-        Per-block noun/verb vocabulary targets, one entry per narrative block.
+    NarrativeVocabPlan
+        Per-block noun/verb vocabulary targets wrapped in the typed inter-step
+        artifact.  The same type is the direct input chunk for the successor
+        step ``GenerateNarrativeVocabStep``, continuing the typed chain.
         One LLM call is made via ``config.runtime.call_llm``.
     """
 
-    def run(self, config: ActionConfig, chunk: NarrativeFrame) -> list[NarrativeVocabBlock]:
+    def run(self, config: ActionConfig, chunk: NarrativeFrame) -> NarrativeVocabPlan:
         prompt = config.language.prompts.build_narrative_vocab_extract_prompt(
             narrative_blocks=chunk.blocks,
             nouns_per_block=config.lesson.num_nouns,
@@ -47,7 +49,7 @@ class ExtractNarrativeVocabAction(StepAction[NarrativeFrame, list[NarrativeVocab
 
         while len(blocks) < len(chunk.blocks):
             blocks.append(NarrativeVocabBlock())
-        return blocks[:len(chunk.blocks)]
+        return NarrativeVocabPlan(blocks=blocks[:len(chunk.blocks)])
 
     @staticmethod
     def _normalize_terms(raw_terms: list, limit: int) -> list[str]:
