@@ -1350,12 +1350,12 @@ def test_run_pipeline_retrieval_miss_falls_back_to_vocab(config, tmp_path):
     with (
         patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB) as mock_load_vocab,
         patch(
-            "jlesson.lesson_pipeline.narrative_generator.step.PipelineRuntime.ask_llm",
-            return_value=mock_narrative,
+            "jlesson.lesson_pipeline.runtime.PipelineRuntime.ask_llm",
+            side_effect=[mock_narrative, mock_generate_narrative_vocab, mock_sentences],
         ),
         patch(
             "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
-            side_effect=[mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_nouns, mock_verbs],
+            side_effect=[mock_narrative_vocab, mock_grammar, mock_nouns, mock_verbs],
         ),
     ):
         ctx = run_pipeline(config)

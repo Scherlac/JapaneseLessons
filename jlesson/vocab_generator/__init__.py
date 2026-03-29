@@ -9,11 +9,12 @@ Usage:
     from jlesson.vocab_generator import validate_vocab_schema
 """
 
-from ._base import VOCAB_DIR, extend_vocab, generate_vocab, validate_vocab_schema
+from ._base import VOCAB_DIR, extend_vocab, generate_vocab, normalize_vocab_item, validate_vocab_schema
 
 __all__ = [
     "generate_vocab",
     "extend_vocab",
+    "normalize_vocab_item",
     "validate_vocab_schema",
     "VOCAB_DIR",
 ]

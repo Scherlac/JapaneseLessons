@@ -5,15 +5,17 @@ from pathlib import Path
 from typing import Any
 
 from jlesson.models import VocabFile
+from jlesson.vocab_generator import generate_vocab, VOCAB_DIR
 from .pipeline_llm import ask_llm
-from .pipeline_vocab import load_vocab as _load_vocab_file
+
+_DEFAULT_VOCAB_DIR = VOCAB_DIR
 
 
 class PipelineRuntime:
     """Shared runtime services used by pipeline steps.
 
-    This centralizes recurring operational concerns such as LLM calls,
-    vocab file loading, and lightweight JSON persistence helpers.
+    This centralizes recurring operational concerns: LLM routing, vocab file
+    loading (with LLM generation fallback), and lightweight JSON persistence.
     """
 
     @staticmethod
@@ -23,8 +25,25 @@ class PipelineRuntime:
 
     @staticmethod
     def load_vocab(theme: str, vocab_dir: Path | None = None) -> VocabFile:
-        """Load vocab JSON for *theme*, generating via LLM if the file is absent."""
-        return _load_vocab_file(theme, vocab_dir)
+        """Load vocab JSON for *theme*, generating via LLM if the file is absent.
+
+        File I/O is handled here (runtime concern).  When the file is missing,
+        generation is delegated to ``vocab_generator.generate_vocab`` (domain
+        concern) which validates, normalizes, and saves the result.
+        """
+        base_dir = Path(vocab_dir) if vocab_dir is not None else _DEFAULT_VOCAB_DIR
+        path = base_dir / f"{theme}.json"
+        if path.exists():
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            print(f"  [vocab] {theme}.json not found — generating via LLM...")
+            raw = generate_vocab(
+                theme=theme,
+                num_nouns=12,
+                num_verbs=10,
+                output_dir=base_dir,
+            )
+        return VocabFile.model_validate(raw)
 
     @staticmethod
     def read_json(path: Path, default: dict[str, Any] | None = None) -> dict[str, Any]:

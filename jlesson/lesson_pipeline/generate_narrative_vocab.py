@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from jlesson.vocab_generator._base import _normalize_vocab_item
+from jlesson.vocab_generator import normalize_vocab_item
 from jlesson.models import VocabFile, VocabItem
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_gadgets import PipelineGadgets
+from .runtime import PipelineRuntime
 
 
 class GenerateNarrativeVocabStep(PipelineStep):
@@ -62,14 +62,14 @@ class GenerateNarrativeVocabStep(PipelineStep):
                 verbs=verb_batch,
                 theme=ctx.config.theme,
             )
-            result = PipelineGadgets.ask_llm(ctx, prompt)
+            result = PipelineRuntime.ask_llm(ctx, prompt)
             nouns.extend(
-                _normalize_vocab_item(n, lc)
+                normalize_vocab_item(n, lc)
                 for n in result.get("nouns", [])
                 if isinstance(n, dict) and n.get(lc.source.vocab_source_key) and n.get(lc.target.vocab_source_key)
             )
             verbs.extend(
-                _normalize_vocab_item(v, lc)
+                normalize_vocab_item(v, lc)
                 for v in result.get("verbs", [])
                 if isinstance(v, dict) and v.get(lc.source.vocab_source_key) and v.get(lc.target.vocab_source_key)
             )

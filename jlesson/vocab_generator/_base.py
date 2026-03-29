@@ -171,7 +171,7 @@ def _merge_unique_by_id(existing: list[dict], new_items: list[dict]) -> tuple[li
     return merged, added
 
 
-def _normalize_vocab_item(item: dict, lc: "LanguageConfig") -> dict:
+def normalize_vocab_item(item: dict, lc: "LanguageConfig") -> dict:
     """Convert a language-specific LLM vocab dict to generic field names.
 
     Adds ``id``, ``source``, ``target``, and ``phonetic`` keys.
@@ -505,7 +505,7 @@ def generate_vocab(
     # Normalize items to generic field names (id / source / target / phonetic)
     lc_norm = get_language_config(language)
     for group in ("nouns", "verbs", "adjectives", "others"):
-        raw[group] = [_normalize_vocab_item(item, lc_norm) for item in raw.get(group, []) if isinstance(item, dict)]
+        raw[group] = [normalize_vocab_item(item, lc_norm) for item in raw.get(group, []) if isinstance(item, dict)]
     if save:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path.write_text(
@@ -584,14 +584,14 @@ def extend_vocab(
     existing_others = existing.get("others", []) if isinstance(existing.get("others", []), list) else []
 
     # Normalize both existing and newly generated items to generic keys before merging
-    existing_nouns = [_normalize_vocab_item(i, lc_norm) for i in existing_nouns if isinstance(i, dict)]
-    existing_verbs = [_normalize_vocab_item(i, lc_norm) for i in existing_verbs if isinstance(i, dict)]
-    existing_adjectives = [_normalize_vocab_item(i, lc_norm) for i in existing_adjectives if isinstance(i, dict)]
-    existing_others = [_normalize_vocab_item(i, lc_norm) for i in existing_others if isinstance(i, dict)]
-    gen_nouns = [_normalize_vocab_item(i, lc_norm) for i in generated.get("nouns", []) if isinstance(i, dict)]
-    gen_verbs = [_normalize_vocab_item(i, lc_norm) for i in generated.get("verbs", []) if isinstance(i, dict)]
-    gen_adjectives = [_normalize_vocab_item(i, lc_norm) for i in generated.get("adjectives", []) if isinstance(i, dict)]
-    gen_others = [_normalize_vocab_item(i, lc_norm) for i in generated.get("others", []) if isinstance(i, dict)]
+    existing_nouns = [normalize_vocab_item(i, lc_norm) for i in existing_nouns if isinstance(i, dict)]
+    existing_verbs = [normalize_vocab_item(i, lc_norm) for i in existing_verbs if isinstance(i, dict)]
+    existing_adjectives = [normalize_vocab_item(i, lc_norm) for i in existing_adjectives if isinstance(i, dict)]
+    existing_others = [normalize_vocab_item(i, lc_norm) for i in existing_others if isinstance(i, dict)]
+    gen_nouns = [normalize_vocab_item(i, lc_norm) for i in generated.get("nouns", []) if isinstance(i, dict)]
+    gen_verbs = [normalize_vocab_item(i, lc_norm) for i in generated.get("verbs", []) if isinstance(i, dict)]
+    gen_adjectives = [normalize_vocab_item(i, lc_norm) for i in generated.get("adjectives", []) if isinstance(i, dict)]
+    gen_others = [normalize_vocab_item(i, lc_norm) for i in generated.get("others", []) if isinstance(i, dict)]
 
     merged_nouns, added_nouns = _merge_unique_by_id(existing_nouns, gen_nouns)
     merged_verbs, added_verbs = _merge_unique_by_id(existing_verbs, gen_verbs)
