@@ -164,7 +164,7 @@ def test_grammar_select_picks_valid_grammar(ctx):
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_result):
         ctx = GrammarSelectStep().execute(ctx)
     assert len(ctx.selected_grammar) == 1
-    assert ctx.selected_grammar[0]["id"] == "action_present_affirmative"
+    assert ctx.selected_grammar[0].id == "action_present_affirmative"
 
 
 def test_grammar_select_falls_back_when_llm_empty(ctx):
@@ -182,7 +182,7 @@ def test_grammar_select_skips_unknown_ids(ctx):
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_result):
         ctx = GrammarSelectStep().execute(ctx)
     # Unknown IDs are skipped, but the chain is still filled programmatically
-    assert all(g["id"] != "nonexistent_grammar_id" for g in ctx.selected_grammar)
+    assert all(g.id != "nonexistent_grammar_id" for g in ctx.selected_grammar)
 
 
 # ---------------------------------------------------------------------------
@@ -709,27 +709,27 @@ def test_persist_content_is_loadable(ctx, tmp_path):
 def test_build_video_items_noun_step_is_introduce():
     nouns = [{"source": "water", "target": "\u307f\u305a", "phonetic": "mizu"}]
     items = RenderVideoStep.build_video_items(nouns, [])
-    assert items[0]["step"] == "INTRODUCE"
+    assert items[0].step == "INTRODUCE"
 
 
 def test_build_video_items_sentence_step_is_translate():
     sentences = [{"source": "I eat.", "target": "\u98df\u3079\u307e\u3059\u3002"}]
     items = RenderVideoStep.build_video_items([], sentences)
-    assert items[0]["step"] == "TRANSLATE"
+    assert items[0].step == "TRANSLATE"
 
 
 def test_build_video_items_counter_format():
     nouns = [{"source": "water", "target": "\u307f\u305a", "phonetic": "mizu"}]
     sentences = [{"source": "I eat.", "target": "\u98df\u3079\u307e\u3059\u3002"}]
     items = RenderVideoStep.build_video_items(nouns, sentences)
-    assert items[0]["counter"] == "1/2"
-    assert items[1]["counter"] == "2/2"
+    assert items[0].counter == "1/2"
+    assert items[1].counter == "2/2"
 
 
 def test_build_video_items_reveal_includes_romaji():
     nouns = [{"source": "water", "target": "\u307f\u305a", "phonetic": "mizu"}]
     items = RenderVideoStep.build_video_items(nouns, [])
-    assert "mizu" in items[0]["reveal"]
+    assert "mizu" in items[0].reveal
 
 
 def test_build_video_items_empty_inputs():

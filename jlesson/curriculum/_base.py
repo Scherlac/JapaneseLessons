@@ -131,10 +131,10 @@ def get_next_grammar_from(
     )
 
 
-def grammar_summary_lines(grammar_entries: list[dict]) -> list[str]:
-    """Format a list of grammar entries as short human-readable lines."""
+def grammar_summary_lines(grammar_entries: list[GrammarItem]) -> list[str]:
+    """Format a list of GrammarItem objects as short human-readable lines."""
     return [
-        f"  [{g['level']}] {g['id']}: {g['pattern']} — {g['description']}"
+        f"  [{g.level}] {g.id}: {g.pattern} \u2014 {g.description}"
         for g in grammar_entries
     ]
 

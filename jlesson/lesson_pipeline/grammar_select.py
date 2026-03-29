@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from jlesson.models import GrammarItem
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_grammar import grammar_id
 from .pipeline_gadgets import PipelineGadgets
 
 
@@ -46,7 +45,7 @@ class GrammarSelectStep(PipelineStep):
         ctx.selected_grammar = []
         for selected_id in selected_ids:
             if selected_id in grammar_map:
-                ctx.selected_grammar.append(grammar_map[selected_id].model_dump())
+                ctx.selected_grammar.append(grammar_map[selected_id])
             else:
                 self._log(
                     ctx, f"       Warning: unknown grammar id {selected_id!r}, skipping"
@@ -57,22 +56,22 @@ class GrammarSelectStep(PipelineStep):
         window = max(1, ctx.config.grammar_points_per_block)
         needed = window + max(ctx.config.lesson_blocks - 1, 0)
         if len(ctx.selected_grammar) < needed:
-            selected_ids_set = {grammar_id(g) for g in ctx.selected_grammar}
+            selected_ids_set = {g.id for g in ctx.selected_grammar}
             already_covered = list(covered) + list(selected_ids_set)
             additional = self._project_grammar(progression, already_covered, needed)
             for g in additional:
                 if g.id not in selected_ids_set:
-                    ctx.selected_grammar.append(g.model_dump())
+                    ctx.selected_grammar.append(g)
                     selected_ids_set.add(g.id)
 
         ctx.selected_grammar_blocks = self._build_block_progression(ctx)
         self._log(
             ctx,
-            f"       selected : {[grammar_id(g) for g in ctx.selected_grammar]}",
+            f"       selected : {[g.id for g in ctx.selected_grammar]}",
         )
         if ctx.selected_grammar_blocks:
             block_lines = "\n".join(
-                f"         block {b + 1:>2}: {[grammar_id(g) for g in block]}"
+                f"         block {b + 1:>2}: {[g.id for g in block]}"
                 for b, block in enumerate(ctx.selected_grammar_blocks)
             )
             self._log(ctx, f"       by block :\n{block_lines}")
@@ -107,7 +106,7 @@ class GrammarSelectStep(PipelineStep):
         return result
 
     @staticmethod
-    def _build_block_progression(ctx: LessonContext) -> list[list[GrammarItem | dict]]:
+    def _build_block_progression(ctx: LessonContext) -> list[list[GrammarItem]]:
         selected = list(ctx.selected_grammar)
         if not selected:
             return []

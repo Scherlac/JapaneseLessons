@@ -100,8 +100,8 @@ class TestGrammarProgressionTable:
 
     def test_get_grammar_by_id_returns_correct_entry(self):
         g = get_grammar_by_id("action_present_affirmative")
-        assert g["level"] == 1
-        assert g["pattern"] == "Subject + object + verb (polite)"
+        assert g.level == 1
+        assert g.pattern == "Subject + object + verb (polite)"
 
     def test_get_grammar_by_id_raises_on_unknown(self):
         with pytest.raises(KeyError):
@@ -115,34 +115,34 @@ class TestGetNextGrammar:
         unlocked = get_next_grammar([])
         assert len(unlocked) >= 1
         for g in unlocked:
-            assert g["requires"] == [], "Non-level-1 step returned when nothing covered"
+            assert g.requires == [], "Non-level-1 step returned when nothing covered"
 
     def test_level1_steps_are_sorted_first(self):
         unlocked = get_next_grammar([])
-        levels = [g["level"] for g in unlocked]
+        levels = [g.level for g in unlocked]
         assert levels == sorted(levels)
 
     def test_completing_prerequisite_unlocks_dependent(self):
         """Covering action_present_affirmative must unlock action_present_negative."""
-        before = {g["id"] for g in get_next_grammar([])}
+        before = {g.id for g in get_next_grammar([])}
         assert "action_present_negative" not in before
 
-        after = {g["id"] for g in get_next_grammar(["action_present_affirmative"])}
+        after = {g.id for g in get_next_grammar(["action_present_affirmative"])}
         assert "action_present_negative" in after
 
     def test_step_not_returned_if_already_covered(self):
         covered = ["action_present_affirmative"]
-        unlocked_ids = {g["id"] for g in get_next_grammar(covered)}
+        unlocked_ids = {g.id for g in get_next_grammar(covered)}
         assert "action_present_affirmative" not in unlocked_ids
 
     def test_multi_prerequisite_step_not_unlocked_until_all_covered(self):
         """action_past_negative requires both action_present_negative AND action_past_affirmative."""
         only_neg = ["action_present_affirmative", "action_present_negative"]
-        ids_neg = {g["id"] for g in get_next_grammar(only_neg)}
+        ids_neg = {g.id for g in get_next_grammar(only_neg)}
         assert "action_past_negative" not in ids_neg
 
         both = only_neg + ["action_past_affirmative"]
-        ids_both = {g["id"] for g in get_next_grammar(both)}
+        ids_both = {g.id for g in get_next_grammar(both)}
         assert "action_past_negative" in ids_both
 
     def test_all_covered_returns_empty(self):

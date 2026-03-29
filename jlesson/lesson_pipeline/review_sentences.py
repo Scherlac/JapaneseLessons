@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_grammar import coerce_grammar_items
 from .pipeline_gadgets import PipelineGadgets
 
 
@@ -33,7 +32,7 @@ class ReviewSentencesStep(PipelineStep):
                 batch,
                 noun_items,
                 verb_items,
-                coerce_grammar_items(ctx.selected_grammar),
+                ctx.selected_grammar,
             )
             result = PipelineGadgets.ask_llm(ctx, prompt)
             for review in result.get("reviews", []):

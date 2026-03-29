@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from jlesson.models import Phase, Sentence
 from .pipeline_core import LessonContext, PipelineStep
-from .pipeline_grammar import coerce_grammar_items
 from .pipeline_gadgets import PipelineGadgets
 
 
@@ -37,7 +36,7 @@ class NarrativeGrammarStep(PipelineStep):
                 else ctx.selected_grammar
             )
             prompt = ctx.language_config.prompts.build_grammar_generate_prompt(
-                coerce_grammar_items(block_grammar),
+                block_grammar,
                 noun_items,
                 verb_items,
                 sentences_per_grammar=ctx.config.sentences_per_grammar,

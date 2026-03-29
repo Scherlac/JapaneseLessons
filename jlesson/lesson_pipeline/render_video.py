@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import jlesson.video.builder as video_builder_module
+from jlesson.models import VideoCard
 from .pipeline_core import LessonContext, PipelineStep
 from .pipeline_paths import resolve_lesson_dir
 
@@ -12,39 +13,35 @@ class RenderVideoStep(PipelineStep):
     description = "Assemble MP4 from touch sequence"
 
     @staticmethod
-    def build_video_items(noun_items: list[dict], sentences: list[dict], tts_voice: str = "") -> list[dict]:
-        items = []
+    def build_video_items(noun_items: list[dict], sentences: list[dict], tts_voice: str = "") -> list[VideoCard]:
+        items: list[VideoCard] = []
         total = len(noun_items) + len(sentences)
 
         for index, noun in enumerate(noun_items, 1):
             target = noun.get("target", "")
             phonetic = noun.get("phonetic", "")
             reveal = f"{target}  ({phonetic})" if phonetic else target
-            items.append(
-                {
-                    "phase": "Nouns",
-                    "step": "INTRODUCE",
-                    "counter": f"{index}/{total}",
-                    "prompt": noun.get("source", ""),
-                    "reveal": reveal,
-                    "tts_text": target,
-                    "tts_voice": tts_voice,
-                }
-            )
+            items.append(VideoCard(
+                phase="Nouns",
+                step="INTRODUCE",
+                counter=f"{index}/{total}",
+                prompt=noun.get("source", ""),
+                reveal=reveal,
+                tts_text=target,
+                tts_voice=tts_voice,
+            ))
 
         offset = len(noun_items)
         for index, sentence in enumerate(sentences, 1):
-            items.append(
-                {
-                    "phase": "Grammar",
-                    "step": "TRANSLATE",
-                    "counter": f"{offset + index}/{total}",
-                    "prompt": sentence.get("source", ""),
-                    "reveal": sentence.get("target", ""),
-                    "tts_text": sentence.get("target", ""),
-                    "tts_voice": tts_voice,
-                }
-            )
+            items.append(VideoCard(
+                phase="Grammar",
+                step="TRANSLATE",
+                counter=f"{offset + index}/{total}",
+                prompt=sentence.get("source", ""),
+                reveal=sentence.get("target", ""),
+                tts_text=sentence.get("target", ""),
+                tts_voice=tts_voice,
+            ))
 
         return items
 

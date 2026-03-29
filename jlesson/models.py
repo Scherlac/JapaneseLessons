@@ -267,6 +267,18 @@ class CompiledItem(GeneralItem):
 # #     model_config = {"arbitrary_types_allowed": True}
 
 
+class VideoCard(BaseModel):
+    """One card item for the simple video rendering pipeline."""
+
+    phase: str
+    step: str
+    counter: str
+    prompt: str
+    reveal: str
+    tts_text: str
+    tts_voice: str = ""
+
+
 class Touch(BaseModel):
     """One learner interaction — output of Stage 3 (touch compiler).
 

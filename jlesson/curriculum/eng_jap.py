@@ -161,22 +161,21 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
 GRAMMAR_PROGRESSION = ENG_TO_JAP_GRAMMAR_PROGRESSION
 
 # Fast lookup by id.
-_GRAMMAR_BY_ID: dict[str, dict] = {g.id: g.model_dump() for g in GRAMMAR_PROGRESSION}
+_GRAMMAR_BY_ID: dict[str, GrammarItem] = {g.id: g for g in GRAMMAR_PROGRESSION}
 
 
 # ── Convenience wrappers with eng-jap defaults ────────────────────────────────
 
-def get_next_grammar(covered_grammar_ids: list[str]) -> list[dict]:
+def get_next_grammar(covered_grammar_ids: list[str]) -> list[GrammarItem]:
     """Return grammar steps that are unlocked but not yet covered (eng-jap).
 
     A step is unlocked when all its prerequisites appear in covered_grammar_ids.
     Results are sorted by level (easiest first).
     """
-    unlocked = get_next_grammar_from(GRAMMAR_PROGRESSION, covered_grammar_ids)
-    return [g.model_dump() for g in unlocked]
+    return get_next_grammar_from(GRAMMAR_PROGRESSION, covered_grammar_ids)
 
 
-def get_grammar_by_id(grammar_id: str) -> dict:
+def get_grammar_by_id(grammar_id: str) -> GrammarItem:
     """Return an eng-jap grammar spec by its id.  Raises KeyError if not found."""
     if grammar_id not in _GRAMMAR_BY_ID:
         raise KeyError(f"Unknown grammar id: {grammar_id!r}")
@@ -209,7 +208,7 @@ def summary(curriculum: dict) -> str:
         lines.append("")
         lines.append(f"  Next available grammar ({len(unlocked)} steps unlocked):")
         for g in unlocked[:5]:
-            lines.append(f"    • [{g['level']}] {g['id']}: {g['description']}")
+            lines.append(f"    \u2022 [{g.level}] {g.id}: {g.description}")
         if len(unlocked) > 5:
             lines.append(f"    … and {len(unlocked) - 5} more")
     else:
