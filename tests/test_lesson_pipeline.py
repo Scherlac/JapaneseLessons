@@ -211,7 +211,7 @@ def test_generate_sentences_stores_sentences(ctx):
             }
         ]
     }
-    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
+    with patch("jlesson.lesson_pipeline.generate_sentences.step.PipelineRuntime.ask_llm", return_value=mock):
         ctx = GenerateSentencesStep().execute(ctx)
     assert len(ctx.sentences) == 1
     assert ctx.sentences[0].source.display_text == "I eat bread."
@@ -230,7 +230,7 @@ def test_generate_sentences_adds_grammar_to_report(ctx):
             }
         ]
     }
-    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
+    with patch("jlesson.lesson_pipeline.generate_sentences.step.PipelineRuntime.ask_llm", return_value=mock):
         ctx = GenerateSentencesStep().execute(ctx)
     md = ctx.report.render()
     assert "## Phase 3" in md
@@ -241,7 +241,7 @@ def test_generate_sentences_empty_llm_response(ctx):
     ctx.nouns = _NOUN_ITEMS[:2]
     ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
-    with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value={}):
+    with patch("jlesson.lesson_pipeline.generate_sentences.step.PipelineRuntime.ask_llm", return_value={}):
         ctx = GenerateSentencesStep().execute(ctx)
     assert ctx.sentences == []
 

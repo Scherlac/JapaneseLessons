@@ -66,27 +66,22 @@ def test_generate_sentences_passes_explicit_narrative_to_prompt(tmp_path: Path):
     ctx = LessonContext(config=config)
     ctx.curriculum = create_curriculum("Test")
     ctx.narrative_blocks = ["Introduce Kiki and her neighborhood."]
-    ctx.nouns = [
-        {"english": "cat", "japanese": "ねこ", "kanji": "猫", "romaji": "neko"}
-    ]
-    ctx.verbs = [
-        {
-            "english": "to fly",
-            "japanese": "とぶ",
-            "kanji": "飛ぶ",
-            "romaji": "tobu",
-            "type": "う-verb",
-            "masu_form": "飛びます",
-        }
-    ]
+    ctx.nouns = [_GEN.convert_raw_noun({"english": "cat", "japanese": "ねこ", "kanji": "猫", "romaji": "neko"})]
+    ctx.verbs = [_GEN.convert_raw_verb({
+        "english": "to fly",
+        "japanese": "とぶ",
+        "kanji": "飛ぶ",
+        "romaji": "tobu",
+        "type": "う-verb",
+        "masu_form": "飛びます",
+    })]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
 
-    with patch.object(
-        ctx.language_config.prompts,
-        "build_grammar_generate_prompt",
+    with patch(
+        "jlesson.lesson_pipeline.generate_sentences.step.build_grammar_sentences_prompt",
         return_value="PROMPT",
     ) as mock_builder, patch(
-        "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
+        "jlesson.lesson_pipeline.generate_sentences.step.PipelineRuntime.ask_llm",
         return_value={"sentences": []},
     ):
         GenerateSentencesStep().execute(ctx)
@@ -232,38 +227,37 @@ def test_generate_sentences_uses_block_specific_grammar_plan(tmp_path: Path):
     ctx.curriculum = create_curriculum("Test")
     ctx.narrative_blocks = ["Block 1 narrative", "Block 2 narrative"]
     ctx.nouns = [
-        {"english": "cat", "japanese": "ねこ", "kanji": "猫", "romaji": "neko"},
-        {"english": "broom", "japanese": "ほうき", "kanji": "箒", "romaji": "houki"},
+        _GEN.convert_raw_noun({"english": "cat", "japanese": "ねこ", "kanji": "猫", "romaji": "neko"}),
+        _GEN.convert_raw_noun({"english": "broom", "japanese": "ほうき", "kanji": "箒", "romaji": "houki"}),
     ]
     ctx.verbs = [
-        {
+        _GEN.convert_raw_verb({
             "english": "to fly",
             "japanese": "とぶ",
             "kanji": "飛ぶ",
             "romaji": "tobu",
             "type": "う-verb",
             "masu_form": "飛びます",
-        },
-        {
+        }),
+        _GEN.convert_raw_verb({
             "english": "to clean",
             "japanese": "そうじする",
             "kanji": "掃除する",
             "romaji": "souji suru",
             "type": "irregular",
             "masu_form": "掃除します",
-        },
+        }),
     ]
     grammar_a = get_grammar_by_id("identity_present_affirmative")
     grammar_b = get_grammar_by_id("action_present_affirmative")
     ctx.selected_grammar = [grammar_a, grammar_b]
     ctx.selected_grammar_blocks = [[grammar_a], [grammar_b]]
 
-    with patch.object(
-        ctx.language_config.prompts,
-        "build_grammar_generate_prompt",
+    with patch(
+        "jlesson.lesson_pipeline.generate_sentences.step.build_grammar_sentences_prompt",
         return_value="PROMPT",
     ) as mock_builder, patch(
-        "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
+        "jlesson.lesson_pipeline.generate_sentences.step.PipelineRuntime.ask_llm",
         return_value={"sentences": []},
     ):
         GenerateSentencesStep().execute(ctx)

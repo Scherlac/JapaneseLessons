@@ -30,10 +30,10 @@ already populated (e.g. from retrieval), the step skips its work and returns ear
 | Field | Type | Set by |
 |---|---|---|
 | `curriculum` | `CurriculumData` | Orchestrator (pre-pipeline) |
-| `vocab` | `dict` | `SelectVocabStep` |
+| `vocab` | `VocabFile \| None` | `SelectVocabStep` |
 | `nouns` / `verbs` | `list[GeneralItem]` | `SelectVocabStep` or `RetrieveLessonMaterialStep` |
 | `narrative_blocks` | `list[str]` | `NarrativeGeneratorStep` |
-| `narrative_vocab_terms` | `list[dict]` | `ExtractNarrativeVocabStep` |
+| `narrative_vocab_terms` | `list[NarrativeVocabBlock]` | `ExtractNarrativeVocabStep` |
 | `selected_grammar` | `list[GrammarItem]` | `GrammarSelectStep` |
 | `selected_grammar_blocks` | `list[list[GrammarItem]]` | `GrammarSelectStep` |
 | `sentences` | `list[Sentence]` | `NarrativeGrammarStep` |
@@ -55,7 +55,7 @@ already populated (e.g. from retrieval), the step skips its work and returns ear
 | 3 | `narrative_generator` | `narrative_generator/` | **Yes** | `config.theme`, `curriculum`, `language_config` | `narrative_blocks` |
 | 4 | `extract_narrative_vocab` | `extract_narrative_vocab.py` | **Yes** | `narrative_blocks` | `narrative_vocab_terms` |
 | 5 | `grammar_select` | `grammar_select.py` | **Yes** | `curriculum`, `language_config` | `selected_grammar`, `selected_grammar_blocks` |
-| 6 | `narrative_grammar` | `generate_sentences.py` | **Yes** | `nouns`, `verbs`, `narrative_blocks`, `selected_grammar*` | `sentences` |
+| 6 | `narrative_grammar` | `generate_sentences/` | **Yes** | `nouns`, `verbs`, `narrative_blocks`, `selected_grammar*` | `sentences` |
 | 7 | `review_sentences` | `review_sentences.py` | **Yes** | `sentences` | `sentences` (rewritten) |
 | 8 | `noun_practice` | `noun_practice.py` | **Yes** | `nouns`, `curriculum` | `noun_items` |
 | 9 | `verb_practice` | `verb_practice.py` | **Yes** | `verbs`, `curriculum` | `verb_items` |
@@ -77,7 +77,7 @@ Steps call runtime services rather than directly importing low-level modules:
 | `PipelineRuntime` | `runtime.py` | `ask_llm`, `read_json`, `write_json` |
 | `PipelineGadgets` | `pipeline_gadgets.py` | `ask_llm`, `load_vocab` (legacy, to be migrated) |
 
-`NarrativeGeneratorStep` is the first step fully migrated to `PipelineRuntime`.
+`NarrativeGeneratorStep` and `NarrativeGrammarStep` are fully migrated to `PipelineRuntime`.
 All other LLM steps still use `PipelineGadgets` — migration is in progress.
 
 ---
