@@ -67,7 +67,7 @@ class LessonContext:
     config: LessonConfig
     report: ReportBuilder = field(default_factory=ReportBuilder)
     step_info: StepInfo | None = None
-    curriculum: CurriculumData = field(default_factory=create_curriculum)
+    curriculum: CurriculumData = field(default_factory=CurriculumData)
     vocab: VocabFile | None = None
     nouns: list[GeneralItem] = field(default_factory=list)
     verbs: list[GeneralItem] = field(default_factory=list)
@@ -219,7 +219,7 @@ class ActionConfig:
     runtime
         I/O facade for LLM calls, retrieval, storage, and cache.
     """
-
+    curriculum: CurriculumData
     lesson: LessonConfig
     block_index: int
     language: LanguageConfig
@@ -313,6 +313,7 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
         for loop_index, chunk in enumerate(chunks):
             block_index = getattr(chunk, "block_index", loop_index)
             cfg = ActionConfig(
+                curriculum=ctx.curriculum,
                 lesson=ctx.config,
                 block_index=block_index,
                 language=ctx.language_config,

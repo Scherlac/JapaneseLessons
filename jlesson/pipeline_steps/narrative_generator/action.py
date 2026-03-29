@@ -8,7 +8,7 @@ testable with a mock runtime.
 from __future__ import annotations
 
 from ..pipeline_core import ActionConfig, NarrativeFrame, NarrativeGenChunk, StepAction
-from .config import build_narrative_generator_language_config
+from .config import build_narrative_generator_language_config, fallback_default_blocks
 from .prompt import build_narrative_generator_prompt
 
 
@@ -37,12 +37,14 @@ class NarrativeGeneratorAction(StepAction[NarrativeGenChunk, NarrativeFrame]):
         if len(provided) >= chunk.lesson_blocks:
             return NarrativeFrame(blocks=provided[:chunk.lesson_blocks])
 
-        step_config = build_narrative_generator_language_config(config.language)
+        language_config = config.language
+        curriculum = config.curriculum
+        step_config = build_narrative_generator_language_config(language_config)
         prompt = build_narrative_generator_prompt(
             theme=chunk.theme,
-            lesson_number=chunk.lesson_number,
+            level_details=curriculum.level_details,
             lesson_blocks=chunk.lesson_blocks,
-            source_language_label=step_config.source_language_label,
+            canonical_language=language_config.canonical_language,
             seed_blocks=provided,
         )
         result = config.runtime.call_llm(prompt)
@@ -51,9 +53,9 @@ class NarrativeGeneratorAction(StepAction[NarrativeGenChunk, NarrativeFrame]):
             for block in result.get("blocks", [])
             if isinstance(block, dict)
         ]
-        defaults = step_config.default_block_builder(
+        defaults = fallback_default_blocks(
             chunk.theme,
-            chunk.lesson_number,
+            curriculum.level_details,
             chunk.lesson_blocks,
         )
         blocks = list(provided)

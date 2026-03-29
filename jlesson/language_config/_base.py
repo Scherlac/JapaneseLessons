@@ -132,6 +132,7 @@ class LanguageConfig:
     # ── Identity ──────────────────────────────────────────────────────────
     code: str
     display_name: str
+    canonical_language: str = "english"  # for prompt builders that need a single language
     source: PartialLanguageConfig
     target: PartialLanguageConfig
 

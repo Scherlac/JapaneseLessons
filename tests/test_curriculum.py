@@ -173,6 +173,7 @@ class TestCreateCurriculum:
     def test_has_required_keys(self):
         cur = create_curriculum()
         assert hasattr(cur, "name")
+        assert hasattr(cur, "level_details")
         assert hasattr(cur, "created_at")
         assert hasattr(cur, "lessons")
         assert hasattr(cur, "covered_nouns")
@@ -185,6 +186,7 @@ class TestCreateCurriculum:
         assert cur.covered_nouns == []
         assert cur.covered_verbs == []
         assert cur.covered_grammar_ids == []
+        assert cur.level_details == "beginner-level"
 
     def test_custom_name(self):
         cur = create_curriculum("My Course")

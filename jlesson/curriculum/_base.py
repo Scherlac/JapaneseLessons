@@ -43,7 +43,8 @@ class LessonRecord(BaseModel):
 class CurriculumData(BaseModel):
     """Typed in-memory curriculum state loaded from / persisted to curriculum.json."""
 
-    name: str
+    name: str = Field(default="My well-structured curriculum", description="A human-friendly name for this curriculum")
+    level_details: str = Field(default="beginner-level", description="Details about the target lesson level, for use in prompts")
     created_at: str = Field(default_factory=_now)
     lessons: list[LessonRecord] = Field(default_factory=list)
     covered_nouns: list[str] = Field(default_factory=list)
@@ -53,9 +54,9 @@ class CurriculumData(BaseModel):
 
 # ── Curriculum CRUD ───────────────────────────────────────────────────────────
 
-def create_curriculum(name: str = "Japanese Beginner") -> CurriculumData:
+def create_curriculum(name: str = "My well-structured curriculum", level_details: str = "beginner-level") -> CurriculumData:
     """Return a fresh empty CurriculumData."""
-    return CurriculumData(name=name)
+    return CurriculumData(name=name, level_details=level_details)
 
 
 def load_curriculum(path: Path) -> CurriculumData:
