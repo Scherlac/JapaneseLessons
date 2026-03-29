@@ -36,6 +36,7 @@ they are not part of the long-term top-level list above:
 | `Persisted lesson content` | `LessonContent` | Durable lesson manifest for later render / analysis workflows. Target shape: reference-only content that points to canonised database items instead of embedding full item payloads. |
 | `Semantic text record` | candidate English-first meaning-aware record, likely stored first in `GeneralItem.metadata` / `Sentence.metadata` | Preserves exact intended meaning for refinement, review, and later translation. |
 | `Canonical semantic record` | candidate normalized record used to build `CanonicalLessonNode` later | Durable meaning identity for retrieval, embeddings, and multilingual branch attachment. |
+| `Compiled asset record` | candidate persisted record derived from `CompiledItem` | Durable render artifact that should attach to a `LanguageBranch` by default, and only attach directly to a `CanonicalLessonNode` when the asset is language-neutral. |
 
 ---
 
@@ -140,6 +141,8 @@ architecture it is the boundary where finalized lesson items are handed to:
 - build canonical semantic records from final reviewed/enriched items, not from intermediate drafts
 - treat `LessonContent` as a reference manifest in the target design, not as the long-term home of full generated item payloads
 - make downstream render steps start from persisted lesson content, not from live in-memory generation artifacts
+- persist compiled assets as first-class records rather than treating `CompiledItem` as a purely transient render structure
+- attach compiled assets to `LanguageBranch` by default, because most cards/audio/text renders are language-specific; only attach directly to `CanonicalLessonNode` when the asset is genuinely language-neutral
 
 ---
 
@@ -204,8 +207,8 @@ conceptual `vocab_enrichment` stage with two item-specific implementations.
 | 9 | `vocab_enrichment` | Enrich selected vocab with examples, conjugation/memory support, and semantic records | selected noun/verb items, lesson number, per-block narrative/grammar context when needed | enriched vocab (`noun_items`, `verb_items`) | `PerBlockContentPlan -> EnrichedVocab + SemanticTextRecord[words]` |
 | 10 | `register_lesson` | Persist curriculum progression and assign lesson id | nouns, verbs, selected grammar, enriched noun items, sentences | updated curriculum, `lesson_id`, `created_at` | `LessonRegistration` derived from reviewed sentences + enriched vocab + grammar plan |
 | 11 | `persist_content` | Canonise finalized lesson items, attach language branches as needed, and persist the lesson manifest | narrative blocks, grammar ids, enriched vocab, reviewed sentences, lesson id | reference-oriented `LessonContent`, `content_path`, canonisation handoff | `Reviewed content + semantic records -> CanonicalSemanticRecord batch -> CanonicalLessonNode/LanguageBranch + LessonContentRefs` |
-| 12 | `compile_assets` | Resolve lesson-content references and render cards/audio needed by the selected profile | `LessonContent`, `Profile` | `compiled_items` | `LessonContentRefs + TouchProfile -> CompiledItemSequence` |
-| 13 | `compile_touches` | Build the learner-facing repetition sequence | `compiled_items`, `Profile` | `touches` as `list[Touch]` | `CompiledItemSequence + TouchProfile -> TouchSequence` |
+| 12 | `compile_assets` | Resolve lesson-content references, render cards/audio, persist compiled asset records, and attach them to branch/canonical entities | `LessonContent`, `Profile` | `compiled_items`, compiled asset refs | `LessonContentRefs + TouchProfile -> CompiledItemSequence + CompiledAssetRecord batch + BranchAssetLinks` |
+| 13 | `compile_touches` | Build the learner-facing repetition sequence | compiled asset refs and/or `compiled_items`, `Profile` | `touches` as `list[Touch]` | `CompiledAssetRecord batch + TouchProfile -> TouchSequence` |
 | 14 | `render_video` | Assemble final MP4 from the touch sequence | `touches` | `video_path` | `TouchSequence -> RenderedVideo` |
 | 15 | `save_report` | Finalise and persist the run report | accumulated `ReportBuilder` state and artifacts | `report_path` | Keep as report sink; not part of the main learning-content artifact chain |
 
@@ -228,6 +231,7 @@ Current state by artifact class:
 - `LessonContent` is still best thought of as a future reference manifest, not as a durable duplicate of the full generated payload. The target boundary is: finalize items, canonise them, then persist only stable references plus lesson structure.
 - `Per-block content plan` is the biggest missing first-class type. It currently exists only as assembly logic inside `BlockChunk` construction and adjacent block-slicing logic.
 - Render-side sequencing is semantically split between `Profile`, `CompiledItem`, and `Touch`. That is workable, but rendering should start from `LessonContent` references rather than directly from live enriched items.
+- Compiled assets should become durable records linked back into the semantic graph. Default attachment should be at `LanguageBranch`; direct canonical-node attachment should be reserved for language-neutral assets.
 
 Most useful next alignment target:
 
@@ -280,7 +284,7 @@ Reading guide:
 - if a step points directly to a concrete artifact node, that boundary is relatively explicit today
 - if several nodes converge on a dashed candidate node before the next step, that is a likely missing abstraction
 - the left half of the graph is generation and planning, the middle is lesson assembly and persistence, and the right half is render/output flow
-- the lower side branch shows the intended future path from refined lesson text into canonisation, canonical retrieval nodes, later multilingual branches, and finally a reference-only lesson manifest used by rendering
+- the lower side branch shows the intended future path from refined lesson text into canonisation, canonical retrieval nodes, later multilingual branches, a reference-only lesson manifest, and persisted compiled assets used by rendering
 
 ```mermaid
 flowchart TD
@@ -307,9 +311,14 @@ flowchart TD
     VocabEnrichment["vocab_enrichment<br/>current: noun_practice + verb_practice"]
     EnrichedVocab["Enriched vocab<br/>noun_items + verb_items"]
     SemanticText["Semantic text record<br/>candidate"]
-    CanonicalSemantic["Canonical semantic record<br/>candidate"]
     CanonicalNode["Canonical lesson node<br/>retrieval"]
     LanguageBranches["Language branches<br/>later"]
+    DatabaseStorePut["Store items<br>put"]
+    VectorStorePut["Retrival items<br>put"]
+    BlobStorePut["Blob items<br>put"]
+    DatabaseStoreGet["Store items<br>get"]
+    VectorStoreGet["Retrival items<br>get"]
+    BlobStoreGet["Blob items<br>get"]
 
     Register[register_lesson]
     Persist[persist_content]
@@ -317,6 +326,7 @@ flowchart TD
 
     Profile["Touch profile<br/>Profile"]
     CompileAssets[compile_assets]
+    CompiledAssetRecord["Compiled asset record<br/>candidate"]
     CompiledItems["Compiled item sequence<br/>list of CompiledItem"]
     CompileTouches[compile_touches]
     Touches["Card / touch sequence<br/>list of Touch"]
@@ -330,6 +340,7 @@ flowchart TD
         LegendCandidate["Candidate / implicit artifact"]
         LegendRequest["Request or config input"]
         LegendSink["Durable output / sink"]
+        LegendRuntime["Runtime services"]
     end
 
     Request --> Retrieval
@@ -371,15 +382,21 @@ flowchart TD
     NarrativeFrame --> Persist
     GrammarPlan --> Persist
     Persist --> SemanticText
-    SemanticText --> CanonicalSemantic
-    CanonicalSemantic --> CanonicalNode
-    CanonicalNode --> LanguageBranches
+    SemanticText --> CanonicalNode
+    CanonicalNode --> VectorStorePut
+    Persist --> LanguageBranches
+    LanguageBranches --> DatabaseStorePut
     Persist --> LessonContent
 
     LessonContent --> CompileAssets
     Profile --> CompileAssets
+    VectorStoreGet --> CompileAssets
+    DatabaseStoreGet --> CompileAssets
+
+    CompileAssets --> CompiledAssetRecord
     CompileAssets --> CompiledItems
 
+    CompiledAssetRecord --> BlobStorePut
     CompiledItems --> CompileTouches
     Profile --> CompileTouches
     CompileTouches --> Touches
@@ -395,18 +412,21 @@ flowchart TD
     classDef candidate fill:#ffedd5,stroke:#c2410c,stroke-width:2px,color:#431407,stroke-dasharray: 6 3
     classDef render fill:#dcfce7,stroke:#166534,stroke-width:2px,color:#052e16
     classDef sink fill:#ccfbf1,stroke:#0f766e,stroke-width:2px,color:#042f2e
+    classDef runtime fill:#fbccd5,stroke:#760f0c,stroke-width:2px,color:#2f0407
 
     class Request,Profile request
     class Retrieval,NarrativeGen,ExtractVocab,GenVocab,SelectVocab,GrammarSelect,SentenceGen,Review,VocabEnrichment,Register,Persist,CompileAssets,CompileTouches,RenderVideo,SaveReport step
     class NarrativeFrame,NarrativePlan,VocabFile,Sentences,ReviewedSentences,LessonContent,CompiledItems,Touches,Video,CanonicalNode,LanguageBranches artifact
-    class Retrieved,VocabSelection,GrammarPlan,BlockPlan,EnrichedVocab,SemanticText,CanonicalSemantic candidate
+    class Retrieved,VocabSelection,GrammarPlan,BlockPlan,EnrichedVocab,SemanticText,CanonicalSemantic,CompiledAssetRecord candidate
     class CompiledItems,Touches,Video render
+    class VectorStorePut,DatabaseStorePut,BlobStorePut runtime
     class LessonContent,Video,SaveReport sink
     class LegendStep step
     class LegendArtifact artifact
     class LegendCandidate candidate
     class LegendRequest request
     class LegendSink sink
+    class LegendRuntime runtime
 ```
 
 ---
@@ -438,6 +458,7 @@ cohesive and makes inter-step artifact alignment easier to see.
 | Semantic text record / canonical semantic record not yet explicit | Needed for meaning-accurate translation and multilingual branching |
 | `LessonContent` still stores full item payloads in current implementation | Target should be reference-only after canonisation |
 | `compile_assets` still starts from live enriched items in current implementation | Target should start from persisted lesson content references |
+| Compiled assets are not yet first-class persisted records linked to `LanguageBranch` / `CanonicalLessonNode` | Needed so rendering artifacts participate in the same durable semantic graph |
 | Retrieval writes directly to multiple context fields | Useful, but architecturally broad |
 | Remaining `PipelineStep` classes not yet migrated to `ActionStep` | Migration in progress |
 | Runtime-services coverage beyond `call_llm` | Still incomplete |
