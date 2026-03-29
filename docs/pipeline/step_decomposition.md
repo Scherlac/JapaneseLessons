@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Date:** 2026-03-29  
-**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`
+**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `review_sentences`
 
 ---
 
@@ -311,6 +311,7 @@ current typed connections.
 |----------------|---------------|----------------|
 | `NarrativeGeneratorStep` | `NarrativeFrame` | `ExtractNarrativeVocabStep` |
 | `ExtractNarrativeVocabStep` | `NarrativeVocabPlan` | `GenerateNarrativeVocabStep` |
+| `NarrativeGrammarStep` | `Sentence` (via `SentenceReviewBatch`) | `ReviewSentencesStep` |
 
 Goal: extend this table as more steps are migrated so that the pipeline's
 dependency graph is expressed entirely through types, not through shared mutable
@@ -391,7 +392,7 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `narrative_generator` | `NarrativeGenChunk` | 0–1 | **done** — emits `NarrativeFrame` |
 | `extract_narrative_vocab` | `NarrativeFrame` ← from `narrative_generator` | 1 | **done** — emits `NarrativeVocabPlan` |
 | `generate_narrative_vocab` | `NarrativeVocabPlan` ← from `extract_narrative_vocab` | 1 per batch | **done** — emits `VocabFile` |
-| `review_sentences` | `ItemBatch[Sentence]` | batched ×30 | not started |
+| `review_sentences` | `SentenceReviewBatch(ItemBatch[Sentence])` ← from `generate_sentences` | batched ×30 | **done** — successor step; chunk item type = `Sentence` (output of `NarrativeGrammarStep`) |
 | `generate_narrative_vocab` | `ItemBatch[str]` | batched ×60 | not started |
 | `select_vocab` | per-block + LLM gap-fill | conditional | not started |
 | `retrieve_material` | single query | retrieval only | not started (needs `query_retrieval` wired) |

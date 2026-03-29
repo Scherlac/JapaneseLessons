@@ -292,7 +292,7 @@ def test_review_sentences_applies_revisions(ctx):
         ],
         "overall_naturalness": 3,
     }
-    with patch("jlesson.runtime.PipelineRuntime.ask_llm", return_value=mock_review):
+    with patch("jlesson.runtime._base.PipelineRuntime.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     assert ctx.sentences[0].source.display_text == "I eat bread."
     assert ctx.sentences[1].source.display_text == "There is water in the kitchen."
@@ -310,7 +310,7 @@ def test_review_sentences_no_revisions_needed(ctx):
         ],
         "overall_naturalness": 5,
     }
-    with patch("jlesson.runtime.PipelineRuntime.ask_llm", return_value=mock_review):
+    with patch("jlesson.runtime._base.PipelineRuntime.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     assert ctx.sentences[0].source.display_text == "I eat bread."
 
@@ -326,7 +326,7 @@ def test_review_sentences_empty_llm_response(ctx):
     ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES]
-    with patch("jlesson.runtime.PipelineRuntime.ask_llm", return_value={}):
+    with patch("jlesson.runtime._base.PipelineRuntime.ask_llm", return_value={}):
         ctx = ReviewSentencesStep().execute(ctx)
     assert len(ctx.sentences) == 2
     assert ctx.sentences[0].source.display_text == "I eat bread."
@@ -357,7 +357,7 @@ def test_review_sentences_ignores_high_score_with_revision(ctx):
         ],
         "overall_naturalness": 4,
     }
-    with patch("jlesson.runtime.PipelineRuntime.ask_llm", return_value=mock_review):
+    with patch("jlesson.runtime._base.PipelineRuntime.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     assert ctx.sentences[0].source.display_text == "I eat bread."
 
@@ -379,7 +379,7 @@ def test_review_sentences_ignores_out_of_bounds_index(ctx):
         ],
         "overall_naturalness": 1,
     }
-    with patch("jlesson.runtime.PipelineRuntime.ask_llm", return_value=mock_review):
+    with patch("jlesson.runtime._base.PipelineRuntime.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     assert ctx.sentences[0].source.display_text == "I eat bread."
 
@@ -396,7 +396,7 @@ def test_review_sentences_ignores_null_revised_sentence(ctx):
         ],
         "overall_naturalness": 1,
     }
-    with patch("jlesson.runtime.PipelineRuntime.ask_llm", return_value=mock_review):
+    with patch("jlesson.runtime._base.PipelineRuntime.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     assert ctx.sentences[0].source.display_text == "I eat bread."
 
@@ -426,7 +426,7 @@ def test_review_sentences_adds_report_on_revisions(ctx):
         ],
         "overall_naturalness": 3,
     }
-    with patch("jlesson.runtime.PipelineRuntime.ask_llm", return_value=mock_review):
+    with patch("jlesson.runtime._base.PipelineRuntime.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     md = ctx.report.render()
     assert "## Sentence Review" in md
@@ -445,7 +445,7 @@ def test_review_sentences_no_report_when_all_natural(ctx):
         ],
         "overall_naturalness": 5,
     }
-    with patch("jlesson.runtime.PipelineRuntime.ask_llm", return_value=mock_review):
+    with patch("jlesson.runtime._base.PipelineRuntime.ask_llm", return_value=mock_review):
         ctx = ReviewSentencesStep().execute(ctx)
     md = ctx.report.render()
     assert "## Sentence Review" not in md
