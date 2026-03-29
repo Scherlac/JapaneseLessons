@@ -4,22 +4,6 @@ from ._base import ItemGenerator
 
 class EngJapItemGenerator(ItemGenerator):
     """Item generator for English-Japanese lessons."""
-
-    def build_default_narrative_blocks(
-        self,
-        theme: str,
-        lesson_number: int,
-        block_count: int,
-    ) -> list[str]:
-        return [
-            (
-                f"Lesson {lesson_number}, block {block_index}, stays in the world of '{theme}'. "
-                "Start with simple observation and identity sentences, then move into small concrete actions. "
-                "Keep the tone warm, clear, and beginner friendly, while advancing the situation from the previous block."
-            )
-            for block_index in range(1, block_count + 1)
-        ]
-
     def convert_noun(self, llm_item: dict, base_item: GeneralItem) -> GeneralItem:
         return GeneralItem(
             source=PartialItem(

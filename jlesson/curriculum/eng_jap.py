@@ -9,7 +9,7 @@ get_grammar_by_id, summary) that default to this progression.
 from __future__ import annotations
 
 from ..models import GrammarItem
-from ._base import create_curriculum, get_next_grammar_from, grammar_summary_lines
+from ._base import CurriculumData, create_curriculum, get_next_grammar_from, grammar_summary_lines
 
 
 # ── Grammar Progression — English → Japanese (levels 1-4) ────────────────────

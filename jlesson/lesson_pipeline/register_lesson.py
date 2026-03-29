@@ -14,7 +14,7 @@ class RegisterLessonStep(PipelineStep):
     description = "Add + complete the lesson in curriculum.json"
 
     def execute(self, ctx: LessonContext) -> LessonContext:
-        lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
+        lesson_number = len(ctx.curriculum.lessons) + 1
         lesson = add_lesson(
             ctx.curriculum,
             title=f"Lesson {lesson_number}: {ctx.config.theme.title()}",
@@ -24,8 +24,8 @@ class RegisterLessonStep(PipelineStep):
             grammar_ids=[grammar_id(g) for g in ctx.selected_grammar],
             items_count=len(ctx.noun_items) + len(ctx.sentences),
         )
-        complete_lesson(ctx.curriculum, lesson["id"])
-        ctx.lesson_id = lesson["id"]
+        complete_lesson(ctx.curriculum, lesson.id)
+        ctx.lesson_id = lesson.id
         save_curriculum(ctx.curriculum, ctx.config.curriculum_path)
         ctx.created_at = (
             datetime.now(timezone.utc)

@@ -155,20 +155,23 @@ class TestGetNextGrammar:
 class TestCreateCurriculum:
     def test_has_required_keys(self):
         cur = create_curriculum()
-        for key in ("name", "created_at", "lessons",
-                    "covered_nouns", "covered_verbs", "covered_grammar_ids"):
-            assert key in cur
+        assert hasattr(cur, "name")
+        assert hasattr(cur, "created_at")
+        assert hasattr(cur, "lessons")
+        assert hasattr(cur, "covered_nouns")
+        assert hasattr(cur, "covered_verbs")
+        assert hasattr(cur, "covered_grammar_ids")
 
     def test_initial_values_empty(self):
         cur = create_curriculum()
-        assert cur["lessons"] == []
-        assert cur["covered_nouns"] == []
-        assert cur["covered_verbs"] == []
-        assert cur["covered_grammar_ids"] == []
+        assert cur.lessons == []
+        assert cur.covered_nouns == []
+        assert cur.covered_verbs == []
+        assert cur.covered_grammar_ids == []
 
     def test_custom_name(self):
         cur = create_curriculum("My Course")
-        assert cur["name"] == "My Course"
+        assert cur.name == "My Course"
 
 
 # ─── add_lesson ───────────────────────────────────────────────────────────────
@@ -183,7 +186,7 @@ class TestAddLesson:
             verbs=food_verbs[:1],
             grammar_ids=["action_present_affirmative"],
         )
-        assert len(empty_cur["lessons"]) == 1
+        assert len(empty_cur.lessons) == 1
 
     def test_lesson_has_correct_fields(self, empty_cur, food_nouns, food_verbs):
         lesson = add_lesson(
@@ -194,19 +197,19 @@ class TestAddLesson:
             verbs=food_verbs[:1],
             grammar_ids=["action_present_affirmative"],
         )
-        assert lesson["title"] == "Lesson 1"
-        assert lesson["theme"] == "food"
-        assert lesson["nouns"] == ["water", "rice"]
-        assert lesson["verbs"] == ["to eat"]
-        assert lesson["grammar_ids"] == ["action_present_affirmative"]
-        assert lesson["status"] == "draft"
+        assert lesson.title == "Lesson 1"
+        assert lesson.theme == "food"
+        assert lesson.nouns == ["water", "rice"]
+        assert lesson.verbs == ["to eat"]
+        assert lesson.grammar_ids == ["action_present_affirmative"]
+        assert lesson.status == "draft"
 
     def test_add_two_lessons_increments_id(self, empty_cur, food_nouns, food_verbs):
         l1 = add_lesson(empty_cur, title="L1", theme="food",
                         nouns=[], verbs=[], grammar_ids=[])
         l2 = add_lesson(empty_cur, title="L2", theme="food",
                         nouns=[], verbs=[], grammar_ids=[])
-        assert l2["id"] == l1["id"] + 1
+        assert l2.id == l1.id + 1
 
     def test_covered_trackers_not_updated_before_complete(self, empty_cur, food_nouns, food_verbs):
         add_lesson(
@@ -214,8 +217,8 @@ class TestAddLesson:
             nouns=food_nouns[:2], verbs=food_verbs[:1],
             grammar_ids=["action_present_affirmative"],
         )
-        assert empty_cur["covered_nouns"] == []
-        assert empty_cur["covered_grammar_ids"] == []
+        assert empty_cur.covered_nouns == []
+        assert empty_cur.covered_grammar_ids == []
 
 
 # ─── complete_lesson ──────────────────────────────────────────────────────────
@@ -226,7 +229,7 @@ class TestCompletedLesson:
             cur, title="Lesson 1", theme="food",
             nouns=nouns, verbs=verbs, grammar_ids=grammar_ids,
         )
-        complete_lesson(cur, lesson["id"])
+        complete_lesson(cur, lesson.id)
         return lesson
 
     def test_status_set_to_completed(self, empty_cur, food_nouns, food_verbs):
@@ -234,30 +237,30 @@ class TestCompletedLesson:
             empty_cur, food_nouns[:2], food_verbs[:1],
             ["action_present_affirmative"],
         )
-        assert lesson["status"] == "completed"
+        assert lesson.status == "completed"
 
     def test_covered_nouns_updated(self, empty_cur, food_nouns, food_verbs):
         self._add_and_complete(
             empty_cur, food_nouns[:2], food_verbs[:1],
             ["action_present_affirmative"],
         )
-        assert "water" in empty_cur["covered_nouns"]
-        assert "rice" in empty_cur["covered_nouns"]
+        assert "water" in empty_cur.covered_nouns
+        assert "rice" in empty_cur.covered_nouns
 
     def test_covered_verbs_updated(self, empty_cur, food_nouns, food_verbs):
         self._add_and_complete(
             empty_cur, food_nouns[:2], food_verbs[:1],
             ["action_present_affirmative"],
         )
-        assert "to eat" in empty_cur["covered_verbs"]
+        assert "to eat" in empty_cur.covered_verbs
 
     def test_covered_grammar_updated(self, empty_cur, food_nouns, food_verbs):
         self._add_and_complete(
             empty_cur, [], [],
             ["action_present_affirmative", "identity_present_affirmative"],
         )
-        assert "action_present_affirmative" in empty_cur["covered_grammar_ids"]
-        assert "identity_present_affirmative" in empty_cur["covered_grammar_ids"]
+        assert "action_present_affirmative" in empty_cur.covered_grammar_ids
+        assert "identity_present_affirmative" in empty_cur.covered_grammar_ids
 
     def test_raises_on_unknown_lesson_id(self, empty_cur):
         with pytest.raises(KeyError):
@@ -269,8 +272,8 @@ class TestCompletedLesson:
                 empty_cur, title="L", theme="food",
                 nouns=food_nouns[:2], verbs=[], grammar_ids=[],
             )
-            complete_lesson(empty_cur, lesson["id"])
-        assert len(empty_cur["covered_nouns"]) == len(set(empty_cur["covered_nouns"]))
+            complete_lesson(empty_cur, lesson.id)
+        assert len(empty_cur.covered_nouns) == len(set(empty_cur.covered_nouns))
 
 
 # ─── suggest_new_vocab ────────────────────────────────────────────────────────
@@ -396,7 +399,7 @@ class TestSummary:
     def test_completed_curriculum_says_complete(self):
         all_ids = [g.id for g in GRAMMAR_PROGRESSION]
         cur = create_curriculum()
-        cur["covered_grammar_ids"] = all_ids
+        cur.covered_grammar_ids = all_ids
         result = summary(cur)
         assert "complete" in result.lower()
 
@@ -410,22 +413,22 @@ class TestLoadSave:
             nouns=food_nouns[:2], verbs=food_verbs[:1],
             grammar_ids=["action_present_affirmative"],
         )
-        complete_lesson(empty_cur, lesson["id"])
+        complete_lesson(empty_cur, lesson.id)
 
         path = tmp_path / "curriculum.json"
         save_curriculum(empty_cur, path)
 
         loaded = load_curriculum(path)
-        assert loaded["name"] == empty_cur["name"]
-        assert len(loaded["lessons"]) == 1
-        assert loaded["covered_nouns"] == empty_cur["covered_nouns"]
-        assert loaded["covered_grammar_ids"] == empty_cur["covered_grammar_ids"]
+        assert loaded.name == empty_cur.name
+        assert len(loaded.lessons) == 1
+        assert loaded.covered_nouns == empty_cur.covered_nouns
+        assert loaded.covered_grammar_ids == empty_cur.covered_grammar_ids
 
     def test_load_nonexistent_returns_fresh_curriculum(self, tmp_path):
         path = tmp_path / "does_not_exist.json"
         cur = load_curriculum(path)
-        assert cur["lessons"] == []
-        assert cur["covered_nouns"] == []
+        assert cur.lessons == []
+        assert cur.covered_nouns == []
 
     def test_save_creates_parent_directories(self, tmp_path):
         path = tmp_path / "subdir" / "nested" / "curriculum.json"

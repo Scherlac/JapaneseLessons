@@ -130,7 +130,7 @@ def test_select_vocab_populates_nouns_and_verbs(ctx):
 def test_select_vocab_excludes_covered_nouns(config):
     c = LessonContext(config=config)
     c.curriculum = create_curriculum("Test")
-    c.curriculum["covered_nouns"] = ["water", "bread"]
+    c.curriculum.covered_nouns = ["water", "bread"]
     with patch("jlesson.lesson_pipeline.PipelineGadgets.load_vocab", return_value=_VOCAB):
         c = SelectVocabStep().execute(c)
     fresh = {n["english"] for n in c.nouns}
@@ -611,8 +611,8 @@ def test_register_lesson_adds_completed_entry_to_curriculum(ctx):
     ctx.sentences = []
     ctx.verb_items = []
     ctx = RegisterLessonStep().execute(ctx)
-    assert len(ctx.curriculum["lessons"]) == 1
-    assert ctx.curriculum["lessons"][0]["status"] == "completed"
+    assert len(ctx.curriculum.lessons) == 1
+    assert ctx.curriculum.lessons[0].status == "completed"
 
 
 def test_register_lesson_updates_covered_grammar(ctx):
@@ -623,7 +623,7 @@ def test_register_lesson_updates_covered_grammar(ctx):
     ctx.sentences = []
     ctx.verb_items = []
     ctx = RegisterLessonStep().execute(ctx)
-    assert "action_present_affirmative" in ctx.curriculum["covered_grammar_ids"]
+    assert "action_present_affirmative" in ctx.curriculum.covered_grammar_ids
 
 
 def test_register_lesson_saves_curriculum_file(ctx, tmp_path):

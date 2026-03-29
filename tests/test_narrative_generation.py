@@ -116,17 +116,29 @@ def test_narrative_generator_falls_back_to_default_blocks_when_llm_empty(tmp_pat
     ctx = LessonContext(config=config)
     ctx.curriculum = create_curriculum("Test")
 
-    with patch.object(
-        ctx.language_config.generator,
-        "build_default_narrative_blocks",
-        return_value=["Auto block 1", "Auto block 2"],
-    ) as mock_default, patch(
+    from jlesson.lesson_pipeline.narrative_generator.config import NarrativeGeneratorLanguageConfig
+
+    builder_calls = []
+
+    def mock_builder(theme: str, lesson_number: int, block_count: int) -> list[str]:
+        builder_calls.append((theme, lesson_number, block_count))
+        return ["Auto block 1", "Auto block 2"]
+
+    mock_step_config = NarrativeGeneratorLanguageConfig(
+        source_language_label="English",
+        default_block_builder=mock_builder,
+    )
+
+    with patch(
+        "jlesson.lesson_pipeline.narrative_generator.step.build_narrative_generator_language_config",
+        return_value=mock_step_config,
+    ), patch(
         "jlesson.lesson_pipeline.narrative_generator.step.PipelineRuntime.ask_llm",
         return_value={"blocks": []},
     ):
         NarrativeGeneratorStep().execute(ctx)
 
-    mock_default.assert_called_once()
+    assert len(builder_calls) == 1
     assert ctx.narrative_blocks == ["Auto block 1", "Auto block 2"]
 
 

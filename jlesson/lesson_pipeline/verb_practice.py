@@ -16,7 +16,7 @@ class VerbPracticeStep(PipelineStep):
         if ctx.verb_items:
             self._log(ctx, "       using retrieved verb items")
             return ctx
-        lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
+        lesson_number = len(ctx.curriculum.lessons) + 1
         verb_items_all = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
         raw_items: list[dict] = []
         for batch_start in range(0, len(verb_items_all), self.BATCH_SIZE):

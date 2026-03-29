@@ -17,9 +17,9 @@ class GrammarSelectStep(PipelineStep):
             return ctx
         lang_cfg = ctx.language_config
         progression = list(lang_cfg.grammar_progression)
-        covered = ctx.curriculum.get("covered_grammar_ids", [])
+        covered = ctx.curriculum.covered_grammar_ids
         grammar_map = {g.id: g for g in progression}
-        lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
+        lesson_number = len(ctx.curriculum.lessons) + 1
         noun_items = [lang_cfg.generator.convert_raw_noun(n) for n in ctx.nouns]
         verb_items = [lang_cfg.generator.convert_raw_verb(v) for v in ctx.verbs]
 

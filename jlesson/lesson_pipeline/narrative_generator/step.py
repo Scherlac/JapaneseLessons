@@ -22,7 +22,7 @@ class NarrativeGeneratorStep(PipelineStep):
         if len(provided) >= block_count:
             ctx.narrative_blocks = provided[:block_count]
         else:
-            lesson_number = len(ctx.curriculum.get("lessons", [])) + 1
+            lesson_number = len(ctx.curriculum.lessons) + 1
             step_config = build_narrative_generator_language_config(ctx.language_config)
             prompt = build_narrative_generator_prompt(
                 theme=ctx.config.theme,
@@ -37,6 +37,8 @@ class NarrativeGeneratorStep(PipelineStep):
                 for block in result.get("blocks", [])
                 if isinstance(block, dict)
             ]
+            if len(generated) < block_count:
+                self._log(ctx, f"       LLM returned {len(generated)}/{block_count} blocks — filling with defaults")
             defaults = step_config.default_block_builder(
                 ctx.config.theme,
                 lesson_number,

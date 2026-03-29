@@ -25,7 +25,7 @@ class SelectVocabStep(PipelineStep):
         if ctx.narrative_vocab_terms:
             ctx.nouns = self._select_from_narrative(
                 ctx.vocab["nouns"],
-                covered_items=ctx.curriculum.get("covered_nouns", []),
+                covered_items=ctx.curriculum.covered_nouns,
                 requested_per_block=ctx.config.num_nouns,
                 lesson_blocks=ctx.config.lesson_blocks,
                 narrative_blocks=ctx.narrative_vocab_terms,
@@ -34,7 +34,7 @@ class SelectVocabStep(PipelineStep):
             )
             ctx.verbs = self._select_from_narrative(
                 ctx.vocab["verbs"],
-                covered_items=ctx.curriculum.get("covered_verbs", []),
+                covered_items=ctx.curriculum.covered_verbs,
                 requested_per_block=ctx.config.num_verbs,
                 lesson_blocks=ctx.config.lesson_blocks,
                 narrative_blocks=ctx.narrative_vocab_terms,
@@ -45,8 +45,8 @@ class SelectVocabStep(PipelineStep):
             ctx.nouns, ctx.verbs = suggest_new_vocab(
                 ctx.vocab["nouns"],
                 ctx.vocab["verbs"],
-                covered_nouns=ctx.curriculum.get("covered_nouns", []),
-                covered_verbs=ctx.curriculum.get("covered_verbs", []),
+                covered_nouns=ctx.curriculum.covered_nouns,
+                covered_verbs=ctx.curriculum.covered_verbs,
                 num_nouns=requested_nouns,
                 num_verbs=requested_verbs,
                 seed=ctx.config.seed,

@@ -10,6 +10,8 @@ continue to work unchanged:
 
 # Language-agnostic CRUD, vocab selection, and grammar helpers
 from ._base import (
+    CurriculumData,
+    LessonRecord,
     create_curriculum,
     load_curriculum,
     save_curriculum,

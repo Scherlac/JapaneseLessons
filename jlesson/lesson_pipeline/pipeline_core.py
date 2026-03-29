@@ -8,6 +8,7 @@ from jlesson.language_config import LanguageConfig, get_language_config
 from jlesson.lesson_report import ReportBuilder
 from jlesson.models import CompiledItem, GeneralItem, GrammarItem, Sentence, Touch
 from jlesson.retrieval import RetrievalResult
+from jlesson.curriculum import CurriculumData, create_curriculum
 
 
 @dataclass
@@ -65,7 +66,7 @@ class LessonContext:
     config: LessonConfig
     report: ReportBuilder = field(default_factory=ReportBuilder)
     step_info: StepInfo | None = None
-    curriculum: dict = field(default_factory=dict)
+    curriculum: CurriculumData = field(default_factory=create_curriculum)
     vocab: dict = field(default_factory=dict)
     nouns: list[GeneralItem] = field(default_factory=list)
     verbs: list[GeneralItem] = field(default_factory=list)
