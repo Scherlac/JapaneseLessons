@@ -8,7 +8,7 @@ continue to work unchanged:
     from jlesson.curriculum import create_curriculum, GRAMMAR_PROGRESSION, ...
 """
 
-# Language-agnostic CRUD, vocab selection, and grammar helpers
+# Language-agnostic CRUD and grammar helpers
 from ._base import (
     CurriculumData,
     LessonRecord,
@@ -19,7 +19,6 @@ from ._base import (
     complete_lesson,
     get_next_grammar_from,
     grammar_summary_lines,
-    suggest_new_vocab,
 )
 
 # English-Japanese
@@ -43,7 +42,6 @@ __all__ = [
     "complete_lesson",
     "get_next_grammar_from",
     "grammar_summary_lines",
-    "suggest_new_vocab",
     # eng-jap
     "ENG_TO_JAP_GRAMMAR_PROGRESSION",
     "GRAMMAR_PROGRESSION",

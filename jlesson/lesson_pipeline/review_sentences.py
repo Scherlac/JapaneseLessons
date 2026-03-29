@@ -22,8 +22,8 @@ class ReviewSentencesStep(PipelineStep):
             if isinstance(sentence, dict):
                 ctx.sentences[index] = ctx.language_config.generator.convert_sentence(sentence)
 
-        noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
-        verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in ctx.verbs]
+        noun_items = list(ctx.nouns)
+        verb_items = list(ctx.verbs)
 
         all_reviews: list[dict] = []
         for batch_start in range(0, len(ctx.sentences), self.BATCH_SIZE):

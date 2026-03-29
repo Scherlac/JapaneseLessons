@@ -1,11 +1,10 @@
 """
-Language-agnostic curriculum CRUD, vocab selection, and grammar progression helpers.
+Language-agnostic curriculum CRUD and grammar progression helpers.
 """
 
 from __future__ import annotations
 
 import json
-import random
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -89,8 +88,8 @@ def add_lesson(
     *,
     title: str,
     theme: str,
-    nouns: list[dict],
-    verbs: list[dict],
+    nouns: list[str],
+    verbs: list[str],
     grammar_ids: list[str],
     items_count: int = 0,
     status: str = "draft",
@@ -104,8 +103,8 @@ def add_lesson(
         id=next_id,
         title=title,
         theme=theme,
-        nouns=[n["english"] for n in nouns],
-        verbs=[v["english"] for v in verbs],
+        nouns=list(nouns),
+        verbs=list(verbs),
         grammar_ids=list(grammar_ids),
         items_count=items_count,
         status=status,
@@ -169,55 +168,6 @@ def grammar_summary_lines(grammar_entries: list[GrammarItem]) -> list[str]:
         f"  [{g.level}] {g.id}: {g.pattern} \u2014 {g.description}"
         for g in grammar_entries
     ]
-
-
-# ── Vocab Selection ───────────────────────────────────────────────────────────
-
-def suggest_new_vocab(
-    all_nouns: list[dict],
-    all_verbs: list[dict],
-    covered_nouns: list[str],
-    covered_verbs: list[str],
-    num_nouns: int = 4,
-    num_verbs: int = 3,
-    *,
-    seed: int | None = None,
-) -> tuple[list[dict], list[dict]]:
-    """Select vocab items not yet covered in previous lessons.
-
-    Prioritises fresh items; fills up from already-covered items if the
-    available pool is exhausted.
-
-    Pass ``seed`` for a deterministic shuffled selection; omit (or ``None``)
-    to get items in their original list order (backward-compatible).
-
-    Returns:
-        (selected_nouns, selected_verbs) — both lists of vocab dicts.
-    """
-    covered_n = set(covered_nouns)
-    covered_v = set(covered_verbs)
-
-    fresh_nouns = [n for n in all_nouns if n["english"] not in covered_n]
-    fresh_verbs = [v for v in all_verbs if v["english"] not in covered_v]
-
-    if seed is not None:
-        rng = random.Random(seed)
-        rng.shuffle(fresh_nouns)
-        rng.shuffle(fresh_verbs)
-
-    selected_nouns = fresh_nouns[:num_nouns]
-    if len(selected_nouns) < num_nouns:
-        seen = {n["english"] for n in selected_nouns}
-        gap = num_nouns - len(selected_nouns)
-        selected_nouns += [n for n in all_nouns if n["english"] not in seen][:gap]
-
-    selected_verbs = fresh_verbs[:num_verbs]
-    if len(selected_verbs) < num_verbs:
-        seen = {v["english"] for v in selected_verbs}
-        gap = num_verbs - len(selected_verbs)
-        selected_verbs += [v for v in all_verbs if v["english"] not in seen][:gap]
-
-    return selected_nouns[:num_nouns], selected_verbs[:num_verbs]
 
 
 

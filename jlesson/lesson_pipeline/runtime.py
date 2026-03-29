@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from jlesson.models import VocabFile
 from .pipeline_llm import ask_llm
 from .pipeline_vocab import load_vocab as _load_vocab_file
 
@@ -21,7 +22,7 @@ class PipelineRuntime:
         return ask_llm(ctx, prompt)
 
     @staticmethod
-    def load_vocab(theme: str, vocab_dir: Path | None = None) -> dict[str, Any]:
+    def load_vocab(theme: str, vocab_dir: Path | None = None) -> VocabFile:
         """Load vocab JSON for *theme*, generating via LLM if the file is absent."""
         return _load_vocab_file(theme, vocab_dir)
 

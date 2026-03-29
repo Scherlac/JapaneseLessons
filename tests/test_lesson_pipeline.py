@@ -1,4 +1,4 @@
-"""Unit tests for jlesson.lesson_pipeline — pipeline steps and runner."""
+﻿"""Unit tests for jlesson.lesson_pipeline — pipeline steps and runner."""
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -26,7 +26,8 @@ from jlesson.lesson_pipeline import (
     VerbPracticeStep,
     run_pipeline,
 )
-from jlesson.models import CompiledItem, ItemAssets, NounItem, Phase, Touch, TouchIntent, TouchType, VerbItem, Sentence, GeneralItem, PartialItem
+from jlesson.models import CompiledItem, ItemAssets, NounItem, Phase, Touch, TouchIntent, TouchType, VerbItem, Sentence, GeneralItem, PartialItem, VocabFile, VocabItem
+from jlesson.item_generator.eng_jap import EngJapItemGenerator
 from jlesson.retrieval import CanonicalLessonNode, FileBackedRetrievalService, LanguageBranch
 
 
@@ -104,6 +105,11 @@ _VERBS = [
 
 _VOCAB = {"nouns": _NOUNS, "verbs": _VERBS}
 
+_GEN = EngJapItemGenerator()
+_NOUN_ITEMS = [_GEN.convert_raw_noun(n) for n in _NOUNS]
+_VERB_ITEMS = [_GEN.convert_raw_verb(v) for v in _VERBS]
+_VOCAB_FILE = VocabFile.model_validate(_VOCAB)
+
 
 # ---------------------------------------------------------------------------
 # StepInfo
@@ -121,7 +127,7 @@ def test_step_info_label():
 
 
 def test_select_vocab_populates_nouns_and_verbs(ctx):
-    with patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB):
+    with patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE):
         ctx = SelectVocabStep().execute(ctx)
     assert len(ctx.nouns) == 2
     assert len(ctx.verbs) == 2
@@ -131,9 +137,9 @@ def test_select_vocab_excludes_covered_nouns(config):
     c = LessonContext(config=config)
     c.curriculum = create_curriculum("Test")
     c.curriculum.covered_nouns = ["water", "bread"]
-    with patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB):
+    with patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE):
         c = SelectVocabStep().execute(c)
-    fresh = {n["english"] for n in c.nouns}
+    fresh = {n.source.display_text for n in c.nouns}
     assert "rice" in fresh or "tea" in fresh
 
 
@@ -143,9 +149,9 @@ def test_select_vocab_with_seed_is_deterministic(config):
     for _ in range(2):
         c = LessonContext(config=config)
         c.curriculum = create_curriculum("T")
-        with patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB):
+        with patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE):
             c = SelectVocabStep().execute(c)
-        results.append([n["english"] for n in c.nouns])
+        results.append([n.source.display_text for n in c.nouns])
     assert results[0] == results[1]
 
 
@@ -155,8 +161,8 @@ def test_select_vocab_with_seed_is_deterministic(config):
 
 
 def test_grammar_select_picks_valid_grammar(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     mock_result = {
         "selected_ids": ["action_present_affirmative"],
         "rationale": "Good start",
@@ -168,16 +174,16 @@ def test_grammar_select_picks_valid_grammar(ctx):
 
 
 def test_grammar_select_falls_back_when_llm_empty(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value={}):
         ctx = GrammarSelectStep().execute(ctx)
     assert len(ctx.selected_grammar) >= 1
 
 
 def test_grammar_select_skips_unknown_ids(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     mock_result = {"selected_ids": ["nonexistent_grammar_id"]}
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock_result):
         ctx = GrammarSelectStep().execute(ctx)
@@ -191,8 +197,8 @@ def test_grammar_select_skips_unknown_ids(ctx):
 
 
 def test_generate_sentences_stores_sentences(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     mock = {
         "sentences": [
@@ -232,8 +238,8 @@ def test_generate_sentences_adds_grammar_to_report(ctx):
 
 
 def test_generate_sentences_empty_llm_response(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value={}):
         ctx = GenerateSentencesStep().execute(ctx)
@@ -263,8 +269,8 @@ _SAMPLE_SENTENCES = [
 
 
 def test_review_sentences_applies_revisions(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES]
     mock_review = {
@@ -295,8 +301,8 @@ def test_review_sentences_applies_revisions(ctx):
 
 
 def test_review_sentences_no_revisions_needed(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES[:1]]
     mock_review = {
@@ -317,8 +323,8 @@ def test_review_sentences_empty_sentences(ctx):
 
 
 def test_review_sentences_empty_llm_response(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES]
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value={}):
@@ -329,8 +335,8 @@ def test_review_sentences_empty_llm_response(ctx):
 
 def test_review_sentences_ignores_high_score_with_revision(ctx):
     """Even if a revision is provided, don't apply it if score >= threshold."""
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES[:1]]
     mock_review = {
@@ -358,8 +364,8 @@ def test_review_sentences_ignores_high_score_with_revision(ctx):
 
 
 def test_review_sentences_ignores_out_of_bounds_index(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES[:1]]
     mock_review = {
@@ -381,8 +387,8 @@ def test_review_sentences_ignores_out_of_bounds_index(ctx):
 
 def test_review_sentences_ignores_null_revised_sentence(ctx):
     """Low-score but null revision should not crash."""
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES[:1]]
     mock_review = {
@@ -397,8 +403,8 @@ def test_review_sentences_ignores_null_revised_sentence(ctx):
 
 
 def test_review_sentences_adds_report_on_revisions(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES]
     mock_review = {
@@ -430,8 +436,8 @@ def test_review_sentences_adds_report_on_revisions(ctx):
 
 
 def test_review_sentences_no_report_when_all_natural(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.sentences = [dict(s) for s in _SAMPLE_SENTENCES[:1]]
     mock_review = {
@@ -452,7 +458,7 @@ def test_review_sentences_no_report_when_all_natural(ctx):
 
 
 def test_noun_practice_stores_items(ctx):
-    ctx.nouns = _NOUNS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
     mock = {
         "noun_items": [
             {
@@ -482,7 +488,7 @@ def test_noun_practice_stores_items(ctx):
 
 
 def test_noun_practice_adds_to_report(ctx):
-    ctx.nouns = _NOUNS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
     mock = {"noun_items": [dict(n) for n in _NOUNS[:2]]}
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
         ctx = NounPracticeStep().execute(ctx)
@@ -493,7 +499,7 @@ def test_noun_practice_adds_to_report(ctx):
 
 
 def test_noun_practice_fills_missing_fields_from_source(ctx):
-    ctx.nouns = _NOUNS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
     mock = {"noun_items": [{"english": "water"}, {"english": "bread"}]}
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
         ctx = NounPracticeStep().execute(ctx)
@@ -503,7 +509,7 @@ def test_noun_practice_fills_missing_fields_from_source(ctx):
 
 
 def test_noun_practice_fallback_on_empty_llm(ctx):
-    ctx.nouns = _NOUNS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value={}):
         ctx = NounPracticeStep().execute(ctx)
     assert len(ctx.noun_items) == 2
@@ -515,7 +521,7 @@ def test_noun_practice_fallback_on_empty_llm(ctx):
 
 
 def test_verb_practice_stores_items(ctx):
-    ctx.verbs = _VERBS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     mock = {
         "verb_items": [
             {
@@ -549,7 +555,7 @@ def test_verb_practice_stores_items(ctx):
 
 
 def test_verb_practice_adds_to_report(ctx):
-    ctx.verbs = _VERBS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     mock = {"verb_items": [dict(v) for v in _VERBS[:2]]}
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
         ctx = VerbPracticeStep().execute(ctx)
@@ -559,7 +565,7 @@ def test_verb_practice_adds_to_report(ctx):
 
 
 def test_verb_practice_fills_missing_fields_from_source(ctx):
-    ctx.verbs = _VERBS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     mock = {"verb_items": [{"english": "to eat"}, {"english": "to drink"}]}
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value=mock):
         ctx = VerbPracticeStep().execute(ctx)
@@ -568,7 +574,7 @@ def test_verb_practice_fills_missing_fields_from_source(ctx):
 
 
 def test_verb_practice_fallback_on_empty_llm(ctx):
-    ctx.verbs = _VERBS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     with patch("jlesson.lesson_pipeline.PipelineGadgets.ask_llm", return_value={}):
         ctx = VerbPracticeStep().execute(ctx)
     assert len(ctx.verb_items) == 2
@@ -580,8 +586,8 @@ def test_verb_practice_fallback_on_empty_llm(ctx):
 
 
 def test_register_lesson_assigns_lesson_id(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.noun_items = [dict(n) for n in _NOUNS[:2]]
     ctx.sentences = []
@@ -591,8 +597,8 @@ def test_register_lesson_assigns_lesson_id(ctx):
 
 
 def test_register_lesson_adds_header_to_report(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.noun_items = []
     ctx.sentences = []
@@ -604,8 +610,8 @@ def test_register_lesson_adds_header_to_report(ctx):
 
 
 def test_register_lesson_adds_completed_entry_to_curriculum(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.noun_items = []
     ctx.sentences = []
@@ -616,8 +622,8 @@ def test_register_lesson_adds_completed_entry_to_curriculum(ctx):
 
 
 def test_register_lesson_updates_covered_grammar(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.noun_items = []
     ctx.sentences = []
@@ -627,8 +633,8 @@ def test_register_lesson_updates_covered_grammar(ctx):
 
 
 def test_register_lesson_saves_curriculum_file(ctx, tmp_path):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.noun_items = []
     ctx.sentences = []
@@ -638,8 +644,8 @@ def test_register_lesson_saves_curriculum_file(ctx, tmp_path):
 
 
 def test_register_lesson_sets_created_at(ctx):
-    ctx.nouns = _NOUNS[:2]
-    ctx.verbs = _VERBS[:2]
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
     ctx.noun_items = []
     ctx.sentences = []
@@ -1318,8 +1324,8 @@ def test_run_pipeline_uses_retrieval_hit_and_skips_vocab(config, tmp_path):
     assert mock_load_vocab.call_count == 0
     assert ctx.retrieval_result is not None
     assert ctx.retrieval_result.used_retrieval is True
-    assert [noun["english"] for noun in ctx.nouns] == ["water", "bread"]
-    assert [verb["english"] for verb in ctx.verbs] == ["to eat", "to drink"]
+    assert [noun.source.display_text for noun in ctx.nouns] == ["water", "bread"]
+    assert [verb.source.display_text for verb in ctx.verbs] == ["to eat", "to drink"]
     assert [item.phase for item in ctx.noun_items] == [Phase.NOUNS, Phase.NOUNS]
     assert [item.phase for item in ctx.verb_items] == [Phase.VERBS, Phase.VERBS]
 
@@ -1389,3 +1395,5 @@ def test_context_has_compiled_items_field(ctx):
 
 def test_context_has_touches_field(ctx):
     assert ctx.touches == []
+
+

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from jlesson.language_config import LanguageConfig, get_language_config
 from jlesson.lesson_report import ReportBuilder
-from jlesson.models import CompiledItem, GeneralItem, GrammarItem, NarrativeVocabBlock, Sentence, Touch
+from jlesson.models import CompiledItem, GeneralItem, GrammarItem, NarrativeVocabBlock, Sentence, Touch, VocabFile
 from jlesson.retrieval import RetrievalResult
 from jlesson.curriculum import CurriculumData, create_curriculum
 
@@ -67,7 +67,7 @@ class LessonContext:
     report: ReportBuilder = field(default_factory=ReportBuilder)
     step_info: StepInfo | None = None
     curriculum: CurriculumData = field(default_factory=create_curriculum)
-    vocab: dict = field(default_factory=dict)
+    vocab: VocabFile | None = None
     nouns: list[GeneralItem] = field(default_factory=list)
     verbs: list[GeneralItem] = field(default_factory=list)
     narrative_blocks: list[str] = field(default_factory=list)

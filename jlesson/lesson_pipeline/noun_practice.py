@@ -17,7 +17,7 @@ class NounPracticeStep(PipelineStep):
             self._log(ctx, "       using retrieved noun items")
             return ctx
         lesson_number = len(ctx.curriculum.lessons) + 1
-        noun_items_all = [ctx.language_config.generator.convert_raw_noun(n) for n in ctx.nouns]
+        noun_items_all = list(ctx.nouns)
         raw_items: list[dict] = []
         for batch_start in range(0, len(noun_items_all), self.BATCH_SIZE):
             batch = noun_items_all[batch_start : batch_start + self.BATCH_SIZE]

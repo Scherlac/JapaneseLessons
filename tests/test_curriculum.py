@@ -7,7 +7,7 @@ Covers:
   - create_curriculum — correct initial structure
   - add_lesson        — adds lesson, does NOT yet update covered trackers
   - complete_lesson   — updates covered_nouns / covered_verbs / covered_grammar_ids
-  - suggest_new_vocab — fresh-first selection, fill-up from covered if too few fresh
+  - SelectVocabStep._select_fallback — fresh-first selection, fill-up from covered if too few fresh
   - summary           — smoke-test non-empty string output
   - load/save round-trip (tmp_path)
 """
@@ -26,15 +26,17 @@ from jlesson.curriculum import (
     get_next_grammar,
     load_curriculum,
     save_curriculum,
-    suggest_new_vocab,
     summary,
 )
+from jlesson.item_generator.eng_jap import EngJapItemGenerator
+from jlesson.lesson_pipeline.select_vocab import SelectVocabStep
+from jlesson.models import VocabItem
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
-_NOUN = lambda en: {"english": en, "japanese": "x", "kanji": "X", "romaji": "x"}
+_NOUN = lambda en: {"id": en, "english": en, "japanese": "x", "kanji": "X", "romaji": "x"}
 _VERB = lambda en: {
-    "english": en, "japanese": "x", "kanji": "X",
+    "id": en, "english": en, "japanese": "x", "kanji": "X",
     "romaji": "x", "type": "る-verb", "masu_form": "Xます",
 }
 
@@ -52,6 +54,21 @@ def food_nouns():
 @pytest.fixture
 def food_verbs():
     return [_VERB(w) for w in ["to eat", "to drink", "to cook"]]
+
+
+@pytest.fixture
+def food_noun_items():
+    return [VocabItem.model_validate(_NOUN(w)) for w in ["water", "rice", "fish", "meat", "egg"]]
+
+
+@pytest.fixture
+def food_verb_items():
+    return [VocabItem.model_validate(_VERB(w)) for w in ["to eat", "to drink", "to cook"]]
+
+
+@pytest.fixture
+def eng_jap_generator():
+    return EngJapItemGenerator()
 
 
 # ─── Grammar Progression table integrity ─────────────────────────────────────
@@ -177,24 +194,24 @@ class TestCreateCurriculum:
 # ─── add_lesson ───────────────────────────────────────────────────────────────
 
 class TestAddLesson:
-    def test_adds_lesson_to_list(self, empty_cur, food_nouns, food_verbs):
+    def test_adds_lesson_to_list(self, empty_cur):
         add_lesson(
             empty_cur,
             title="Lesson 1",
             theme="food",
-            nouns=food_nouns[:2],
-            verbs=food_verbs[:1],
+            nouns=["water", "rice"],
+            verbs=["to eat"],
             grammar_ids=["action_present_affirmative"],
         )
         assert len(empty_cur.lessons) == 1
 
-    def test_lesson_has_correct_fields(self, empty_cur, food_nouns, food_verbs):
+    def test_lesson_has_correct_fields(self, empty_cur):
         lesson = add_lesson(
             empty_cur,
             title="Lesson 1",
             theme="food",
-            nouns=food_nouns[:2],
-            verbs=food_verbs[:1],
+            nouns=["water", "rice"],
+            verbs=["to eat"],
             grammar_ids=["action_present_affirmative"],
         )
         assert lesson.title == "Lesson 1"
@@ -204,17 +221,17 @@ class TestAddLesson:
         assert lesson.grammar_ids == ["action_present_affirmative"]
         assert lesson.status == "draft"
 
-    def test_add_two_lessons_increments_id(self, empty_cur, food_nouns, food_verbs):
+    def test_add_two_lessons_increments_id(self, empty_cur):
         l1 = add_lesson(empty_cur, title="L1", theme="food",
                         nouns=[], verbs=[], grammar_ids=[])
         l2 = add_lesson(empty_cur, title="L2", theme="food",
                         nouns=[], verbs=[], grammar_ids=[])
         assert l2.id == l1.id + 1
 
-    def test_covered_trackers_not_updated_before_complete(self, empty_cur, food_nouns, food_verbs):
+    def test_covered_trackers_not_updated_before_complete(self, empty_cur):
         add_lesson(
             empty_cur, title="L1", theme="food",
-            nouns=food_nouns[:2], verbs=food_verbs[:1],
+            nouns=["water", "rice"], verbs=["to eat"],
             grammar_ids=["action_present_affirmative"],
         )
         assert empty_cur.covered_nouns == []
@@ -232,29 +249,29 @@ class TestCompletedLesson:
         complete_lesson(cur, lesson.id)
         return lesson
 
-    def test_status_set_to_completed(self, empty_cur, food_nouns, food_verbs):
+    def test_status_set_to_completed(self, empty_cur):
         lesson = self._add_and_complete(
-            empty_cur, food_nouns[:2], food_verbs[:1],
+            empty_cur, ["water", "rice"], ["to eat"],
             ["action_present_affirmative"],
         )
         assert lesson.status == "completed"
 
-    def test_covered_nouns_updated(self, empty_cur, food_nouns, food_verbs):
+    def test_covered_nouns_updated(self, empty_cur):
         self._add_and_complete(
-            empty_cur, food_nouns[:2], food_verbs[:1],
+            empty_cur, ["water", "rice"], ["to eat"],
             ["action_present_affirmative"],
         )
         assert "water" in empty_cur.covered_nouns
         assert "rice" in empty_cur.covered_nouns
 
-    def test_covered_verbs_updated(self, empty_cur, food_nouns, food_verbs):
+    def test_covered_verbs_updated(self, empty_cur):
         self._add_and_complete(
-            empty_cur, food_nouns[:2], food_verbs[:1],
+            empty_cur, ["water", "rice"], ["to eat"],
             ["action_present_affirmative"],
         )
         assert "to eat" in empty_cur.covered_verbs
 
-    def test_covered_grammar_updated(self, empty_cur, food_nouns, food_verbs):
+    def test_covered_grammar_updated(self, empty_cur):
         self._add_and_complete(
             empty_cur, [], [],
             ["action_present_affirmative", "identity_present_affirmative"],
@@ -266,109 +283,122 @@ class TestCompletedLesson:
         with pytest.raises(KeyError):
             complete_lesson(empty_cur, lesson_id=99)
 
-    def test_no_duplicate_covered_nouns_after_two_lessons(self, empty_cur, food_nouns, food_verbs):
+    def test_no_duplicate_covered_nouns_after_two_lessons(self, empty_cur):
         for _ in range(2):
             lesson = add_lesson(
                 empty_cur, title="L", theme="food",
-                nouns=food_nouns[:2], verbs=[], grammar_ids=[],
+                nouns=["water", "rice"], verbs=[], grammar_ids=[],
             )
             complete_lesson(empty_cur, lesson.id)
         assert len(empty_cur.covered_nouns) == len(set(empty_cur.covered_nouns))
 
 
-# ─── suggest_new_vocab ────────────────────────────────────────────────────────
+# ─── SelectVocabStep._select_fallback ────────────────────────────────────────
 
-class TestSuggestNewVocab:
-    def test_returns_fresh_items_first(self, food_nouns, food_verbs):
-        nouns, verbs = suggest_new_vocab(
-            food_nouns, food_verbs,
+
+class TestSelectFallback:
+    def _fallback(self, noun_items, verb_items, covered_nouns, covered_verbs,
+                  num_nouns, num_verbs, seed=None):
+        gen = EngJapItemGenerator()
+        return SelectVocabStep._select_fallback(
+            noun_items, verb_items,
+            covered_nouns=covered_nouns,
+            covered_verbs=covered_verbs,
+            num_nouns=num_nouns,
+            num_verbs=num_verbs,
+            seed=seed,
+            generator=gen,
+        )
+
+    def test_returns_fresh_items_first(self, food_noun_items, food_verb_items):
+        nouns, verbs = self._fallback(
+            food_noun_items, food_verb_items,
             covered_nouns=["water", "rice"],
             covered_verbs=[],
             num_nouns=3, num_verbs=2,
         )
-        assert "water" not in [n["english"] for n in nouns]
-        assert "rice" not in [n["english"] for n in nouns]
+        names = [n.source.display_text for n in nouns]
+        assert "water" not in names
+        assert "rice" not in names
 
-    def test_respects_num_nouns_and_verbs(self, food_nouns, food_verbs):
-        nouns, verbs = suggest_new_vocab(
-            food_nouns, food_verbs,
+    def test_respects_num_nouns_and_verbs(self, food_noun_items, food_verb_items):
+        nouns, verbs = self._fallback(
+            food_noun_items, food_verb_items,
             covered_nouns=[], covered_verbs=[],
             num_nouns=3, num_verbs=2,
         )
         assert len(nouns) == 3
         assert len(verbs) == 2
 
-    def test_fills_up_from_covered_when_fresh_exhausted(self, food_nouns, food_verbs):
-        # Cover all nouns — should still return 3 (from already-covered pool)
-        all_noun_names = [n["english"] for n in food_nouns]
-        nouns, _ = suggest_new_vocab(
-            food_nouns, food_verbs,
+    def test_fills_up_from_covered_when_fresh_exhausted(self, food_noun_items):
+        all_noun_names = [n.id for n in food_noun_items]
+        nouns, _ = self._fallback(
+            food_noun_items, [],
             covered_nouns=all_noun_names, covered_verbs=[],
             num_nouns=3, num_verbs=0,
         )
         assert len(nouns) == 3
 
-    def test_empty_covered_returns_items_in_order(self, food_nouns, food_verbs):
-        nouns, _ = suggest_new_vocab(
-            food_nouns, food_verbs,
+    def test_empty_covered_returns_items_in_order(self, food_noun_items):
+        nouns, _ = self._fallback(
+            food_noun_items, [],
             covered_nouns=[], covered_verbs=[],
             num_nouns=2, num_verbs=0,
         )
-        assert nouns[0]["english"] == food_nouns[0]["english"]
-        assert nouns[1]["english"] == food_nouns[1]["english"]
+        assert nouns[0].source.display_text == food_noun_items[0].id
+        assert nouns[1].source.display_text == food_noun_items[1].id
 
-    def test_seeded_call_is_reproducible(self, food_nouns, food_verbs):
+    def test_seeded_call_is_reproducible(self, food_noun_items, food_verb_items):
         """Same seed must produce same noun/verb order on every call."""
-        nouns_a, verbs_a = suggest_new_vocab(
-            food_nouns, food_verbs,
+        nouns_a, verbs_a = self._fallback(
+            food_noun_items, food_verb_items,
             covered_nouns=[], covered_verbs=[],
             num_nouns=4, num_verbs=3,
             seed=42,
         )
-        nouns_b, verbs_b = suggest_new_vocab(
-            food_nouns, food_verbs,
+        nouns_b, verbs_b = self._fallback(
+            food_noun_items, food_verb_items,
             covered_nouns=[], covered_verbs=[],
             num_nouns=4, num_verbs=3,
             seed=42,
         )
-        assert [n["english"] for n in nouns_a] == [n["english"] for n in nouns_b]
-        assert [v["english"] for v in verbs_a] == [v["english"] for v in verbs_b]
+        assert [n.source.display_text for n in nouns_a] == [n.source.display_text for n in nouns_b]
+        assert [v.source.display_text for v in verbs_a] == [v.source.display_text for v in verbs_b]
 
-    def test_different_seeds_produce_different_orders(self, food_nouns, food_verbs):
+    def test_different_seeds_produce_different_orders(self, food_noun_items):
         """Different seeds should produce different orderings (with high probability on a 5-item pool)."""
-        # Use the full pool (5 nouns) so shuffles are non-trivial
-        nouns_42, _ = suggest_new_vocab(
-            food_nouns, food_verbs,
+        nouns_42, _ = self._fallback(
+            food_noun_items, [],
             covered_nouns=[], covered_verbs=[],
             num_nouns=5, num_verbs=0,
             seed=42,
         )
-        nouns_99, _ = suggest_new_vocab(
-            food_nouns, food_verbs,
+        nouns_99, _ = self._fallback(
+            food_noun_items, [],
             covered_nouns=[], covered_verbs=[],
             num_nouns=5, num_verbs=0,
             seed=99,
         )
-        assert [n["english"] for n in nouns_42] != [n["english"] for n in nouns_99]
+        assert [n.source.display_text for n in nouns_42] != [n.source.display_text for n in nouns_99]
 
-    def test_seed_none_preserves_list_order(self, food_nouns, food_verbs):
+    def test_seed_none_preserves_list_order(self, food_noun_items):
         """seed=None (default) must not shuffle — items returned in original order."""
-        nouns, _ = suggest_new_vocab(
-            food_nouns, food_verbs,
+        nouns, _ = self._fallback(
+            food_noun_items, [],
             covered_nouns=[], covered_verbs=[],
             num_nouns=5, num_verbs=0,
         )
-        assert [n["english"] for n in nouns] == [n["english"] for n in food_nouns]
+        assert [n.source.display_text for n in nouns] == [item.id for item in food_noun_items]
 
-    def test_seed_does_not_pollute_global_random_state(self, food_nouns, food_verbs):
+    def test_seed_does_not_pollute_global_random_state(self, food_noun_items, food_verb_items):
         """Using a seed should not affect subsequent calls without a seed."""
         import random
         random.seed(123)
         r_before = random.random()
 
         random.seed(123)
-        suggest_new_vocab(
-            food_nouns, food_verbs,
+        self._fallback(
+            food_noun_items, food_verb_items,
             covered_nouns=[], covered_verbs=[],
             num_nouns=3, num_verbs=2,
             seed=999,
@@ -376,7 +406,7 @@ class TestSuggestNewVocab:
         r_after = random.random()
 
         assert r_before == r_after, (
-            "suggest_new_vocab with seed= must not alter the global random state"
+            "_select_fallback with seed= must not alter the global random state"
         )
 
 
@@ -407,10 +437,10 @@ class TestSummary:
 # ─── load / save round-trip ───────────────────────────────────────────────────
 
 class TestLoadSave:
-    def test_round_trip(self, tmp_path, empty_cur, food_nouns, food_verbs):
+    def test_round_trip(self, tmp_path, empty_cur):
         lesson = add_lesson(
             empty_cur, title="L1", theme="food",
-            nouns=food_nouns[:2], verbs=food_verbs[:1],
+            nouns=["water", "rice"], verbs=["to eat"],
             grammar_ids=["action_present_affirmative"],
         )
         complete_lesson(empty_cur, lesson.id)
@@ -435,7 +465,7 @@ class TestLoadSave:
         save_curriculum(create_curriculum(), path)
         assert path.exists()
 
-    def test_saved_file_is_valid_json_with_unicode(self, tmp_path, food_nouns, food_verbs):
+    def test_saved_file_is_valid_json_with_unicode(self, tmp_path):
         cur = create_curriculum("テスト")
         path = tmp_path / "cur.json"
         save_curriculum(cur, path)

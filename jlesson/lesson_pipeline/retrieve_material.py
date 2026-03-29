@@ -91,18 +91,19 @@ class RetrieveLessonMaterialStep(PipelineStep):
                 )
             self._log(ctx, f"       fallback : {result.fallback_reason}")
         else:
-            ctx.nouns = result.material.nouns[: ctx.config.num_nouns]
-            ctx.verbs = result.material.verbs[: ctx.config.num_verbs]
-            ctx.noun_items = [
-                ctx.language_config.generator.convert_raw_noun(item)
-                for item in ctx.nouns
+            generator = ctx.language_config.generator
+            ctx.nouns = [
+                generator.convert_raw_noun(item)
+                for item in result.material.nouns[: ctx.config.num_nouns]
             ]
+            ctx.verbs = [
+                generator.convert_raw_verb(item)
+                for item in result.material.verbs[: ctx.config.num_verbs]
+            ]
+            ctx.noun_items = list(ctx.nouns)
             for item in ctx.noun_items:
                 item.phase = Phase.NOUNS
-            ctx.verb_items = [
-                ctx.language_config.generator.convert_raw_verb(item)
-                for item in ctx.verbs
-            ]
+            ctx.verb_items = list(ctx.verbs)
             for item in ctx.verb_items:
                 item.phase = Phase.VERBS
             ctx.sentences = [

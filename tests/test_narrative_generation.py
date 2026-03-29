@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from jlesson.curriculum import create_curriculum, get_grammar_by_id
+from jlesson.item_generator import EngJapItemGenerator
 from jlesson.models import NarrativeVocabBlock
 from jlesson.lesson_pipeline import (
     ExtractNarrativeVocabStep,
@@ -12,6 +13,8 @@ from jlesson.lesson_pipeline import (
     NarrativeGeneratorStep,
 )
 from jlesson.prompt_template import build_grammar_generate_prompt
+
+_GEN = EngJapItemGenerator()
 
 
 def test_build_grammar_generate_prompt_includes_narrative():
@@ -188,15 +191,15 @@ def test_grammar_select_builds_block_progression(tmp_path: Path):
     )
     ctx = LessonContext(config=config)
     ctx.curriculum = create_curriculum("Test")
-    ctx.nouns = [{"english": "cat", "japanese": "ねこ", "kanji": "猫", "romaji": "neko"}]
-    ctx.verbs = [{
+    ctx.nouns = [_GEN.convert_raw_noun({"english": "cat", "japanese": "ねこ", "kanji": "猫", "romaji": "neko"})]
+    ctx.verbs = [_GEN.convert_raw_verb({
         "english": "to fly",
         "japanese": "とぶ",
         "kanji": "飛ぶ",
         "romaji": "tobu",
         "type": "う-verb",
         "masu_form": "飛びます",
-    }]
+    })]
 
     selected_ids = [
         "identity_present_affirmative",

@@ -136,7 +136,7 @@ def render_existing_lesson(
 def __getattr__(name: str) -> Any:
     if name == "PIPELINE":
         return _build_pipeline()
-    if name in {"load_curriculum", "suggest_new_vocab"}:
+    if name == "load_curriculum":
         curriculum = import_module("jlesson.curriculum")
         return getattr(curriculum, name)
     if name in _EXPORTS:
@@ -176,5 +176,4 @@ __all__ = [
     "load_curriculum",
     "render_existing_lesson",
     "run_pipeline",
-    "suggest_new_vocab",
 ]

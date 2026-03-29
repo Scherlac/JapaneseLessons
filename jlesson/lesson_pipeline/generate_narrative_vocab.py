@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from jlesson.vocab_generator._base import _normalize_vocab_item
+from jlesson.models import VocabFile, VocabItem
 from .pipeline_core import LessonContext, PipelineStep
 from .pipeline_gadgets import PipelineGadgets
 
@@ -73,10 +74,10 @@ class GenerateNarrativeVocabStep(PipelineStep):
                 if isinstance(v, dict) and v.get(lc.source.vocab_source_key) and v.get(lc.target.vocab_source_key)
             )
 
-        ctx.vocab = {
-            "theme": ctx.config.theme,
-            "nouns": nouns,
-            "verbs": verbs,
-        }
+        ctx.vocab = VocabFile(
+            theme=ctx.config.theme,
+            nouns=[VocabItem.model_validate(n) for n in nouns],
+            verbs=[VocabItem.model_validate(v) for v in verbs],
+        )
         self._log(ctx, f"       generated {len(nouns)} nouns, {len(verbs)} verbs from narrative")
         return ctx

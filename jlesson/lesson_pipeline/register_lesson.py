@@ -19,8 +19,8 @@ class RegisterLessonStep(PipelineStep):
             ctx.curriculum,
             title=f"Lesson {lesson_number}: {ctx.config.theme.title()}",
             theme=ctx.config.theme,
-            nouns=ctx.nouns,
-            verbs=ctx.verbs,
+            nouns=[n.source.display_text for n in ctx.nouns],
+            verbs=[v.source.display_text for v in ctx.verbs],
             grammar_ids=[grammar_id(g) for g in ctx.selected_grammar],
             items_count=len(ctx.noun_items) + len(ctx.sentences),
         )

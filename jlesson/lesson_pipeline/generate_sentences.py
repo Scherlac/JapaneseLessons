@@ -27,8 +27,8 @@ class NarrativeGrammarStep(PipelineStep):
         for block_index in range(total_blocks):
             block_nouns = noun_blocks[block_index] if block_index < len(noun_blocks) else []
             block_verbs = verb_blocks[block_index] if block_index < len(verb_blocks) else []
-            noun_items = [ctx.language_config.generator.convert_raw_noun(n) for n in block_nouns]
-            verb_items = [ctx.language_config.generator.convert_raw_verb(v) for v in block_verbs]
+            noun_items = list(block_nouns)
+            verb_items = list(block_verbs)
             block_narrative = ctx.narrative_blocks[block_index] if block_index < len(ctx.narrative_blocks) else ""
             block_grammar = (
                 ctx.selected_grammar_blocks[block_index]

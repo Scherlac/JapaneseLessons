@@ -14,7 +14,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Union
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class _NullStrCoerce(BaseModel):
@@ -141,6 +141,35 @@ class NarrativeVocabBlock(BaseModel):
 
     nouns: list[str] = Field(default_factory=list)
     verbs: list[str] = Field(default_factory=list)
+
+
+class VocabItem(BaseModel):
+    """A single vocabulary entry within a VocabFile.
+
+    Language-specific fields (e.g. ``english``, ``japanese``, ``romaji``) are
+    preserved as-is via ``extra='allow'`` and surfaced through ``model_dump()``
+    so that ``ItemGenerator.convert_raw_noun/verb`` continue to work unchanged.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str = ""
+    source: str = ""
+    target: str = ""
+    phonetic: str = ""
+
+
+class VocabFile(BaseModel):
+    """Typed representation of a theme vocab file (nouns + verbs).
+
+    Replaces the raw ``dict`` previously stored in ``LessonContext.vocab``,
+    giving typed attribute access to ``.nouns`` and ``.verbs`` while remaining
+    fully round-trippable through ``model_validate`` / ``model_dump``.
+    """
+
+    theme: str = ""
+    nouns: list[VocabItem] = Field(default_factory=list)
+    verbs: list[VocabItem] = Field(default_factory=list)
 
 
 class GrammarItem(BaseModel):

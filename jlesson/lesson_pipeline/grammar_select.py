@@ -20,8 +20,8 @@ class GrammarSelectStep(PipelineStep):
         covered = ctx.curriculum.covered_grammar_ids
         grammar_map = {g.id: g for g in progression}
         lesson_number = len(ctx.curriculum.lessons) + 1
-        noun_items = [lang_cfg.generator.convert_raw_noun(n) for n in ctx.nouns]
-        verb_items = [lang_cfg.generator.convert_raw_verb(v) for v in ctx.verbs]
+        noun_items = list(ctx.nouns)
+        verb_items = list(ctx.verbs)
 
         # Ask LLM to pick only the starting grammar points from currently-unlocked items.
         # If the full progression has been covered, cycle back from the beginning.
