@@ -37,48 +37,31 @@ Usage:
 from __future__ import annotations
 
 from pathlib import Path
-from importlib import import_module
-from typing import Any
 
-from jlesson.lesson_pipeline.compile_assets import CompileAssetsStep
-from jlesson.lesson_pipeline.compile_touches import CompileTouchesStep
-from jlesson.lesson_pipeline.extract_narrative_vocab import ExtractNarrativeVocabStep
-from jlesson.lesson_pipeline.generate_narrative_vocab import GenerateNarrativeVocabStep
-from jlesson.lesson_pipeline.generate_sentences import NarrativeGrammarStep
-from jlesson.lesson_pipeline.grammar_select import GrammarSelectStep
-from jlesson.lesson_pipeline.narrative_generator import NarrativeGeneratorStep
-from jlesson.lesson_pipeline.noun_practice import NounPracticeStep
-from jlesson.lesson_pipeline.persist_content import PersistContentStep
-from jlesson.lesson_pipeline.register_lesson import RegisterLessonStep
-from jlesson.lesson_pipeline.render_video import RenderVideoStep
-from jlesson.lesson_pipeline.retrieve_material import RetrieveLessonMaterialStep
-from jlesson.lesson_pipeline.review_sentences import ReviewSentencesStep
-from jlesson.lesson_pipeline.save_report import SaveReportStep
-from jlesson.lesson_pipeline.select_vocab import SelectVocabStep
-from jlesson.lesson_pipeline.verb_practice import VerbPracticeStep
-
-from .pipeline_core import LessonConfig, LessonContext, PipelineStep, StepInfo
-
-_EXPORTS: dict[str, tuple[str, str]] = {
-    "CompileAssetsStep": (".compile_assets", "CompileAssetsStep"),
-    "CompileTouchesStep": (".compile_touches", "CompileTouchesStep"),
-    "ExtractNarrativeVocabStep": (".extract_narrative_vocab", "ExtractNarrativeVocabStep"),
-    "GenerateNarrativeVocabStep": (".generate_narrative_vocab", "GenerateNarrativeVocabStep"),
-    "GenerateSentencesStep": (".generate_sentences", "GenerateSentencesStep"),
-    "GrammarSelectStep": (".grammar_select", "GrammarSelectStep"),
-    "NarrativeGeneratorStep": (".narrative_generator", "NarrativeGeneratorStep"),
-    "NarrativeGrammarStep": (".generate_sentences", "NarrativeGrammarStep"),
-    "NounPracticeStep": (".noun_practice", "NounPracticeStep"),
-    "PersistContentStep": (".persist_content", "PersistContentStep"),
-    "PipelineGadgets": (".pipeline_gadgets", "PipelineGadgets"),
-    "RegisterLessonStep": (".register_lesson", "RegisterLessonStep"),
-    "RenderVideoStep": (".render_video", "RenderVideoStep"),
-    "RetrieveLessonMaterialStep": (".retrieve_material", "RetrieveLessonMaterialStep"),
-    "ReviewSentencesStep": (".review_sentences", "ReviewSentencesStep"),
-    "SaveReportStep": (".save_report", "SaveReportStep"),
-    "SelectVocabStep": (".select_vocab", "SelectVocabStep"),
-    "VerbPracticeStep": (".verb_practice", "VerbPracticeStep"),
-}
+from jlesson.curriculum import load_curriculum
+from jlesson.pipeline_steps import (
+    CompileAssetsStep,
+    CompileTouchesStep,
+    ExtractNarrativeVocabStep,
+    GenerateNarrativeVocabStep,
+    GrammarSelectStep,
+    LessonConfig,
+    LessonContext,
+    NarrativeGeneratorStep,
+    NounPracticeStep,
+    PersistContentStep,
+    PipelineStep,
+    RegisterLessonStep,
+    RenderVideoStep,
+    RetrieveLessonMaterialStep,
+    ReviewSentencesStep,
+    SaveReportStep,
+    SelectVocabStep,
+    StepInfo,
+    VerbPracticeStep,
+)
+from jlesson.pipeline_steps.generate_sentences import GenerateSentencesStep, NarrativeGrammarStep
+from jlesson.runtime import PipelineGadgets, PipelineRuntime
 
 
 def _build_pipeline() -> list[PipelineStep]:
@@ -104,7 +87,6 @@ def _build_pipeline() -> list[PipelineStep]:
 
 def run_pipeline(config: LessonConfig) -> LessonContext:
     """Run the full lesson generation pipeline."""
-    from jlesson.curriculum import load_curriculum
     from .pipeline_orchestrator import run_pipeline as _run_pipeline_impl
 
     return _run_pipeline_impl(
@@ -133,16 +115,9 @@ def render_existing_lesson(
     )
 
 
-def __getattr__(name: str) -> Any:
+def __getattr__(name: str):
     if name == "PIPELINE":
         return _build_pipeline()
-    if name == "load_curriculum":
-        curriculum = import_module("jlesson.curriculum")
-        return getattr(curriculum, name)
-    if name in _EXPORTS:
-        module_name, attr_name = _EXPORTS[name]
-        module = import_module(module_name, __name__)
-        return getattr(module, attr_name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -154,6 +129,7 @@ __all__ = [
     "CompileAssetsStep",
     "CompileTouchesStep",
     "ExtractNarrativeVocabStep",
+    "GenerateNarrativeVocabStep",
     "GenerateSentencesStep",
     "GrammarSelectStep",
     "LessonConfig",
@@ -164,6 +140,7 @@ __all__ = [
     "PersistContentStep",
     "PIPELINE",
     "PipelineGadgets",
+    "PipelineRuntime",
     "PipelineStep",
     "RegisterLessonStep",
     "RenderVideoStep",

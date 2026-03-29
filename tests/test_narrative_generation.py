@@ -78,10 +78,10 @@ def test_generate_sentences_passes_explicit_narrative_to_prompt(tmp_path: Path):
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
 
     with patch(
-        "jlesson.lesson_pipeline.generate_sentences.step.build_grammar_sentences_prompt",
+        "jlesson.pipeline_steps.generate_sentences.step.build_grammar_sentences_prompt",
         return_value="PROMPT",
     ) as mock_builder, patch(
-        "jlesson.lesson_pipeline.generate_sentences.step.PipelineRuntime.ask_llm",
+        "jlesson.pipeline_steps.generate_sentences.step.PipelineRuntime.ask_llm",
         return_value={"sentences": []},
     ):
         GenerateSentencesStep().execute(ctx)
@@ -115,7 +115,7 @@ def test_narrative_generator_falls_back_to_default_blocks_when_llm_empty(tmp_pat
     ctx = LessonContext(config=config)
     ctx.curriculum = create_curriculum("Test")
 
-    from jlesson.lesson_pipeline.narrative_generator.config import NarrativeGeneratorLanguageConfig
+    from jlesson.pipeline_steps.narrative_generator.config import NarrativeGeneratorLanguageConfig
 
     builder_calls = []
 
@@ -129,10 +129,10 @@ def test_narrative_generator_falls_back_to_default_blocks_when_llm_empty(tmp_pat
     )
 
     with patch(
-        "jlesson.lesson_pipeline.narrative_generator.step.build_narrative_generator_language_config",
+        "jlesson.pipeline_steps.narrative_generator.step.build_narrative_generator_language_config",
         return_value=mock_step_config,
     ), patch(
-        "jlesson.lesson_pipeline.narrative_generator.step.PipelineRuntime.ask_llm",
+        "jlesson.pipeline_steps.narrative_generator.step.PipelineRuntime.ask_llm",
         return_value={"blocks": []},
     ):
         NarrativeGeneratorStep().execute(ctx)
@@ -254,10 +254,10 @@ def test_generate_sentences_uses_block_specific_grammar_plan(tmp_path: Path):
     ctx.selected_grammar_blocks = [[grammar_a], [grammar_b]]
 
     with patch(
-        "jlesson.lesson_pipeline.generate_sentences.step.build_grammar_sentences_prompt",
+        "jlesson.pipeline_steps.generate_sentences.step.build_grammar_sentences_prompt",
         return_value="PROMPT",
     ) as mock_builder, patch(
-        "jlesson.lesson_pipeline.generate_sentences.step.PipelineRuntime.ask_llm",
+        "jlesson.pipeline_steps.generate_sentences.step.PipelineRuntime.ask_llm",
         return_value={"sentences": []},
     ):
         GenerateSentencesStep().execute(ctx)

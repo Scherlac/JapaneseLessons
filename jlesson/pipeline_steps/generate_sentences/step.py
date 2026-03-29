@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from jlesson.runtime import PipelineRuntime
 from jlesson.models import GeneralItem, GrammarItem, Phase, Sentence
 from ..pipeline_core import LessonContext, PipelineStep
-from ..runtime import PipelineRuntime
 from .config import build_narrative_grammar_language_config
 from .prompt import build_grammar_sentences_prompt
 

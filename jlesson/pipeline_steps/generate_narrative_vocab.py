@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from jlesson.vocab_generator import normalize_vocab_item
 from jlesson.models import VocabFile, VocabItem
+from jlesson.runtime import PipelineRuntime
 from .pipeline_core import LessonContext, PipelineStep
-from .runtime import PipelineRuntime
 
 
 class GenerateNarrativeVocabStep(PipelineStep):

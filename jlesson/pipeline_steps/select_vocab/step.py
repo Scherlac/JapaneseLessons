@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Callable
 
 from jlesson.models import GeneralItem, NarrativeVocabBlock, VocabItem
+from jlesson.runtime import PipelineRuntime
 from ..pipeline_core import LessonContext, PipelineStep
-from ..runtime import PipelineRuntime
 from .config import build_select_vocab_language_config
 from .prompt import build_vocab_gap_fill_prompt
 

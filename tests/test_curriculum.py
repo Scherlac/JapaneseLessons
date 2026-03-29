@@ -29,7 +29,7 @@ from jlesson.curriculum import (
     summary,
 )
 from jlesson.item_generator.eng_jap import EngJapItemGenerator
-from jlesson.lesson_pipeline.select_vocab import SelectVocabStep
+from jlesson.pipeline_steps.select_vocab import SelectVocabStep
 from jlesson.models import VocabItem
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────

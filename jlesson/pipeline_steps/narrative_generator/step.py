@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from jlesson.runtime import PipelineRuntime
 from ..pipeline_core import LessonContext, PipelineStep
-from ..runtime import PipelineRuntime
 from .config import build_narrative_generator_language_config
 from .prompt import build_narrative_generator_prompt
 

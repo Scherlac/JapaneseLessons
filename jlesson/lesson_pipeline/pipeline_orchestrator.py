@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from jlesson.language_config import get_language_config
-from .pipeline_core import LessonConfig, LessonContext, PipelineStep, StepInfo
+from jlesson.pipeline_steps.pipeline_core import LessonConfig, LessonContext, PipelineStep, StepInfo
 
 
 def run_pipeline(

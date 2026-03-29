@@ -127,7 +127,7 @@ def test_step_info_label():
 
 
 def test_select_vocab_populates_nouns_and_verbs(ctx):
-    with patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE):
+    with patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE):
         ctx = SelectVocabStep().execute(ctx)
     assert len(ctx.nouns) == 2
     assert len(ctx.verbs) == 2
@@ -137,7 +137,7 @@ def test_select_vocab_excludes_covered_nouns(config):
     c = LessonContext(config=config)
     c.curriculum = create_curriculum("Test")
     c.curriculum.covered_nouns = ["water", "bread"]
-    with patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE):
+    with patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE):
         c = SelectVocabStep().execute(c)
     fresh = {n.source.display_text for n in c.nouns}
     assert "rice" in fresh or "tea" in fresh
@@ -149,7 +149,7 @@ def test_select_vocab_with_seed_is_deterministic(config):
     for _ in range(2):
         c = LessonContext(config=config)
         c.curriculum = create_curriculum("T")
-        with patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE):
+        with patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE):
             c = SelectVocabStep().execute(c)
         results.append([n.source.display_text for n in c.nouns])
     assert results[0] == results[1]
@@ -211,7 +211,7 @@ def test_generate_sentences_stores_sentences(ctx):
             }
         ]
     }
-    with patch("jlesson.lesson_pipeline.generate_sentences.step.PipelineRuntime.ask_llm", return_value=mock):
+    with patch("jlesson.pipeline_steps.generate_sentences.step.PipelineRuntime.ask_llm", return_value=mock):
         ctx = GenerateSentencesStep().execute(ctx)
     assert len(ctx.sentences) == 1
     assert ctx.sentences[0].source.display_text == "I eat bread."
@@ -230,7 +230,7 @@ def test_generate_sentences_adds_grammar_to_report(ctx):
             }
         ]
     }
-    with patch("jlesson.lesson_pipeline.generate_sentences.step.PipelineRuntime.ask_llm", return_value=mock):
+    with patch("jlesson.pipeline_steps.generate_sentences.step.PipelineRuntime.ask_llm", return_value=mock):
         ctx = GenerateSentencesStep().execute(ctx)
     md = ctx.report.render()
     assert "## Phase 3" in md
@@ -241,7 +241,7 @@ def test_generate_sentences_empty_llm_response(ctx):
     ctx.nouns = _NOUN_ITEMS[:2]
     ctx.verbs = _VERB_ITEMS[:2]
     ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
-    with patch("jlesson.lesson_pipeline.generate_sentences.step.PipelineRuntime.ask_llm", return_value={}):
+    with patch("jlesson.pipeline_steps.generate_sentences.step.PipelineRuntime.ask_llm", return_value={}):
         ctx = GenerateSentencesStep().execute(ctx)
     assert ctx.sentences == []
 
@@ -823,7 +823,7 @@ def test_run_pipeline_no_video_completes(config):
     }
 
     with (
-        patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB),
+        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB),
         patch(
             "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
             side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_review, mock_nouns, mock_verbs],
@@ -849,7 +849,7 @@ def test_run_pipeline_persists_correct_theme(config, tmp_path):
     mock_verbs = {"verb_items": []}
 
     with (
-        patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB),
+        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB),
         patch(
             "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
             side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_nouns, mock_verbs],
@@ -874,7 +874,7 @@ def test_run_pipeline_curriculum_updated(config, tmp_path):
     mock_verbs = {"verb_items": []}
 
     with (
-        patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB),
+        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB),
         patch(
             "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
             side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_nouns, mock_verbs],
@@ -941,7 +941,7 @@ def test_run_pipeline_report_contains_all_sections(config):
     }
 
     with (
-        patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB),
+        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB),
         patch(
             "jlesson.lesson_pipeline.PipelineGadgets.ask_llm",
             side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_review, mock_nouns, mock_verbs],
@@ -1039,7 +1039,7 @@ def test_compile_assets_step_full(ctx, tmp_path):
         "jlesson.asset_compiler.compile_assets",
         return_value=mock_compiled,
     ):
-        with patch("jlesson.lesson_pipeline.compile_assets.asyncio.run", return_value=mock_compiled):
+        with patch("jlesson.pipeline_steps.compile_assets.asyncio.run", return_value=mock_compiled):
             ctx = CompileAssetsStep().execute(ctx)
     assert len(ctx.compiled_items) == 1
 
@@ -1316,7 +1316,7 @@ def test_run_pipeline_uses_retrieval_hit_and_skips_vocab(config, tmp_path):
         "jlesson.lesson_pipeline.load_curriculum",
         return_value=create_curriculum("Test"),
     ), patch(
-        "jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab",
+        "jlesson.runtime.PipelineRuntime.load_vocab",
         return_value=_VOCAB,
     ) as mock_load_vocab:
         ctx = run_pipeline(config)
@@ -1348,9 +1348,9 @@ def test_run_pipeline_retrieval_miss_falls_back_to_vocab(config, tmp_path):
     mock_verbs = {"verb_items": []}
 
     with (
-        patch("jlesson.lesson_pipeline.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB) as mock_load_vocab,
+        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB) as mock_load_vocab,
         patch(
-            "jlesson.lesson_pipeline.runtime.PipelineRuntime.ask_llm",
+            "jlesson.runtime.PipelineRuntime.ask_llm",
             side_effect=[mock_narrative, mock_generate_narrative_vocab, mock_sentences],
         ),
         patch(

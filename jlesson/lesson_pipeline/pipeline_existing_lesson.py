@@ -7,11 +7,11 @@ from jlesson.asset_compiler import compile_assets
 from jlesson.language_config import get_language_config
 from jlesson.lesson_store import load_lesson_content
 from jlesson.models import Phase
+from jlesson.pipeline_steps.pipeline_core import LessonConfig
 from jlesson.profiles import get_profile
 from jlesson.touch_compiler import compile_touches
 from jlesson.video.builder import VideoBuilder
 
-from .pipeline_core import LessonConfig
 from .pipeline_paths import resolve_lesson_dir, resolve_output_dir
 
 
