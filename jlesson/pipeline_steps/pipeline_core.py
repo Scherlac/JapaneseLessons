@@ -151,6 +151,40 @@ class ItemBatch(Generic[_T]):
 
 
 # ---------------------------------------------------------------------------
+# Narrative inter-step typed artifacts
+# ---------------------------------------------------------------------------
+
+@dataclass
+class NarrativeGenChunk:
+    """Input chunk for ``NarrativeGeneratorStep``.
+
+    Carries everything needed for one narrative generation call.
+    ``lesson_number`` is resolved from curriculum state inside
+    ``build_chunks`` so the action remains free of ``LessonContext``.
+    """
+
+    theme: str
+    lesson_number: int
+    lesson_blocks: int
+    seed_blocks: list[str]
+
+
+@dataclass
+class NarrativeFrame:
+    """Typed output of ``NarrativeGeneratorStep``.
+
+    Also serves as the input chunk for ``ExtractNarrativeVocabStep``,
+    making the inter-step dependency explicit and typed: the same artifact
+    that ``NarrativeGeneratorStep`` emits is the chunk type the next step
+    directly consumes.
+
+    Context field: ``LessonContext.narrative_blocks``
+    """
+
+    blocks: list[str]
+
+
+# ---------------------------------------------------------------------------
 # Per-invocation action configuration
 # ---------------------------------------------------------------------------
 

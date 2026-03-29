@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Date:** 2026-03-29  
-**Reference implementation:** `generate_sentences` step
+**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`
 
 ---
 
@@ -203,81 +203,117 @@ for custom chunk types.
 
 ---
 
-## Reference Implementation: `generate_sentences`
+## Migrated Steps
 
-The `generate_sentences` step is the canonical reference for the per-block
-iteration pattern.
+| Step | Chunk type | Pattern |
+|------|-----------|--------|
+| `generate_sentences` | `BlockChunk` | one LLM call per lesson block |
+| `grammar_select` | `GrammarSelectChunk` | single LLM call + pure post-processing |
+| `noun_practice` | `NounPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×25 |
+| `verb_practice` | `VerbPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×20 |
 
-### Files
+---
 
-```
-jlesson/pipeline_steps/generate_sentences/
-  action.py   ← GenerateSentencesAction  (new — pure transformation)
-  step.py     ← NarrativeGrammarStep     (refactored — ActionStep subclass)
-  config.py   ← NarrativeGrammarLanguageConfig (unchanged)
-  prompt.py   ← build_grammar_sentences_prompt (unchanged)
-```
+## Reference Implementations
 
-### `GenerateSentencesAction` — `action.py`
+### `generate_sentences` — per-block iteration (`BlockChunk`)
 
-```
-Input:  BlockChunk  (narrative, nouns, verbs, grammar for one block)
-Output: list[Sentence]
-I/O:    config.runtime.call_llm(prompt)  — one LLM call per chunk
-```
-
-Has no knowledge of `LessonContext`.  Can be tested with any object that
-satisfies `RuntimeServices`.
-
-### `NarrativeGrammarStep` — `step.py`
+The reference for steps that make one LLM call per lesson block. See also
+[step_narrative_grammar.md](step_narrative_grammar.md).
 
 ```
-should_skip:    return bool(ctx.sentences)   # retrieval pre-populated
-build_chunks:   one BlockChunk per lesson block, slicing nouns/verbs/grammar
-merge_outputs:  ctx.sentences = flatten(outputs); add grammar_practice report section
+Input:   BlockChunk  (narrative, nouns, verbs, grammar for one block)
+Output:  list[Sentence]
+Action:  one call_llm per chunk
 ```
 
-No iteration loop, no `PipelineRuntime` import, no direct LLM call.
+### `grammar_select` — single LLM call with pure post-processing
 
-### Before / after comparison
+Demonstrates single-call steps where most of the complexity is in deterministic
+transformation rather than I/O. The action performs three phases:
 
-**Before (all concerns mixed in `execute`)**
+1. LLM call to get `selected_ids`
+2. `_project_grammar` extension — fills the selection so multi-block lessons
+   have enough grammar points to assign one per block
+3. `_build_block_progression` — slices the extended list into per-block windows
+
+```
+Input:   GrammarSelectChunk  (unlocked grammar, nouns/verbs, lesson_number)
+Output:  GrammarSelectResult (selected_grammar + selected_grammar_blocks)
+Action:  one call_llm + deterministic extension + block slicing
+```
+
+`_project_grammar` and `_build_block_progression` are module-level pure functions
+accessible to both the action (for post-processing) and the step (for `build_chunks`,
+which needs `_project_grammar` to compute the unlocked set before the LLM call).
+
+### `noun_practice` / `verb_practice` — batched enrichment (`ItemBatch`)
+
+The reference for steps that call the LLM in fixed-size batches over a flat list
+of items. `NounPracticeBatch` and `VerbPracticeBatch` extend `ItemBatch[GeneralItem]`
+with `lesson_number` — an extra field that cannot be carried in `ActionConfig` alone
+because it depends on curriculum state at execution time.
+
+```
+Input:   NounPracticeBatch / VerbPracticeBatch  (up to 25 / 20 items + lesson_number)
+Output:  list[GeneralItem]  (enriched items for the batch)
+Action:  one call_llm per batch chunk
+```
+
+`merge_outputs` concatenates all batch outputs, applies phase + block_index
+assignment, and falls back to the raw input items when the LLM returns nothing.
+
+### `narrative_generator` / `extract_narrative_vocab` — inter-step typed artifact (`NarrativeFrame`)
+
+Demonstrates the dependency-aware flow goal: one generated artifact becomes the
+typed input of the successor step rather than an implicit `list[str]` field on
+`LessonContext`.
+
+**`NarrativeFrame`** is defined in `pipeline_core.py` as the shared inter-step
+type.  It is the output of `NarrativeGeneratorStep` and the direct input chunk
+for `ExtractNarrativeVocabStep`.
+
+```
+NarrativeGeneratorStep
+  Input chunk:  NarrativeGenChunk  (theme, lesson_number, lesson_blocks, seed_blocks)
+  Output:       NarrativeFrame     (blocks: list[str])
+  Action:       zero or one call_llm (skipped when seed_blocks covers all blocks)
+
+ExtractNarrativeVocabStep
+  Input chunk:  NarrativeFrame     ← direct output type of the preceding step
+  Output:       list[NarrativeVocabBlock]
+  Action:       one call_llm
+```
+
+The `build_chunks` of `ExtractNarrativeVocabStep` wraps `ctx.narrative_blocks`
+in a `NarrativeFrame`:
 
 ```python
-class NarrativeGrammarStep(PipelineStep):
-    def execute(self, ctx):
-        if ctx.sentences:             # guard
-            return ctx
-        for block_index in range(total_blocks):   # iteration
-            prompt = build_grammar_sentences_prompt(...)  # transformation
-            result = PipelineRuntime.ask_llm(ctx, prompt) # I/O
-            for s in result["sentences"]:                 # transformation
-                ctx.sentences.append(...)
-        ctx.report.add(...)           # assembly
-        return ctx
+def build_chunks(self, ctx: LessonContext) -> list[NarrativeFrame]:
+    if not ctx.narrative_blocks:
+        return []
+    return [NarrativeFrame(blocks=ctx.narrative_blocks)]
 ```
 
-**After (concerns separated)**
+This makes the dependency visible in the type signature rather than buried in
+prose documentation: any step whose `build_chunks` returns `list[NarrativeFrame]`
+declares, at the type level, that it follows `NarrativeGeneratorStep`.
 
-```python
-# action.py — transformation + I/O only
-class GenerateSentencesAction(StepAction[BlockChunk, list[Sentence]]):
-    def run(self, config, chunk):
-        prompt = build_grammar_sentences_prompt(...)
-        result = config.runtime.call_llm(prompt)    # I/O via facade
-        return [convert(s) for s in result["sentences"]]
+---
 
-# step.py — structure only
-class NarrativeGrammarStep(ActionStep[BlockChunk, list[Sentence]]):
-    action = GenerateSentencesAction()
+## Inter-Step Type Alignment
 
-    def should_skip(self, ctx):   return bool(ctx.sentences)
-    def build_chunks(self, ctx):  return [BlockChunk(...) for i in range(blocks)]
-    def merge_outputs(self, ctx, outputs):
-        ctx.sentences = flatten(outputs)
-        ctx.report.add(...)
-        return ctx
-```
+The decomposition pattern converges toward a dependency-aware flow where one
+step's output type is the next step's chunk type.  The table below records the
+current typed connections.
+
+| Producing step | Artifact type | Consuming step |
+|----------------|---------------|----------------|
+| `NarrativeGeneratorStep` | `NarrativeFrame` | `ExtractNarrativeVocabStep` |
+
+Goal: extend this table as more steps are migrated so that the pipeline's
+dependency graph is expressed entirely through types, not through shared mutable
+fields on `LessonContext`.
 
 ---
 
@@ -345,16 +381,17 @@ To migrate any existing `PipelineStep` to this pattern:
 
 Steps ordered by iteration pattern clarity and migration effort.
 
-| Step | Chunk type | LLM calls | Migration effort |
-|------|-----------|-----------|-----------------|
-| `noun_practice` | `ItemBatch[GeneralItem]` | batched ×25 | low |
-| `verb_practice` | `ItemBatch[GeneralItem]` | batched ×20 | low |
-| `review_sentences` | `ItemBatch[Sentence]` | batched ×30 | low |
-| `extract_narrative_vocab` | single `BlockChunk` list | 1 | low |
-| `grammar_select` | single chunk | 1 | medium |
-| `narrative_generator` | single chunk | 1 | medium |
-| `generate_narrative_vocab` | `ItemBatch[str]` | batched ×60 | medium |
-| `select_vocab` | per-block + LLM gap-fill | conditional | high |
-| `retrieve_material` | single query | retrieval only | high (needs `query_retrieval` wired) |
-| `register_lesson` | no LLM | storage only | high (needs `write_curriculum` wired) |
-| `persist_content` | no LLM | storage only | high (needs `write_content` wired) |
+| Step | Chunk type | LLM calls | Status |
+|------|-----------|-----------|--------|
+| `generate_sentences` | `BlockChunk` | 1 per block | **done** |
+| `noun_practice` | `NounPracticeBatch(ItemBatch)` | batched ×25 | **done** |
+| `verb_practice` | `VerbPracticeBatch(ItemBatch)` | batched ×20 | **done** |
+| `grammar_select` | `GrammarSelectChunk` | 1 | **done** |
+| `narrative_generator` | `NarrativeGenChunk` | 0–1 | **done** — emits `NarrativeFrame` |
+| `extract_narrative_vocab` | `NarrativeFrame` ← from `narrative_generator` | 1 | **done** — consumes `NarrativeFrame` |
+| `review_sentences` | `ItemBatch[Sentence]` | batched ×30 | not started |
+| `generate_narrative_vocab` | `ItemBatch[str]` | batched ×60 | not started |
+| `select_vocab` | per-block + LLM gap-fill | conditional | not started |
+| `retrieve_material` | single query | retrieval only | not started (needs `query_retrieval` wired) |
+| `register_lesson` | no LLM | storage only | not started (needs `write_curriculum` wired) |
+| `persist_content` | no LLM | storage only | not started (needs `write_content` wired) |

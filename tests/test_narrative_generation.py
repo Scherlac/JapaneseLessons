@@ -129,10 +129,10 @@ def test_narrative_generator_falls_back_to_default_blocks_when_llm_empty(tmp_pat
     )
 
     with patch(
-        "jlesson.pipeline_steps.narrative_generator.step.build_narrative_generator_language_config",
+        "jlesson.pipeline_steps.narrative_generator.action.build_narrative_generator_language_config",
         return_value=mock_step_config,
     ), patch(
-        "jlesson.pipeline_steps.narrative_generator.step.PipelineRuntime.ask_llm",
+        "jlesson.runtime._base.PipelineRuntime.ask_llm",
         return_value={"blocks": []},
     ):
         NarrativeGeneratorStep().execute(ctx)
@@ -159,7 +159,7 @@ def test_extract_narrative_vocab_stores_block_terms(tmp_path: Path):
         "build_narrative_vocab_extract_prompt",
         return_value="PROMPT",
     ), patch(
-        "jlesson.runtime.PipelineRuntime.ask_llm",
+        "jlesson.runtime._base.PipelineRuntime.ask_llm",
         return_value={
             "blocks": [
                 {"index": 1, "nouns": ["Kiki", "Jiji"], "verbs": ["meet"]},

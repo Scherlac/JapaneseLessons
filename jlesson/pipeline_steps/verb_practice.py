@@ -1,36 +1,112 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from jlesson.models import GeneralItem, Phase
-from jlesson.runtime import PipelineRuntime
-from .pipeline_core import LessonContext, PipelineStep
+from .pipeline_core import ActionConfig, ActionStep, ItemBatch, LessonContext, StepAction
 
 
-class VerbPracticeStep(PipelineStep):
-    """Step 6 — LLM: enrich verbs with conjugation forms and memory tips."""
+# ---------------------------------------------------------------------------
+# Chunk type
+# ---------------------------------------------------------------------------
+
+@dataclass
+class VerbPracticeBatch(ItemBatch[GeneralItem]):
+    """One LLM enrichment batch for verbs.
+
+    Extends :class:`ItemBatch` with ``lesson_number`` so the action can pass it
+    to the prompt builder without touching ``LessonContext`` or ``LessonConfig``.
+    """
+
+    lesson_number: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Action
+# ---------------------------------------------------------------------------
+
+class VerbPracticeAction(StepAction[VerbPracticeBatch, list[GeneralItem]]):
+    """Enrich one batch of verbs via a single LLM call.
+
+    Input
+    -----
+    chunk : VerbPracticeBatch
+        A fixed-size slice of the full verb list plus the lesson ordinal.
+
+    Output
+    ------
+    list[GeneralItem]
+        Enriched items for this batch.  Items are paired with their source
+        counterpart using ``zip``.
+    """
+
+    def run(self, config: ActionConfig, chunk: VerbPracticeBatch) -> list[GeneralItem]:
+        prompt = config.language.prompts.build_verb_practice_prompt(
+            chunk.items, chunk.lesson_number
+        )
+        result = config.runtime.call_llm(prompt)
+        raw_items = result.get("verb_items", [])
+        return [
+            config.language.generator.convert_verb(raw, base)
+            for raw, base in zip(raw_items, chunk.items)
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Step
+# ---------------------------------------------------------------------------
+
+class VerbPracticeStep(ActionStep[VerbPracticeBatch, list[GeneralItem]]):
+    """Step 6 — LLM: enrich verbs with conjugation forms and memory tips.
+
+    Inputs (from ``LessonContext``)
+    --------------------------------
+    verbs       list[GeneralItem]
+        Selected lesson verbs to enrich.
+    curriculum.lessons
+        Used to derive the lesson ordinal for the prompt.
+    config.num_verbs
+        Used to assign ``block_index`` in ``merge_outputs``.
+
+    Outputs
+    -------
+    verb_items  list[GeneralItem]
+        Enriched verbs with conjugation forms and memory tips.
+    """
 
     name = "verb_practice"
     description = "LLM: enrich verbs with conjugations + memory tips"
     BATCH_SIZE = 20
 
-    def execute(self, ctx: LessonContext) -> LessonContext:
+    @property
+    def action(self) -> VerbPracticeAction:
+        return VerbPracticeAction()
+
+    def should_skip(self, ctx: LessonContext) -> bool:
         if ctx.verb_items:
             self._log(ctx, "       using retrieved verb items")
-            return ctx
+            return True
+        return False
+
+    def build_chunks(self, ctx: LessonContext) -> list[VerbPracticeBatch]:
         lesson_number = len(ctx.curriculum.lessons) + 1
-        verb_items_all = list(ctx.verbs)
-        raw_items: list[dict] = []
-        for batch_start in range(0, len(verb_items_all), self.BATCH_SIZE):
-            batch = verb_items_all[batch_start : batch_start + self.BATCH_SIZE]
-            result = PipelineRuntime.ask_llm(
-                ctx,
-                ctx.language_config.prompts.build_verb_practice_prompt(batch, lesson_number),
+        items = list(ctx.verbs)
+        return [
+            VerbPracticeBatch(
+                batch_index=i,
+                block_index=-1,
+                items=items[start : start + self.BATCH_SIZE],
+                lesson_number=lesson_number,
             )
-            raw_items.extend(result.get("verb_items", []))
-        ctx.verb_items = []
-        for verb_item, base_item in zip(raw_items, verb_items_all):
-            ctx.verb_items.append(ctx.language_config.generator.convert_verb(verb_item, base_item))
-        if not ctx.verb_items:
-            ctx.verb_items = list(verb_items_all)
+            for i, start in enumerate(range(0, len(items), self.BATCH_SIZE))
+        ] or [VerbPracticeBatch(batch_index=0, block_index=-1, items=[], lesson_number=lesson_number)]
+
+    def merge_outputs(
+        self, ctx: LessonContext, outputs: list[list[GeneralItem]]
+    ) -> LessonContext:
+        verb_items_all = list(ctx.verbs)
+        enriched = [item for batch_output in outputs for item in batch_output]
+        ctx.verb_items = enriched if enriched else list(verb_items_all)
         for index, item in enumerate(ctx.verb_items):
             item.phase = Phase.VERBS
             item.block_index = index // max(1, ctx.config.num_verbs) + 1

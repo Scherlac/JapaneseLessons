@@ -1,36 +1,113 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from jlesson.models import GeneralItem, Phase
-from jlesson.runtime import PipelineRuntime
-from .pipeline_core import LessonContext, PipelineStep
+from .pipeline_core import ActionConfig, ActionStep, ItemBatch, LessonContext, StepAction
 
 
-class NounPracticeStep(PipelineStep):
-    """Step 5 — LLM: enrich nouns with example sentences and memory tips."""
+# ---------------------------------------------------------------------------
+# Chunk type
+# ---------------------------------------------------------------------------
+
+@dataclass
+class NounPracticeBatch(ItemBatch[GeneralItem]):
+    """One LLM enrichment batch for nouns.
+
+    Extends :class:`ItemBatch` with ``lesson_number`` so the action can pass it
+    to the prompt builder without touching ``LessonContext`` or ``LessonConfig``.
+    """
+
+    lesson_number: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Action
+# ---------------------------------------------------------------------------
+
+class NounPracticeAction(StepAction[NounPracticeBatch, list[GeneralItem]]):
+    """Enrich one batch of nouns via a single LLM call.
+
+    Input
+    -----
+    chunk : NounPracticeBatch
+        A fixed-size slice of the full noun list plus the lesson ordinal.
+
+    Output
+    ------
+    list[GeneralItem]
+        Enriched items for this batch.  Items are paired with their source
+        counterpart using ``zip`` (LLM responses shorter than the input batch
+        yield a shorter output; merge_outputs handles the overall fallback).
+    """
+
+    def run(self, config: ActionConfig, chunk: NounPracticeBatch) -> list[GeneralItem]:
+        prompt = config.language.prompts.build_noun_practice_prompt(
+            chunk.items, chunk.lesson_number
+        )
+        result = config.runtime.call_llm(prompt)
+        raw_items = result.get("noun_items", [])
+        return [
+            config.language.generator.convert_noun(raw, base)
+            for raw, base in zip(raw_items, chunk.items)
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Step
+# ---------------------------------------------------------------------------
+
+class NounPracticeStep(ActionStep[NounPracticeBatch, list[GeneralItem]]):
+    """Step 5 — LLM: enrich nouns with example sentences and memory tips.
+
+    Inputs (from ``LessonContext``)
+    --------------------------------
+    nouns       list[GeneralItem]
+        Selected lesson nouns to enrich.
+    curriculum.lessons
+        Used to derive the lesson ordinal for the prompt.
+    config.num_nouns
+        Used to assign ``block_index`` in ``merge_outputs``.
+
+    Outputs
+    -------
+    noun_items  list[GeneralItem]
+        Enriched nouns with example sentences and memory tips.
+    """
 
     name = "noun_practice"
     description = "LLM: enrich nouns with examples + memory tips"
     BATCH_SIZE = 25
 
-    def execute(self, ctx: LessonContext) -> LessonContext:
+    @property
+    def action(self) -> NounPracticeAction:
+        return NounPracticeAction()
+
+    def should_skip(self, ctx: LessonContext) -> bool:
         if ctx.noun_items:
             self._log(ctx, "       using retrieved noun items")
-            return ctx
+            return True
+        return False
+
+    def build_chunks(self, ctx: LessonContext) -> list[NounPracticeBatch]:
         lesson_number = len(ctx.curriculum.lessons) + 1
-        noun_items_all = list(ctx.nouns)
-        raw_items: list[dict] = []
-        for batch_start in range(0, len(noun_items_all), self.BATCH_SIZE):
-            batch = noun_items_all[batch_start : batch_start + self.BATCH_SIZE]
-            result = PipelineRuntime.ask_llm(
-                ctx,
-                ctx.language_config.prompts.build_noun_practice_prompt(batch, lesson_number),
+        items = list(ctx.nouns)
+        return [
+            NounPracticeBatch(
+                batch_index=i,
+                block_index=-1,
+                items=items[start : start + self.BATCH_SIZE],
+                lesson_number=lesson_number,
             )
-            raw_items.extend(result.get("noun_items", []))
-        ctx.noun_items = []
-        for noun_item, base_item in zip(raw_items, noun_items_all):
-            ctx.noun_items.append(ctx.language_config.generator.convert_noun(noun_item, base_item))
-        if not ctx.noun_items:
-            ctx.noun_items = list(noun_items_all)
+            for i, start in enumerate(range(0, len(items), self.BATCH_SIZE))
+        ] or [NounPracticeBatch(batch_index=0, block_index=-1, items=[], lesson_number=lesson_number)]
+
+    def merge_outputs(
+        self, ctx: LessonContext, outputs: list[list[GeneralItem]]
+    ) -> LessonContext:
+        noun_items_all = list(ctx.nouns)
+        enriched = [item for batch_output in outputs for item in batch_output]
+        ctx.noun_items = enriched if enriched else list(noun_items_all)
         for index, item in enumerate(ctx.noun_items):
             item.phase = Phase.NOUNS
             item.block_index = index // max(1, ctx.config.num_nouns) + 1

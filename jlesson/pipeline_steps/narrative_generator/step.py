@@ -1,57 +1,55 @@
 from __future__ import annotations
 
-from jlesson.runtime import PipelineRuntime
-from ..pipeline_core import LessonContext, PipelineStep
-from .config import build_narrative_generator_language_config
-from .prompt import build_narrative_generator_prompt
+from ..pipeline_core import ActionStep, LessonContext, NarrativeFrame, NarrativeGenChunk
+from .action import NarrativeGeneratorAction
 
 
-class NarrativeGeneratorStep(PipelineStep):
-    """Generate or normalize a narrative progression across lesson blocks."""
+class NarrativeGeneratorStep(ActionStep[NarrativeGenChunk, NarrativeFrame]):
+    """Generate or normalise a narrative progression across lesson blocks.
+
+    Inputs (from ``LessonContext``)
+    --------------------------------
+    config.narrative        list[str]  — optional user-provided seed blocks
+    config.lesson_blocks    int        — desired block count
+    config.theme            str        — lesson theme
+    curriculum              used to derive ``lesson_number``
+
+    Output
+    ------
+    narrative_blocks        list[str]  written back to ``LessonContext``
+
+    The action emits a ``NarrativeFrame`` which is also the direct input chunk
+    type for the successor step ``ExtractNarrativeVocabStep``, making the
+    inter-step dependency explicit and typed.
+    """
 
     name = "narrative_generator"
     description = "LLM: generate block-by-block narrative progression"
 
-    def execute(self, ctx: LessonContext) -> LessonContext:
+    @property
+    def action(self) -> NarrativeGeneratorAction:
+        return NarrativeGeneratorAction()
+
+    def should_skip(self, ctx: LessonContext) -> bool:
         if ctx.narrative_blocks:
             self._log(ctx, "       using existing narrative blocks")
-            return ctx
+            return True
+        return False
 
+    def build_chunks(self, ctx: LessonContext) -> list[NarrativeGenChunk]:
         block_count = max(1, ctx.config.lesson_blocks)
         provided = [text.strip() for text in ctx.config.narrative if text.strip()]
-        if len(provided) >= block_count:
-            ctx.narrative_blocks = provided[:block_count]
-        else:
-            lesson_number = len(ctx.curriculum.lessons) + 1
-            step_config = build_narrative_generator_language_config(ctx.language_config)
-            prompt = build_narrative_generator_prompt(
-                theme=ctx.config.theme,
-                lesson_number=lesson_number,
-                lesson_blocks=block_count,
-                source_language_label=step_config.source_language_label,
-                seed_blocks=provided,
-            )
-            result = PipelineRuntime.ask_llm(ctx, prompt)
-            generated = [
-                (block.get("narrative") or "").strip()
-                for block in result.get("blocks", [])
-                if isinstance(block, dict)
-            ]
-            if len(generated) < block_count:
-                self._log(ctx, f"       LLM returned {len(generated)}/{block_count} blocks — filling with defaults")
-            defaults = step_config.default_block_builder(
-                ctx.config.theme,
-                lesson_number,
-                block_count,
-            )
-            blocks = list(provided)
-            for text in generated:
-                if text and len(blocks) < block_count:
-                    blocks.append(text)
-            while len(blocks) < block_count:
-                blocks.append(defaults[len(blocks)])
-            ctx.narrative_blocks = blocks[:block_count]
+        lesson_number = len(ctx.curriculum.lessons) + 1
+        return [NarrativeGenChunk(
+            theme=ctx.config.theme,
+            lesson_number=lesson_number,
+            lesson_blocks=block_count,
+            seed_blocks=provided,
+        )]
 
+    def merge_outputs(self, ctx: LessonContext, outputs: list[NarrativeFrame]) -> LessonContext:
+        frame = outputs[0]
+        ctx.narrative_blocks = frame.blocks
         self._log(ctx, f"       {len(ctx.narrative_blocks)} narrative blocks")
         ctx.report.add("narrative", self._render_narrative(ctx.narrative_blocks))
         return ctx
