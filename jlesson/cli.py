@@ -36,8 +36,8 @@ LANGUAGE_OPTION = click.option(
     "--language",
     default="eng-jap",
     show_default=True,
-    type=click.Choice(["eng-jap", "hun-eng"]),
-    help="Language pair: eng-jap (default) or hun-eng.",
+    type=click.Choice(["eng-jap", "hun-eng", "hun-ger"]),
+    help="Language pair: eng-jap (default), hun-eng, or hun-ger.",
 )
 
 

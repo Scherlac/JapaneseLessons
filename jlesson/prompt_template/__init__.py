@@ -46,6 +46,21 @@ from .hun_eng import (
     hungarian_build_sentence_review_prompt,
 )
 
+# Hungarian-German
+from .hun_ger import (
+    GERMAN_PERSONS,
+    GERMAN_GRAMMAR_PATTERNS,
+    HunGerPrompts,
+    german_build_lesson_prompt,
+    german_build_vocab_prompt,
+    german_build_narrative_vocab_generate_prompt,
+    german_build_noun_practice_prompt,
+    german_build_verb_practice_prompt,
+    german_build_grammar_select_prompt,
+    german_build_grammar_generate_prompt,
+    german_build_sentence_review_prompt,
+)
+
 __all__ = [
     # base
     "PromptInterface",
@@ -76,4 +91,16 @@ __all__ = [
     "hungarian_build_grammar_select_prompt",
     "hungarian_build_grammar_generate_prompt",
     "hungarian_build_sentence_review_prompt",
+    # hun-ger
+    "GERMAN_PERSONS",
+    "GERMAN_GRAMMAR_PATTERNS",
+    "HunGerPrompts",
+    "german_build_lesson_prompt",
+    "german_build_vocab_prompt",
+    "german_build_narrative_vocab_generate_prompt",
+    "german_build_noun_practice_prompt",
+    "german_build_verb_practice_prompt",
+    "german_build_grammar_select_prompt",
+    "german_build_grammar_generate_prompt",
+    "german_build_sentence_review_prompt",
 ]

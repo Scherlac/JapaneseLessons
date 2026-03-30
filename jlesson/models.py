@@ -56,6 +56,8 @@ class GeneralItem(_NullStrCoerce):
     errors, which is useful for accommodating different language pairs with
     varying requirements.
     """
+    id: str = ""
+    canonical_text: str = ""
     source: PartialItem = Field(default_factory=PartialItem)
     target: PartialItem = Field(default_factory=PartialItem)
     assets: dict[str, Path] = Field(default_factory=dict)

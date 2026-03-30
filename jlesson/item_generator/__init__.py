@@ -12,9 +12,11 @@ Usage:
 from ._base import ItemGenerator
 from .eng_jap import EngJapItemGenerator
 from .hun_eng import HunEngItemGenerator
+from .hun_ger import HunGerItemGenerator
 
 __all__ = [
     "ItemGenerator",
     "EngJapItemGenerator",
     "HunEngItemGenerator",
+    "HunGerItemGenerator",
 ]

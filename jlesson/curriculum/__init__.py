@@ -33,6 +33,9 @@ from .eng_jap import (
 # Hungarian-English
 from .hun_eng import HUN_TO_ENG_GRAMMAR_PROGRESSION
 
+# Hungarian-German
+from .hun_ger import HUN_TO_GER_GRAMMAR_PROGRESSION
+
 __all__ = [
     # base
     "create_curriculum",
@@ -50,4 +53,6 @@ __all__ = [
     "summary",
     # hun-eng
     "HUN_TO_ENG_GRAMMAR_PROGRESSION",
+    # hun-ger
+    "HUN_TO_GER_GRAMMAR_PROGRESSION",
 ]

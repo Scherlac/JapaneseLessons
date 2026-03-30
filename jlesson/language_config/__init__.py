@@ -12,11 +12,13 @@ Usage:
 from ._base import FieldMap, LanguageConfig, PartialFieldMap, PartialLanguageConfig, _CONFIGS, get_language_config
 from .eng_jap import ENG_JAP_CONFIG
 from .hun_eng import HUN_ENG_CONFIG
+from .hun_ger import HUN_GER_CONFIG
 
 # Populate the registry — order determines the error message when an unknown
 # code is supplied (sorted anyway, so order doesn't matter functionally).
 _CONFIGS[ENG_JAP_CONFIG.code] = ENG_JAP_CONFIG
 _CONFIGS[HUN_ENG_CONFIG.code] = HUN_ENG_CONFIG
+_CONFIGS[HUN_GER_CONFIG.code] = HUN_GER_CONFIG
 
 __all__ = [
     "FieldMap",
@@ -26,4 +28,5 @@ __all__ = [
     "get_language_config",
     "ENG_JAP_CONFIG",
     "HUN_ENG_CONFIG",
+    "HUN_GER_CONFIG",
 ]

@@ -97,6 +97,8 @@ VOICES = {
     "english_uk_female": "en-GB-SoniaNeural",
     "hungarian_female": "hu-HU-NoemiNeural",
     "hungarian_male": "hu-HU-TamasNeural",
+    "german_female": "de-DE-KatjaNeural",
+    "german_male": "de-DE-ConradNeural",
 }
 
 
