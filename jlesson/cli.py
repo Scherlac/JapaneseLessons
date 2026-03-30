@@ -246,6 +246,75 @@ def lesson() -> None:
     """Generate and manage lessons."""
 
 
+def _run_lesson_generation(
+    *,
+    theme: str,
+    nouns: int,
+    verbs: int,
+    sentences: int,
+    grammar_points: int,
+    grammar_points_per_block: int,
+    blocks: int,
+    seed: int | None,
+    curriculum_path: str | None,
+    output_dir: str | None,
+    no_video: bool,
+    no_cache: bool,
+    dry_run: bool,
+    profile: str,
+    narrative: tuple[str, ...],
+    narrative_file: Path | None,
+    retrieval: bool,
+    retrieval_store: Path | None,
+    retrieval_backend: str,
+    retrieval_embedding_model: str,
+    retrieval_min_coverage: float,
+    language: str,
+    regenerate_lesson_id: int | None,
+) -> None:
+    """Run lesson generation, optionally overwriting an existing lesson ID."""
+    from .lesson_pipeline import LessonConfig, run_pipeline
+
+    lang_cfg = get_language_config(language)
+    resolved_curriculum = (
+        Path(curriculum_path) if curriculum_path
+        else Path(__file__).parent.parent / lang_cfg.curriculum_file
+    )
+    narrative_blocks = [text.strip() for text in narrative if text.strip()]
+    if narrative_file is not None:
+        file_text = narrative_file.read_text(encoding="utf-8")
+        file_blocks = [block.strip() for block in file_text.split("\n---\n") if block.strip()]
+        narrative_blocks.extend(file_blocks)
+    config = LessonConfig(
+        theme=theme,
+        curriculum_path=resolved_curriculum,
+        output_dir=Path(output_dir) if output_dir else None,
+        num_nouns=nouns,
+        num_verbs=verbs,
+        sentences_per_grammar=sentences,
+        grammar_points_per_lesson=grammar_points,
+        grammar_points_per_block=grammar_points_per_block,
+        lesson_blocks=blocks,
+        seed=seed,
+        use_cache=not no_cache,
+        render_video=not no_video,
+        dry_run=dry_run,
+        profile=profile,
+        language=language,
+        narrative=narrative_blocks,
+        retrieval_enabled=retrieval,
+        retrieval_store_path=retrieval_store,
+        retrieval_backend=retrieval_backend,
+        retrieval_embedding_model=retrieval_embedding_model,
+        retrieval_min_coverage=retrieval_min_coverage,
+        regenerate_lesson_id=regenerate_lesson_id,
+    )
+    try:
+        run_pipeline(config)
+    except Exception as exc:
+        raise click.ClickException(_friendly_error(exc)) from exc
+
+
 @lesson.command("next")
 @click.option("--theme", "-t", required=True, help="Vocabulary theme for this lesson.")
 @click.option("--nouns", default=4, show_default=True, help="Nouns per lesson.")
@@ -369,45 +438,179 @@ def lesson_next(
     Selects grammar, generates sentences and practice items via LLM,
     persists lesson content, and renders an MP4 video.
     """
-    from .lesson_pipeline import LessonConfig, run_pipeline
-
-    lang_cfg = get_language_config(language)
-    resolved_curriculum = (
-        Path(curriculum_path) if curriculum_path
-        else Path(__file__).parent.parent / lang_cfg.curriculum_file
-    )
-    narrative_blocks = [text.strip() for text in narrative if text.strip()]
-    if narrative_file is not None:
-        file_text = narrative_file.read_text(encoding="utf-8")
-        file_blocks = [block.strip() for block in file_text.split("\n---\n") if block.strip()]
-        narrative_blocks.extend(file_blocks)
-    config = LessonConfig(
+    _run_lesson_generation(
         theme=theme,
-        curriculum_path=resolved_curriculum,
-        output_dir=Path(output_dir) if output_dir else None,
-        num_nouns=nouns,
-        num_verbs=verbs,
-        sentences_per_grammar=sentences,
-        grammar_points_per_lesson=grammar_points,
+        nouns=nouns,
+        verbs=verbs,
+        sentences=sentences,
+        grammar_points=grammar_points,
         grammar_points_per_block=grammar_points_per_block,
-        lesson_blocks=blocks,
+        blocks=blocks,
         seed=seed,
-        use_cache=not no_cache,
-        render_video=not no_video,
+        curriculum_path=curriculum_path,
+        output_dir=output_dir,
+        no_video=no_video,
+        no_cache=no_cache,
         dry_run=dry_run,
         profile=profile,
         language=language,
-        narrative=narrative_blocks,
-        retrieval_enabled=retrieval,
-        retrieval_store_path=retrieval_store,
+        narrative=narrative,
+        narrative_file=narrative_file,
+        retrieval=retrieval,
+        retrieval_store=retrieval_store,
         retrieval_backend=retrieval_backend,
         retrieval_embedding_model=retrieval_embedding_model,
         retrieval_min_coverage=retrieval_min_coverage,
+        regenerate_lesson_id=None,
     )
-    try:
-        run_pipeline(config)
-    except Exception as exc:
-        raise click.ClickException(_friendly_error(exc)) from exc
+
+
+@lesson.command("regenerate")
+@click.argument("lesson_id", type=click.IntRange(1))
+@click.option("--theme", "-t", required=True, help="Vocabulary theme for this lesson.")
+@click.option("--nouns", default=4, show_default=True, help="Nouns per lesson.")
+@click.option("--verbs", default=3, show_default=True, help="Verbs per lesson.")
+@click.option("--sentences", default=3, show_default=True, help="Sentences per grammar point.")
+@click.option(
+    "--grammar-points",
+    default=2,
+    show_default=True,
+    type=click.IntRange(1),
+    help="How many grammar progression points to include in the lesson.",
+)
+@click.option(
+    "--grammar-points-per-block",
+    default=1,
+    show_default=True,
+    type=click.IntRange(1),
+    help="How many grammar points each block should actively practice from the lesson progression.",
+)
+@click.option(
+    "--blocks",
+    default=1,
+    show_default=True,
+    type=click.IntRange(1),
+    help="Generate this many fresh content blocks within the lesson.",
+)
+@click.option("--seed", type=int, default=None, help="Random seed for reproducible vocab selection.")
+@click.option(
+    "--curriculum",
+    "curriculum_path",
+    default=None,
+    type=click.Path(),
+    help="Path to curriculum JSON (default: curriculum/curriculum.json).",
+)
+@click.option(
+    "--output-dir",
+    default=None,
+    type=click.Path(),
+    help="Output directory (default: output/).",
+)
+@click.option("--no-video", is_flag=True, default=False, help="Skip video rendering.")
+@click.option("--no-cache", is_flag=True, default=False, help="Disable LLM response cache (always call LLM).")
+@click.option("--dry-run", is_flag=True, default=False, help="Skip TTS/card/video — generate content and report only.")
+@click.option(
+    "--profile",
+    default="passive_video",
+    show_default=True,
+    type=click.Choice(["passive_video", "active_flash_cards", "simple_listen"]),
+    help="Touch profile for asset compilation and video rendering.",
+)
+@click.option(
+    "--narrative",
+    multiple=True,
+    help="Optional block narrative. Repeat the option to provide a progression across blocks.",
+)
+@click.option(
+    "--narrative-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to a text file with story context for sentence generation.",
+)
+@click.option(
+    "--retrieval/--no-retrieval",
+    default=True,
+    show_default=True,
+    help="Enable retrieval before the current generation flow.",
+)
+@click.option(
+    "--retrieval-store",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to a JSON retrieval store.",
+)
+@click.option(
+    "--retrieval-backend",
+    default="file",
+    show_default=True,
+    type=click.Choice(["file", "chroma"]),
+    help="Retrieval backend implementation.",
+)
+@click.option(
+    "--retrieval-embedding-model",
+    default="text-embedding-3-small",
+    show_default=True,
+    help="Embedding model used by vector retrieval backends.",
+)
+@click.option(
+    "--retrieval-min-coverage",
+    type=float,
+    default=0.6,
+    show_default=True,
+    help="Minimum retrieval coverage required before retrieved material is used.",
+)
+@LANGUAGE_OPTION
+def lesson_regenerate(
+    lesson_id: int,
+    theme: str,
+    nouns: int,
+    verbs: int,
+    sentences: int,
+    grammar_points: int,
+    grammar_points_per_block: int,
+    blocks: int,
+    seed: int | None,
+    curriculum_path: str | None,
+    output_dir: str | None,
+    no_video: bool,
+    no_cache: bool,
+    dry_run: bool,
+    profile: str,
+    narrative: tuple[str, ...],
+    narrative_file: Path | None,
+    retrieval: bool,
+    retrieval_store: Path | None,
+    retrieval_backend: str,
+    retrieval_embedding_model: str,
+    retrieval_min_coverage: float,
+    language: str,
+) -> None:
+    """Regenerate an existing lesson ID in place instead of appending a new lesson."""
+    _run_lesson_generation(
+        theme=theme,
+        nouns=nouns,
+        verbs=verbs,
+        sentences=sentences,
+        grammar_points=grammar_points,
+        grammar_points_per_block=grammar_points_per_block,
+        blocks=blocks,
+        seed=seed,
+        curriculum_path=curriculum_path,
+        output_dir=output_dir,
+        no_video=no_video,
+        no_cache=no_cache,
+        dry_run=dry_run,
+        profile=profile,
+        narrative=narrative,
+        narrative_file=narrative_file,
+        retrieval=retrieval,
+        retrieval_store=retrieval_store,
+        retrieval_backend=retrieval_backend,
+        retrieval_embedding_model=retrieval_embedding_model,
+        retrieval_min_coverage=retrieval_min_coverage,
+        language=language,
+        regenerate_lesson_id=lesson_id,
+    )
 
 
 @lesson.command("render")

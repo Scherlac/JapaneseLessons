@@ -17,6 +17,17 @@ from jlesson.models import GeneralItem, Touch, TouchIntent
 class CardRenderer:
     """Renders video cards for Japanese lessons."""
 
+    INTENT_LABELS = {
+        TouchIntent.INTRODUCE: "Introduce",
+        TouchIntent.RECALL: "Recall",
+        TouchIntent.REINFORCE: "Reinforce",
+        TouchIntent.CONFIRM: "Confirm",
+        TouchIntent.LOCK_IN: "Lock-in",
+        TouchIntent.TRANSLATE: "Translate",
+        TouchIntent.COMPREHEND: "Comprehend",
+        TouchIntent.UNKNOWN: "",
+    }
+
     def __init__(
         self,
         width: int = 1920,
@@ -58,28 +69,10 @@ class CardRenderer:
 
         self.fonts = self._load_fonts()
 
-        self.source_fonts = {
-            x[3:] :y 
-            for x, y in self.fonts.items()
-            if x.startswith(f"{self.source_lang}_")
-        }
-
-        self.target_fonts = {
-            x[3:] :y 
-            for x, y in self.fonts.items()
-            if x.startswith(f"{self.target_lang}_")
-        }
-
-        self.intent_mapping = {
-            TouchIntent.INTRODUCE: "Introduce",
-            TouchIntent.RECALL: "Recall",
-            TouchIntent.REINFORCE: "Reinforce",
-            TouchIntent.CONFIRM: "Confirm",
-            TouchIntent.LOCK_IN: "Lock-in",
-            TouchIntent.TRANSLATE: "Translate",
-            TouchIntent.COMPREHEND: "Comprehend",
-            TouchIntent.UNKNOWN: "",
-        }
+        src_tag = f"{self.source_lang}_"
+        self.source_fonts = {k[len(src_tag):]: v for k, v in self.fonts.items() if k.startswith(src_tag)}
+        tgt_tag = f"{self.target_lang}_"
+        self.target_fonts = {k[len(tgt_tag):]: v for k, v in self.fonts.items() if k.startswith(tgt_tag)}
 
     def _load_fonts(self) -> Dict[str, ImageFont.FreeTypeFont]:
         """Load system fonts for Japanese and English text."""
@@ -165,6 +158,27 @@ class CardRenderer:
             chunks.append(current)
         return chunks or [token]
 
+    def _greedy_wrap(
+        self,
+        pieces: list[str],
+        font: ImageFont.FreeTypeFont,
+        max_width: int,
+        sep: str = " ",
+    ) -> list[str]:
+        """Pack *pieces* into lines that fit within *max_width*, joining with *sep*."""
+        lines: list[str] = []
+        current = ""
+        for piece in pieces:
+            candidate = piece if not current else f"{current}{sep}{piece}"
+            if current and self._measure_text_width(candidate, font) > max_width:
+                lines.append(current)
+                current = piece
+            else:
+                current = candidate
+        if current:
+            lines.append(current)
+        return lines
+
     def _wrap_text_to_width(
         self,
         text: str,
@@ -175,47 +189,22 @@ class CardRenderer:
         if not text or max_width <= 0:
             return text
 
-        wrapped_lines: list[str] = []
+        wrapped: list[str] = []
         for paragraph in str(text).splitlines() or [str(text)]:
-            if not paragraph:
-                wrapped_lines.append("")
-                continue
+            if not paragraph or self._measure_text_width(paragraph, font) <= max_width:
+                wrapped.append(paragraph)
+            elif any(c.isspace() for c in paragraph):
+                pieces: list[str] = []
+                for word in paragraph.split():
+                    if self._measure_text_width(word, font) > max_width:
+                        pieces.extend(self._split_token_to_fit(word, font, max_width))
+                    else:
+                        pieces.append(word)
+                wrapped.extend(self._greedy_wrap(pieces, font, max_width))
+            else:
+                wrapped.extend(self._split_token_to_fit(paragraph, font, max_width))
 
-            if self._measure_text_width(paragraph, font) <= max_width:
-                wrapped_lines.append(paragraph)
-                continue
-
-            if any(char.isspace() for char in paragraph):
-                current = ""
-                for token in paragraph.split():
-                    parts = (
-                        self._split_token_to_fit(token, font, max_width)
-                        if self._measure_text_width(token, font) > max_width
-                        else [token]
-                    )
-                    for part in parts:
-                        candidate = part if not current else f"{current} {part}"
-                        if current and self._measure_text_width(candidate, font) > max_width:
-                            wrapped_lines.append(current)
-                            current = part
-                        else:
-                            current = candidate
-                if current:
-                    wrapped_lines.append(current)
-                continue
-
-            current = ""
-            for char in paragraph:
-                candidate = f"{current}{char}"
-                if current and self._measure_text_width(candidate, font) > max_width:
-                    wrapped_lines.append(current)
-                    current = char
-                else:
-                    current = candidate
-            if current:
-                wrapped_lines.append(current)
-
-        return "\n".join(wrapped_lines)
+        return "\n".join(wrapped)
 
     def _draw_text_block(
         self,
@@ -284,7 +273,7 @@ class CardRenderer:
         cx = self.width // 2
 
         intent = touch.intent if touch else TouchIntent.UNKNOWN
-        intent_label = self.intent_mapping.get(intent, "")
+        intent_label = self.INTENT_LABELS.get(intent, "")
 
         header = "  ".join(part for part in (intent_label, label) if part)
         if header:
@@ -307,18 +296,7 @@ class CardRenderer:
         draw.line([(cx - 200, divider_y), (cx + 200, divider_y)], fill="#333333", width=2)
 
         if intent.show_target():
-            extra_keys = (
-                lang_cfg.target_extra_display_keys if lang_cfg else []
-            )
-            extra_font_keys = (
-                lang_cfg.target_card_extra_font_keys if lang_cfg else {}
-            )
-            self._draw_target_block(
-                draw, cx, divider_y + 40, item,
-                self.target_fonts, self.fonts,
-                extra_font_keys, extra_keys,
-                self.text_color, self.dim_color,
-            )
+            self._draw_target_block(draw, cx, divider_y + 40, item, lang_cfg)
 
         if progress > 0:
             self._draw_progress_bar(draw, self.height - 80, progress)
@@ -331,61 +309,40 @@ class CardRenderer:
         cx: int,
         y_top: int,
         item: GeneralItem,
-        target_fonts: dict,
-        all_fonts: dict,
-        extra_font_keys: dict,
-        extra_display_keys: list,
-        text_color: str,
-        dim_color: str,
-        gap_after_main: int = 20,
-        gap_after_line: int = 12,
+        lang_cfg: LanguageConfig | None = None,
     ) -> None:
-        """Draw the target reveal block: display text, pronunciation, then extra fields.
-
-        All elements are stacked vertically and sized dynamically using getbbox()
-        so no text overflows into the progress bar.
-
-        Parameters
-        ----------
-        extra_font_keys
-            Per-extra-key font mapping ``{extra_key: font_key}``.
-            ``font_key`` must be a key in ``all_fonts``.
-            Unrecognised or absent keys fall back to ``"en_small"``.
-        """
-
+        """Draw the target reveal block: display text, pronunciation, then extras."""
         y = y_top
         max_width = self.width - 320
 
-        # 1. Main target display text (large)
-        font_main = target_fonts.get("large")
+        font_main = self.target_fonts.get("large")
         if font_main and item.target.display_text:
             y = self._draw_text_block(
-                draw, cx, y, item.target.display_text, font_main, text_color, max_width
+                draw, cx, y, item.target.display_text, font_main, self.text_color, max_width
             )
-            y += gap_after_main
+            y += 20
 
-        # 2. Pronunciation / romaji
-        font_pron = target_fonts.get("medium", font_main)
+        font_pron = self.target_fonts.get("medium", font_main)
         if font_pron and item.target.pronunciation:
             y = self._draw_text_block(
-                draw, cx, y, item.target.pronunciation, font_pron, dim_color, max_width
+                draw, cx, y, item.target.pronunciation, font_pron, self.dim_color, max_width
             )
-            y += gap_after_line
+            y += 12
 
-        # 3. Extra fields — each may have its own font
-        _fallback = all_fonts.get("en_small")
-        keys = extra_display_keys if extra_display_keys else list(item.target.extra.keys())
-        for key in keys:
+        extra_keys = lang_cfg.target_extra_display_keys if lang_cfg else list(item.target.extra.keys())
+        extra_font_keys = lang_cfg.target_card_extra_font_keys if lang_cfg else {}
+        fallback = self.fonts.get("en_small")
+        for key in extra_keys:
             val = item.target.extra.get(key) or ""
             if val:
                 fk = extra_font_keys.get(key, "en_small")
-                font_extra = all_fonts.get(fk, _fallback)
+                font_extra = self.fonts.get(fk, fallback)
                 if font_extra is None:
                     continue
                 y = self._draw_text_block(
-                    draw, cx, y, str(val), font_extra, dim_color, max_width
+                    draw, cx, y, str(val), font_extra, self.dim_color, max_width
                 )
-                y += gap_after_line
+                y += 12
 
     def save_card(self, img: Image.Image, path: Path) -> None:
         """Save a rendered card image to disk.

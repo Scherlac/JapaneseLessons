@@ -16,7 +16,9 @@ from ._base import (
     load_curriculum,
     save_curriculum,
     add_lesson,
+    replace_lesson,
     complete_lesson,
+    recompute_coverage,
     get_next_grammar_from,
     grammar_summary_lines,
 )
@@ -42,7 +44,9 @@ __all__ = [
     "load_curriculum",
     "save_curriculum",
     "add_lesson",
+    "replace_lesson",
     "complete_lesson",
+    "recompute_coverage",
     "get_next_grammar_from",
     "grammar_summary_lines",
     # eng-jap

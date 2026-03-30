@@ -41,6 +41,7 @@ class LessonConfig:
     retrieval_embedding_model: str = "text-embedding-3-small"
     retrieval_min_coverage: float = 0.6
     retrieval_limit: int = 24
+    regenerate_lesson_id: int | None = None
 
 
 @dataclass(frozen=True)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from jlesson.curriculum import add_lesson, complete_lesson
+from jlesson.curriculum import add_lesson, complete_lesson, replace_lesson
 
 from ..pipeline_core import ActionConfig, LessonRegistrationArtifact, StepAction, VocabEnhancementArtifact
 
@@ -23,16 +23,27 @@ class RegisterLessonAction(StepAction[RegisterLessonRequest, LessonRegistrationA
 
     def run(self, config: ActionConfig, chunk: RegisterLessonRequest) -> LessonRegistrationArtifact:
         curriculum = config.curriculum.model_copy(deep=True)
-        lesson_number = len(curriculum.lessons) + 1
-        lesson = add_lesson(
-            curriculum,
-            title=f"Lesson {lesson_number}: {chunk.theme.title()}",
+        regenerate_lesson_id = config.lesson.regenerate_lesson_id
+        vocab_kwargs = dict(
             theme=chunk.theme,
             nouns=[item.source.display_text for item in chunk.nouns],
             verbs=[item.source.display_text for item in chunk.verbs],
             grammar_ids=chunk.grammar_ids,
             items_count=chunk.items_count,
         )
+        if regenerate_lesson_id is None:
+            lesson = add_lesson(
+                curriculum,
+                title=f"Lesson {len(curriculum.lessons) + 1}: {chunk.theme.title()}",
+                **vocab_kwargs,
+            )
+        else:
+            lesson = replace_lesson(
+                curriculum,
+                lesson_id=regenerate_lesson_id,
+                title=f"Lesson {regenerate_lesson_id}: {chunk.theme.title()}",
+                **vocab_kwargs,
+            )
         complete_lesson(curriculum, lesson.id)
         config.runtime.write_curriculum(curriculum)
 

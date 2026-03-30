@@ -25,6 +25,8 @@ from jlesson.curriculum import (
     get_grammar_by_id,
     get_next_grammar,
     load_curriculum,
+    recompute_coverage,
+    replace_lesson,
     save_curriculum,
     summary,
 )
@@ -293,6 +295,57 @@ class TestCompletedLesson:
             )
             complete_lesson(empty_cur, lesson.id)
         assert len(empty_cur.covered_nouns) == len(set(empty_cur.covered_nouns))
+
+    def test_replace_lesson_updates_existing_record(self, empty_cur):
+        lesson = add_lesson(
+            empty_cur,
+            title="Lesson 1: Food",
+            theme="food",
+            nouns=["apple"],
+            verbs=["eat"],
+            grammar_ids=["g1"],
+        )
+
+        replaced = replace_lesson(
+            empty_cur,
+            lesson_id=lesson.id,
+            title="Lesson 1: Totoro",
+            theme="totoro",
+            nouns=["tree"],
+            verbs=["run"],
+            grammar_ids=["g2"],
+            items_count=42,
+        )
+
+        assert replaced.id == lesson.id
+        assert replaced.title == "Lesson 1: Totoro"
+        assert replaced.theme == "totoro"
+        assert replaced.nouns == ["tree"]
+        assert replaced.verbs == ["run"]
+        assert replaced.grammar_ids == ["g2"]
+        assert replaced.items_count == 42
+
+    def test_recompute_coverage_rebuilds_from_completed_lessons(self, empty_cur):
+        l1 = add_lesson(empty_cur, title="L1", theme="food", nouns=["apple"], verbs=["eat"], grammar_ids=["g1"])
+        l2 = add_lesson(empty_cur, title="L2", theme="travel", nouns=["train"], verbs=["go"], grammar_ids=["g2"])
+        complete_lesson(empty_cur, l1.id)
+        complete_lesson(empty_cur, l2.id)
+
+        replace_lesson(
+            empty_cur,
+            lesson_id=l1.id,
+            title="L1b",
+            theme="forest",
+            nouns=["tree"],
+            verbs=["walk"],
+            grammar_ids=["g3"],
+        )
+        complete_lesson(empty_cur, l1.id)
+        recompute_coverage(empty_cur)
+
+        assert empty_cur.covered_nouns == ["train", "tree"]
+        assert empty_cur.covered_verbs == ["go", "walk"]
+        assert empty_cur.covered_grammar_ids == ["g2", "g3"]
 
 
 # ─── SelectVocabStep._select_fallback ────────────────────────────────────────

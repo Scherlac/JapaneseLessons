@@ -94,16 +94,12 @@ class GrammarSelectAction(StepAction[GrammarSelectChunk, GrammarSelectResult]):
             grammar_map[selected_id] for selected_id in selected_ids if selected_id in grammar_map
         ]
 
-        window = max(1, config.lesson.grammar_points_per_block)
-        needed = window + max(config.lesson.lesson_blocks - 1, 0)
-        if len(selected_grammar) < needed:
-            selected_ids_set = {grammar.id for grammar in selected_grammar}
-            already_covered = list(chunk.covered_grammar_ids) + list(selected_ids_set)
-            additional = _project_grammar(chunk.progression, already_covered, needed)
-            for grammar in additional:
-                if grammar.id not in selected_ids_set:
-                    selected_grammar.append(grammar)
-                    selected_ids_set.add(grammar.id)
+        if not selected_grammar:
+            selected_grammar = _project_grammar(
+                chunk.progression,
+                chunk.covered_grammar_ids,
+                max(1, config.lesson.grammar_points_per_lesson),
+            )
 
         selected_grammar_blocks = _build_block_progression(
             selected_grammar,

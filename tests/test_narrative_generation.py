@@ -214,6 +214,41 @@ def test_grammar_select_builds_block_progression(tmp_path: Path):
     ]
 
 
+def test_grammar_select_does_not_expand_lesson_count_for_many_blocks(tmp_path: Path):
+    config = LessonConfig(
+        theme="totoro",
+        curriculum_path=tmp_path / "curriculum.json",
+        lesson_blocks=30,
+        grammar_points_per_lesson=1,
+        grammar_points_per_block=1,
+        verbose=False,
+    )
+    ctx = LessonContext(config=config)
+    ctx.curriculum = create_curriculum("Test")
+    ctx.nouns = [_GEN.convert_raw_noun({"english": "cat", "japanese": "ねこ", "kanji": "猫", "romaji": "neko"})]
+    ctx.verbs = [_GEN.convert_raw_verb({
+        "english": "to fly",
+        "japanese": "とぶ",
+        "kanji": "飛ぶ",
+        "romaji": "tobu",
+        "type": "う-verb",
+        "masu_form": "飛びます",
+    })]
+
+    with patch(
+        "jlesson.runtime.PipelineRuntime.ask_llm",
+        return_value={"selected_ids": ["identity_present_affirmative"]},
+    ):
+        GrammarSelectStep().execute(ctx)
+
+    assert [g.id for g in ctx.selected_grammar] == ["identity_present_affirmative"]
+    assert len(ctx.selected_grammar_blocks) == 30
+    assert all(
+        [g.id for g in block] == ["identity_present_affirmative"]
+        for block in ctx.selected_grammar_blocks
+    )
+
+
 def test_generate_sentences_uses_block_specific_grammar_plan(tmp_path: Path):
     config = LessonConfig(
         theme="kikis delivery service",

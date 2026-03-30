@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from jlesson.curriculum import create_curriculum, get_grammar_by_id
+from jlesson.curriculum import add_lesson, complete_lesson, create_curriculum, get_grammar_by_id
 from jlesson.lesson_pipeline import (
     CompileAssetsStep,
     CompileTouchesStep,
@@ -652,6 +652,33 @@ def test_register_lesson_sets_created_at(ctx):
     ctx = RegisterLessonStep().execute(ctx)
     assert ctx.created_at != ""
     assert ctx.created_at.endswith("Z")
+
+
+def test_register_lesson_can_regenerate_existing_lesson_id(ctx):
+    original = add_lesson(
+        ctx.curriculum,
+        title="Lesson 1: Old Theme",
+        theme="old_theme",
+        nouns=["old noun"],
+        verbs=["old verb"],
+        grammar_ids=["old_grammar"],
+    )
+    complete_lesson(ctx.curriculum, original.id)
+    ctx.config.regenerate_lesson_id = 1
+    ctx.nouns = _NOUN_ITEMS[:2]
+    ctx.verbs = _VERB_ITEMS[:2]
+    ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
+    ctx.noun_items = []
+    ctx.sentences = []
+    ctx.verb_items = []
+
+    ctx = RegisterLessonStep().execute(ctx)
+
+    assert ctx.lesson_id == 1
+    assert len(ctx.curriculum.lessons) == 1
+    assert ctx.curriculum.lessons[0].title == "Lesson 1: Food"
+    assert ctx.curriculum.lessons[0].theme == "food"
+    assert ctx.curriculum.covered_grammar_ids == ["action_present_affirmative"]
 
 
 # ---------------------------------------------------------------------------

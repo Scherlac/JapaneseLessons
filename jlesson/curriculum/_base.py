@@ -115,23 +115,56 @@ def add_lesson(
     return lesson
 
 
+def replace_lesson(
+    curriculum: CurriculumData,
+    *,
+    lesson_id: int,
+    title: str,
+    theme: str,
+    nouns: list[str],
+    verbs: list[str],
+    grammar_ids: list[str],
+    items_count: int = 0,
+    status: str = "draft",
+) -> LessonRecord:
+    """Replace an existing lesson entry and return the updated LessonRecord."""
+    lesson = _get_lesson(curriculum, lesson_id)
+    lesson.title = title
+    lesson.theme = theme
+    lesson.nouns = list(nouns)
+    lesson.verbs = list(verbs)
+    lesson.grammar_ids = list(grammar_ids)
+    lesson.items_count = items_count
+    lesson.status = status
+    lesson.created_at = _now()
+    lesson.completed_at = None
+    return lesson
+
+
+def recompute_coverage(curriculum: CurriculumData) -> None:
+    """Rebuild covered vocab/grammar trackers from completed lessons."""
+    covered_nouns: set[str] = set()
+    covered_verbs: set[str] = set()
+    covered_grammar: set[str] = set()
+
+    for lesson in curriculum.lessons:
+        if lesson.status != "completed":
+            continue
+        covered_nouns.update(lesson.nouns)
+        covered_verbs.update(lesson.verbs)
+        covered_grammar.update(lesson.grammar_ids)
+
+    curriculum.covered_nouns = sorted(covered_nouns)
+    curriculum.covered_verbs = sorted(covered_verbs)
+    curriculum.covered_grammar_ids = sorted(covered_grammar)
+
+
 def complete_lesson(curriculum: CurriculumData, lesson_id: int) -> None:
     """Mark a lesson as completed and update covered vocab/grammar trackers."""
     lesson = _get_lesson(curriculum, lesson_id)
     lesson.status = "completed"
     lesson.completed_at = _now()
-
-    covered_nouns = set(curriculum.covered_nouns)
-    covered_verbs = set(curriculum.covered_verbs)
-    covered_grammar = set(curriculum.covered_grammar_ids)
-
-    covered_nouns.update(lesson.nouns)
-    covered_verbs.update(lesson.verbs)
-    covered_grammar.update(lesson.grammar_ids)
-
-    curriculum.covered_nouns = sorted(covered_nouns)
-    curriculum.covered_verbs = sorted(covered_verbs)
-    curriculum.covered_grammar_ids = sorted(covered_grammar)
+    recompute_coverage(curriculum)
 
 
 def _get_lesson(curriculum: CurriculumData, lesson_id: int) -> LessonRecord:
