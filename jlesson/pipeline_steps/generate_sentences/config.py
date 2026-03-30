@@ -57,9 +57,18 @@ _HUN_ENG_CONFIG = NarrativeGrammarLanguageConfig(
     output_phonetic_field="pronunciation",
 )
 
+_HUN_GER_CONFIG = NarrativeGrammarLanguageConfig(
+    persons=(),  # replaced at build time from LanguageConfig.persons
+    teacher_description="a German teacher for Hungarian beginners",
+    output_source_field="hungarian",
+    output_target_field="german",
+    output_phonetic_field="",
+)
+
 _LANGUAGE_DEFAULTS: dict[str, NarrativeGrammarLanguageConfig] = {
     "eng-jap": _ENG_JAP_CONFIG,
     "hun-eng": _HUN_ENG_CONFIG,
+    "hun-ger": _HUN_GER_CONFIG,
 }
 
 _FALLBACK = NarrativeGrammarLanguageConfig(persons=())

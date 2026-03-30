@@ -5,7 +5,7 @@ from jlesson.models import GeneralItem, GrammarItem
 
 # Extra target-side keys shown verbatim inside the vocab block.
 # Any language pair may produce these fields on GeneralItem.target.extra.
-_NOTABLE_EXTRA_KEYS: tuple[str, ...] = ("kanji", "masu_form", "type", "past_tense")
+_NOTABLE_EXTRA_KEYS: tuple[str, ...] = ("kanji", "masu_form", "type", "past_tense", "partizip_ii", "hilfsverb", "article")
 
 
 def format_vocab_items(items: list[GeneralItem]) -> str:
