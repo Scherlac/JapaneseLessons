@@ -201,6 +201,23 @@ class NarrativeVocabPlan:
     blocks: list[NarrativeVocabBlock]
 
 
+@dataclass
+class SelectedVocabSet:
+    """Typed output of ``SelectVocabStep``.
+
+    This is the stable vocab-selection artifact handed to later lesson-content
+    generation steps. ``GrammarSelectStep`` uses this as its visible
+    predecessor artifact by extending it in its request chunk.
+
+    Context fields: ``LessonContext.vocab``, ``LessonContext.nouns``,
+    ``LessonContext.verbs``
+    """
+
+    vocab: VocabFile | None
+    nouns: list[GeneralItem]
+    verbs: list[GeneralItem]
+
+
 # ---------------------------------------------------------------------------
 # Render inter-step typed artifacts
 # ---------------------------------------------------------------------------

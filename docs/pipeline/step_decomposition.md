@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Date:** 2026-03-29  
-**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`, `register_lesson`, `persist_content`
+**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `select_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`, `register_lesson`, `persist_content`
 
 ---
 
@@ -50,8 +50,10 @@ class RuntimeServices(Protocol):
     def query_retrieval(self, theme: str, **kwargs) -> RetrievalResult: ...
     def update_retrieval(self, theme: str, items: list) -> None: ...
 
+    def load_vocab(self, theme: str, vocab_dir: Path | None = None) -> VocabFile: ...
+
     def read_content(self, lesson_id: int) -> dict[str, Any]: ...
-    def write_content(self, lesson_id: int, data: dict[str, Any]) -> None: ...
+    def write_content(self, lesson_id: int, data: dict[str, Any]) -> Path: ...
 
     def read_curriculum(self) -> CurriculumData: ...
     def write_curriculum(self, data: CurriculumData) -> None: ...
@@ -60,8 +62,9 @@ class RuntimeServices(Protocol):
     def update_cache(self, key: str, value: dict[str, Any]) -> None: ...
 ```
 
-**Migration status** — `call_llm`, `read_curriculum`, `write_curriculum`,
-`read_content`, and `write_content` are wired in `ContextRuntime`.
+**Migration status** — `call_llm`, `load_vocab`, `read_curriculum`,
+`write_curriculum`, `read_content`, and `write_content` are wired in
+`ContextRuntime`.
 Retrieval and cache operations still raise `NotImplementedError` until the
 corresponding steps are migrated.
 
@@ -76,6 +79,7 @@ Constructed once per `execute` call inside `ActionStep.execute`.
 class ContextRuntime:
     def __init__(self, ctx: LessonContext) -> None: ...
     def call_llm(self, prompt: str) -> dict[str, Any]: ...
+    def load_vocab(self, theme: str, vocab_dir: Path | None = None) -> VocabFile: ...
     def read_curriculum(self) -> CurriculumData: ...
     def write_curriculum(self, data: CurriculumData) -> None: ...
     def read_content(self, lesson_id: int) -> dict[str, Any]: ...
@@ -233,6 +237,7 @@ for custom chunk types.
 | `grammar_select` | `GrammarSelectChunk` | single LLM call + pure post-processing |
 | `noun_practice` | `NounPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×25 |
 | `verb_practice` | `VerbPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×20 |
+| `select_vocab` | `SelectVocabRequest` | single vocab selection pass producing a typed successor artifact |
 | `register_lesson` | `RegisterLessonRequest` | single storage write producing a typed registration artifact |
 | `compile_assets` | `AssetCompileRequest` | single render compilation producing a typed successor artifact |
 | `compile_touches` | `CompiledItemSequence` | single pure transform from compiled items to touch sequence |
@@ -290,6 +295,30 @@ Action:  one call_llm per batch chunk
 
 `merge_outputs` concatenates all batch outputs, applies phase + block_index
 assignment, and falls back to the raw input items when the LLM returns nothing.
+
+### `select_vocab` — bridge from `VocabFile` to grammar selection
+
+This makes the vocabulary bridge dependency-aware instead of leaving it as a
+context-only mutation. `SelectVocabRequest` keeps the predecessor `VocabFile`
+visible while carrying the narrative term plan and curriculum coverage needed
+to choose fresh lesson vocab.
+
+`SelectVocabAction` emits `SelectedVocabSet`, and `GrammarSelectChunk` now
+extends that artifact so the successor step advertises the dependency in its
+type signature.
+
+```
+GenerateNarrativeVocabStep
+    Output:        VocabFile
+
+SelectVocabStep
+    Input chunk:   SelectVocabRequest    (VocabFile + narrative plan + curriculum coverage)
+    Output:        SelectedVocabSet      (vocab + nouns + verbs)
+    Action:        load-or-reuse vocab + select narrative-aware fresh items
+
+GrammarSelectStep
+    Input chunk:   GrammarSelectChunk    (SelectedVocabSet + grammar progression state)
+```
 
 ### `compile_touches` — render-side successor artifact (`CompiledItemSequence`)
 
@@ -468,6 +497,8 @@ current typed connections.
 |----------------|---------------|----------------|
 | `NarrativeGeneratorStep` | `NarrativeFrame` | `ExtractNarrativeVocabStep` |
 | `ExtractNarrativeVocabStep` | `NarrativeVocabPlan` | `GenerateNarrativeVocabStep` |
+| `GenerateNarrativeVocabStep` | `VocabFile` (via `SelectVocabRequest`) | `SelectVocabStep` |
+| `SelectVocabStep` | `SelectedVocabSet` | `GrammarSelectStep` |
 | `NarrativeGrammarStep` | `Sentence` (via `SentenceReviewBatch`) | `ReviewSentencesStep` |
 | `RegisterLessonStep` | `LessonRegistrationArtifact` | `PersistContentStep` |
 | `CompileAssetsStep` | `CompiledItemSequence` | `CompileTouchesStep` |
@@ -560,6 +591,6 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `render_video` | `RenderVideoRequest(TouchSequence)` ← from `compile_touches` | 1 sink render call | **done** — successor step; chunk type preserves `TouchSequence` as the predecessor artifact |
 | `save_report` | `SaveReportRequest(RenderedVideoArtifact)` ← from `render_video` | 1 sink write | **done** — successor step; chunk type preserves `RenderedVideoArtifact` as the predecessor artifact |
 | `generate_narrative_vocab` | `ItemBatch[str]` | batched ×60 | not started |
-| `select_vocab` | per-block + LLM gap-fill | conditional | not started |
+| `select_vocab` | `SelectVocabRequest` ← from `generate_narrative_vocab` | conditional vocab load + gap-fill | **done** — bridge step; emits `SelectedVocabSet` for `grammar_select` |
 | `retrieve_material` | single query | retrieval only | not started (needs `query_retrieval` wired) |
 | `persist_content` | `PersistContentRequest` ← from `register_lesson` | storage only | **done** — successor step; request preserves `LessonRegistrationArtifact` as the predecessor artifact |

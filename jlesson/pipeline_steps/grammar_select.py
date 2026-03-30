@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from jlesson.models import GeneralItem, GrammarItem
-from .pipeline_core import ActionConfig, ActionStep, LessonContext, StepAction
+from jlesson.models import GrammarItem
+from .pipeline_core import ActionConfig, ActionStep, LessonContext, SelectedVocabSet, StepAction
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ def _build_block_progression(
 # ---------------------------------------------------------------------------
 
 @dataclass
-class GrammarSelectChunk:
+class GrammarSelectChunk(SelectedVocabSet):
     """All data the grammar select action needs — one chunk per step execution.
 
     ``block_index`` is always 0 because grammar selection is a single LLM call
@@ -77,8 +77,6 @@ class GrammarSelectChunk:
     unlocked: list[GrammarItem]
     covered_grammar_ids: list[str]
     lesson_number: int
-    nouns: list[GeneralItem]
-    verbs: list[GeneralItem]
 
 
 @dataclass
@@ -208,13 +206,14 @@ class GrammarSelectStep(ActionStep[GrammarSelectChunk, GrammarSelectResult]):
             unlocked = _project_grammar(progression, covered, ctx.config.grammar_points_per_lesson)
         lesson_number = len(ctx.curriculum.lessons) + 1
         return [GrammarSelectChunk(
+            vocab=ctx.vocab,
+            nouns=list(ctx.nouns),
+            verbs=list(ctx.verbs),
             block_index=0,
             progression=progression,
             unlocked=unlocked,
             covered_grammar_ids=covered,
             lesson_number=lesson_number,
-            nouns=list(ctx.nouns),
-            verbs=list(ctx.verbs),
         )]
 
     def merge_outputs(
