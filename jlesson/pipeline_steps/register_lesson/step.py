@@ -21,9 +21,12 @@ class RegisterLessonStep(ActionStep[RegisterLessonRequest, LessonRegistrationArt
     def build_chunks(self, ctx: LessonContext) -> list[RegisterLessonRequest]:
         return [
             RegisterLessonRequest(
+                vocab=ctx.vocab,
+                nouns=list(ctx.nouns),
+                verbs=list(ctx.verbs),
+                noun_items=list(ctx.noun_items),
+                verb_items=list(ctx.verb_items),
                 theme=ctx.config.theme,
-                nouns=[n.source.display_text for n in ctx.nouns],
-                verbs=[v.source.display_text for v in ctx.verbs],
                 grammar_ids=[g.id for g in ctx.selected_grammar],
                 block_grammar_ids=[[g.id for g in block] for block in ctx.selected_grammar_blocks],
                 items_count=len(ctx.noun_items) + len(ctx.sentences),

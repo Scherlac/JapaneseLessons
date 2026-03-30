@@ -11,14 +11,13 @@ Orchestrates the full lesson workflow through fifteen sequential steps:
     step 6   grammar_select          — LLM: pick grammar points for this lesson
     step 7   narrative_grammar       — LLM: produce block-aware practice sentences
     step 8   review_sentences        — LLM: rate naturalness, rewrite awkward sentences
-    step 9   noun_practice           — LLM: enrich nouns with examples + memory tips
-    step 10  verb_practice           — LLM: enrich verbs with conjugations + memory tips
-    step 11  register_lesson         — add+complete the lesson in curriculum.json
-    step 12  persist_content         — save LessonContent to output/<id>/content.json
-    step 13  compile_assets          — render card images + TTS audio per item (Stage 2)
-    step 14  compile_touches         — profile-driven touch sequencing (Stage 3)
-    step 15  render_video            — assemble MP4 from touch sequence
-    step 16  save_report             — finalize and save Markdown lesson report
+    step 9   vocab_enhancement       — LLM: enrich nouns and verbs together
+    step 10  register_lesson         — add+complete the lesson in curriculum.json
+    step 11  persist_content         — save LessonContent to output/<id>/content.json
+    step 12  compile_assets          — render card images + TTS audio per item (Stage 2)
+    step 13  compile_touches         — profile-driven touch sequencing (Stage 3)
+    step 14  render_video            — assemble MP4 from touch sequence
+    step 15  save_report             — finalize and save Markdown lesson report
 
 Each step is a PipelineStep subclass with an execute(ctx) method,
 making them individually testable and easy to extend.
@@ -58,6 +57,7 @@ from jlesson.pipeline_steps import (
     SaveReportStep,
     SelectVocabStep,
     StepInfo,
+    VocabEnhancementStep,
     VerbPracticeStep,
 )
 from jlesson.pipeline_steps.generate_sentences import NarrativeGrammarStep
@@ -74,8 +74,7 @@ def _build_pipeline() -> list[PipelineStep]:
         GrammarSelectStep(),
         NarrativeGrammarStep(),
         ReviewSentencesStep(),
-        NounPracticeStep(),
-        VerbPracticeStep(),
+        VocabEnhancementStep(),
         RegisterLessonStep(),
         PersistContentStep(),
         CompileAssetsStep(),
@@ -148,6 +147,7 @@ __all__ = [
     "SaveReportStep",
     "SelectVocabStep",
     "StepInfo",
+    "VocabEnhancementStep",
     "VerbPracticeStep",
     "load_curriculum",
     "render_existing_lesson",

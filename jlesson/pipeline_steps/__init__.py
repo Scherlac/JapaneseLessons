@@ -15,6 +15,7 @@ from .pipeline_core import (
 	SelectedVocabSet,
 	StepInfo,
 	TouchSequence,
+	VocabEnhancementArtifact,
 )
 
 
@@ -26,7 +27,7 @@ _STEP_EXPORTS = {
 	"NarrativeGrammarStep": ".generate_sentences",
 	"GrammarSelectStep": ".grammar_select",
 	"NarrativeGeneratorStep": ".narrative_generator",
-	"NounPracticeStep": ".noun_practice",
+	"NounPracticeStep": ".vocab_enhancement",
 	"PersistContentStep": ".persist_content",
 	"RegisterLessonStep": ".register_lesson",
 	"RenderVideoStep": ".render_video",
@@ -34,7 +35,8 @@ _STEP_EXPORTS = {
 	"ReviewSentencesStep": ".review_sentences",
 	"SaveReportStep": ".save_report",
 	"SelectVocabStep": ".select_vocab",
-	"VerbPracticeStep": ".verb_practice",
+	"VerbPracticeStep": ".vocab_enhancement",
+	"VocabEnhancementStep": ".vocab_enhancement",
 }
 
 
@@ -65,6 +67,7 @@ __all__ = [
 	"SaveReportStep",
 	"SelectVocabStep",
 	"VerbPracticeStep",
+	"VocabEnhancementStep",
 	"CompiledItemSequence",
 	"LessonConfig",
 	"LessonContext",
@@ -79,4 +82,5 @@ __all__ = [
 	"SelectedVocabSet",
 	"StepInfo",
 	"TouchSequence",
+	"VocabEnhancementArtifact",
 ]

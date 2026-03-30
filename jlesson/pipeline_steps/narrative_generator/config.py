@@ -10,8 +10,16 @@ from jlesson.language_config import LanguageConfig
 class NarrativeGeneratorLanguageConfig:
     """Language-specific configuration used only by the narrative generator step."""
 
-    canonical_language: str
     default_block_builder: Callable[[str, str, int], list[str]]
+    canonical_language: str | None = None
+    source_language_label: str | None = None
+
+    def __post_init__(self) -> None:
+        language = self.canonical_language or self.source_language_label
+        if not language:
+            raise ValueError("NarrativeGeneratorLanguageConfig requires a language label")
+        object.__setattr__(self, "canonical_language", language)
+        object.__setattr__(self, "source_language_label", language)
 
 
 # ---------------------------------------------------------------------------

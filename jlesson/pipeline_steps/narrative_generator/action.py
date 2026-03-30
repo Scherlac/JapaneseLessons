@@ -8,7 +8,7 @@ testable with a mock runtime.
 from __future__ import annotations
 
 from ..pipeline_core import ActionConfig, NarrativeFrame, NarrativeGenChunk, StepAction
-from .config import build_narrative_generator_language_config, fallback_default_blocks
+from .config import build_narrative_generator_language_config
 from .prompt import build_narrative_generator_prompt
 
 
@@ -44,7 +44,7 @@ class NarrativeGeneratorAction(StepAction[NarrativeGenChunk, NarrativeFrame]):
             theme=chunk.theme,
             level_details=curriculum.level_details,
             lesson_blocks=chunk.lesson_blocks,
-            canonical_language=language_config.canonical_language,
+            canonical_language=step_config.canonical_language,
             seed_blocks=provided,
         )
         result = config.runtime.call_llm(prompt)
@@ -53,7 +53,7 @@ class NarrativeGeneratorAction(StepAction[NarrativeGenChunk, NarrativeFrame]):
             for block in result.get("blocks", [])
             if isinstance(block, dict)
         ]
-        defaults = fallback_default_blocks(
+        defaults = step_config.default_block_builder(
             chunk.theme,
             curriculum.level_details,
             chunk.lesson_blocks,

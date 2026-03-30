@@ -219,13 +219,28 @@ class SelectedVocabSet:
 
 
 @dataclass
-class RetrievedMaterialArtifact(SelectedVocabSet):
+class VocabEnhancementArtifact(SelectedVocabSet):
+    """Typed output of ``VocabEnhancementStep``.
+
+    This keeps the selected-vocab predecessor artifact visible while adding the
+    richer noun/verb practice payload needed by later storage and persistence
+    steps.
+
+    Context fields: ``LessonContext.noun_items``, ``LessonContext.verb_items``
+    """
+
+    noun_items: list[GeneralItem]
+    verb_items: list[GeneralItem]
+
+
+@dataclass
+class RetrievedMaterialArtifact(VocabEnhancementArtifact):
     """Typed output of ``RetrieveLessonMaterialStep``.
 
     Retrieval is an alternate early producer of lesson vocab and other seed
-    material. This artifact intentionally extends ``SelectedVocabSet`` so the
-    retrieval path converges on the same successor-side vocabulary layer that
-    later generation steps use.
+    material. This artifact intentionally extends
+    ``VocabEnhancementArtifact`` so the retrieval path converges on the same
+    successor-side enriched vocabulary layer that later generation steps use.
 
     Context fields: ``LessonContext.retrieval_result``, ``LessonContext.nouns``,
     ``LessonContext.verbs``, ``LessonContext.noun_items``,
@@ -233,8 +248,6 @@ class RetrievedMaterialArtifact(SelectedVocabSet):
     ``LessonContext.selected_grammar``
     """
 
-    noun_items: list[GeneralItem]
-    verb_items: list[GeneralItem]
     sentences: list[Sentence]
     selected_grammar: list[GrammarItem]
     retrieval_result: RetrievalResult

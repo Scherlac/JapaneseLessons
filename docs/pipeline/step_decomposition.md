@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Date:** 2026-03-29  
-**Migrated steps:** `retrieve_material`, `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `select_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`, `register_lesson`, `persist_content`
+**Migrated steps:** `retrieve_material`, `generate_sentences`, `grammar_select`, `vocab_enhancement`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `select_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`, `register_lesson`, `persist_content`
 
 ---
 
@@ -125,8 +125,7 @@ class ItemBatch(Generic[T]):
     items: list[T]
 ```
 
-Example steps: `noun_practice` (25-item batches), `verb_practice` (20-item batches),
-`review_sentences` (30-item batches).
+Example steps: `review_sentences` (30-item batches).
 
 #### Composite chunk types — when one action needs more than one input
 
@@ -237,8 +236,7 @@ for custom chunk types.
 | `generate_sentences` | `BlockChunk` | one LLM call per lesson block |
 | `retrieve_material` | `RetrieveMaterialRequest` | single retrieval query producing a typed retrieval seed artifact |
 | `grammar_select` | `GrammarSelectChunk` | single LLM call + pure post-processing |
-| `noun_practice` | `NounPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×25 |
-| `verb_practice` | `VerbPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×20 |
+| `vocab_enhancement` | `VocabEnhancementRequest(SelectedVocabSet)` | merged noun/verb enrichment with typed successor artifact |
 | `select_vocab` | `SelectVocabRequest` | single vocab selection pass producing a typed successor artifact |
 | `register_lesson` | `RegisterLessonRequest` | single storage write producing a typed registration artifact |
 | `compile_assets` | `AssetCompileRequest` | single render compilation producing a typed successor artifact |
@@ -282,21 +280,33 @@ Action:  one call_llm + deterministic extension + block slicing
 accessible to both the action (for post-processing) and the step (for `build_chunks`,
 which needs `_project_grammar` to compute the unlocked set before the LLM call).
 
-### `noun_practice` / `verb_practice` — batched enrichment (`ItemBatch`)
+### `vocab_enhancement` — merged noun/verb enrichment after `select_vocab`
 
-The reference for steps that call the LLM in fixed-size batches over a flat list
-of items. `NounPracticeBatch` and `VerbPracticeBatch` extend `ItemBatch[GeneralItem]`
-with `lesson_number` — an extra field that cannot be carried in `ActionConfig` alone
-because it depends on curriculum state at execution time.
+This generalizes the former noun and verb practice steps into one typed
+successor of `SelectedVocabSet`. `VocabEnhancementRequest` keeps the selected
+vocab artifact visible while carrying the lesson ordinal and the set of parts
+that still need enrichment.
+
+`VocabEnhancementAction` performs noun and verb enrichment through shared batch
+helpers and emits `VocabEnhancementArtifact`, which becomes the visible
+predecessor artifact for `RegisterLessonStep`.
 
 ```
-Input:   NounPracticeBatch / VerbPracticeBatch  (up to 25 / 20 items + lesson_number)
-Output:  list[GeneralItem]  (enriched items for the batch)
-Action:  one call_llm per batch chunk
+SelectVocabStep
+    Output:        SelectedVocabSet     (vocab + nouns + verbs)
+
+VocabEnhancementStep
+    Input chunk:   VocabEnhancementRequest   (SelectedVocabSet + lesson_number + pending parts)
+    Output:        VocabEnhancementArtifact  (noun_items + verb_items)
+    Action:        noun and verb enrichment via shared batch helpers
+
+RegisterLessonStep
+    Input chunk:   RegisterLessonRequest     (VocabEnhancementArtifact + grammar state)
 ```
 
-`merge_outputs` concatenates all batch outputs, applies phase + block_index
-assignment, and falls back to the raw input items when the LLM returns nothing.
+Compatibility note: `NounPracticeStep` and `VerbPracticeStep` remain as thin
+wrappers over the merged implementation so existing imports and tests continue
+to work while the main pipeline uses `VocabEnhancementStep`.
 
 ### `select_vocab` — bridge from `VocabFile` to grammar selection
 
@@ -327,14 +337,15 @@ GrammarSelectStep
 This migrates the retrieval branch into the same action-step pattern and gives
 it a typed output artifact rather than a large opaque context mutation.
 
-`RetrievedMaterialArtifact` extends `SelectedVocabSet`, so the retrieval path
-converges on the same vocabulary-layer semantics as `select_vocab` while also
-carrying retrieved sentences, grammar, and the retrieval trace envelope.
+`RetrievedMaterialArtifact` extends `VocabEnhancementArtifact`, so the retrieval
+path converges on the same enriched-vocabulary layer used after
+`vocab_enhancement` while also carrying retrieved sentences, grammar, and the
+retrieval trace envelope.
 
 ```
 RetrieveLessonMaterialStep
     Input chunk:   RetrieveMaterialRequest   (theme + query filters + requested language)
-    Output:        RetrievedMaterialArtifact (SelectedVocabSet + retrieved sentences + grammar + trace)
+    Output:        RetrievedMaterialArtifact (VocabEnhancementArtifact + retrieved sentences + grammar + trace)
     Action:        one retrieval query + deterministic coverage gate + item conversion
 ```
 
@@ -432,14 +443,14 @@ This opens the storage-side typed chain. `RegisterLessonAction` emits a
 `LessonRegistrationArtifact` that carries the stable lesson identity and
 creation timestamp needed by content persistence.
 
-`RegisterLessonRequest` is still a composite request because lesson
-registration depends on multiple finalized inputs, but the output is now a
-stable artifact that a later `PersistContentStep` migration can consume
-directly.
+`RegisterLessonRequest` now extends `VocabEnhancementArtifact`, keeping the
+merged enrichment artifact visible even though lesson registration also depends
+on grammar identifiers and count summaries. The output remains a stable
+artifact that `PersistContentStep` consumes directly.
 
 ```
 RegisterLessonStep
-    Input chunk:   RegisterLessonRequest   (theme + nouns + verbs + grammar + counts)
+    Input chunk:   RegisterLessonRequest   (VocabEnhancementArtifact + grammar + counts)
     Output:        LessonRegistrationArtifact  (lesson_id + created_at + curriculum)
     Action:        one curriculum update + save
 
@@ -514,10 +525,12 @@ current typed connections.
 | Producing step | Artifact type | Consuming step |
 |----------------|---------------|----------------|
 | `NarrativeGeneratorStep` | `NarrativeFrame` | `ExtractNarrativeVocabStep` |
-| `RetrieveLessonMaterialStep` | `RetrievedMaterialArtifact` (extends `SelectedVocabSet`) | Later generation steps via seeded vocab/sentence/grammar state |
+| `RetrieveLessonMaterialStep` | `RetrievedMaterialArtifact` (extends `VocabEnhancementArtifact`) | Later generation steps via seeded vocab/sentence/grammar state |
 | `ExtractNarrativeVocabStep` | `NarrativeVocabPlan` | `GenerateNarrativeVocabStep` |
 | `GenerateNarrativeVocabStep` | `VocabFile` (via `SelectVocabRequest`) | `SelectVocabStep` |
 | `SelectVocabStep` | `SelectedVocabSet` | `GrammarSelectStep` |
+| `SelectVocabStep` | `SelectedVocabSet` | `VocabEnhancementStep` |
+| `VocabEnhancementStep` | `VocabEnhancementArtifact` | `RegisterLessonStep` |
 | `NarrativeGrammarStep` | `Sentence` (via `SentenceReviewBatch`) | `ReviewSentencesStep` |
 | `RegisterLessonStep` | `LessonRegistrationArtifact` | `PersistContentStep` |
 | `CompileAssetsStep` | `CompiledItemSequence` | `CompileTouchesStep` |
@@ -597,8 +610,7 @@ Steps ordered by iteration pattern clarity and migration effort.
 | Step | Chunk type | LLM calls | Status |
 |------|-----------|-----------|--------|
 | `generate_sentences` | `BlockChunk` | 1 per block | **done** |
-| `noun_practice` | `NounPracticeBatch(ItemBatch)` | batched ×25 | **done** |
-| `verb_practice` | `VerbPracticeBatch(ItemBatch)` | batched ×20 | **done** |
+| `vocab_enhancement` | `VocabEnhancementRequest` ← from `select_vocab` | merged batched noun/verb enrichment | **done** — successor step; emits `VocabEnhancementArtifact` for `register_lesson` |
 | `grammar_select` | `GrammarSelectChunk` | 1 | **done** |
 | `narrative_generator` | `NarrativeGenChunk` | 0–1 | **done** — emits `NarrativeFrame` |
 | `extract_narrative_vocab` | `NarrativeFrame` ← from `narrative_generator` | 1 | **done** — emits `NarrativeVocabPlan` |
@@ -610,6 +622,6 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `render_video` | `RenderVideoRequest(TouchSequence)` ← from `compile_touches` | 1 sink render call | **done** — successor step; chunk type preserves `TouchSequence` as the predecessor artifact |
 | `save_report` | `SaveReportRequest(RenderedVideoArtifact)` ← from `render_video` | 1 sink write | **done** — successor step; chunk type preserves `RenderedVideoArtifact` as the predecessor artifact |
 | `generate_narrative_vocab` | `ItemBatch[str]` | batched ×60 | not started |
-| `select_vocab` | `SelectVocabRequest` ← from `generate_narrative_vocab` | conditional vocab load + gap-fill | **done** — bridge step; emits `SelectedVocabSet` for `grammar_select` |
-| `retrieve_material` | `RetrieveMaterialRequest` | single query | **done** — predecessor step; emits `RetrievedMaterialArtifact` as an alternate early producer of `SelectedVocabSet`-compatible data |
+| `select_vocab` | `SelectVocabRequest` ← from `generate_narrative_vocab` | conditional vocab load + gap-fill | **done** — bridge step; emits `SelectedVocabSet` for `grammar_select` and `vocab_enhancement` |
+| `retrieve_material` | `RetrieveMaterialRequest` | single query | **done** — predecessor step; emits `RetrievedMaterialArtifact` as an alternate early producer of `VocabEnhancementArtifact`-compatible data |
 | `persist_content` | `PersistContentRequest` ← from `register_lesson` | storage only | **done** — successor step; request preserves `LessonRegistrationArtifact` as the predecessor artifact |

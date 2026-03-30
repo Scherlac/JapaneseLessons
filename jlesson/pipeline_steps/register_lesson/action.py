@@ -5,16 +5,14 @@ from datetime import datetime, timezone
 
 from jlesson.curriculum import add_lesson, complete_lesson
 
-from ..pipeline_core import ActionConfig, LessonRegistrationArtifact, StepAction
+from ..pipeline_core import ActionConfig, LessonRegistrationArtifact, StepAction, VocabEnhancementArtifact
 
 
 @dataclass
-class RegisterLessonRequest:
+class RegisterLessonRequest(VocabEnhancementArtifact):
     """Composite storage request for lesson registration."""
 
     theme: str
-    nouns: list[str]
-    verbs: list[str]
     grammar_ids: list[str]
     block_grammar_ids: list[list[str]]
     items_count: int
@@ -30,8 +28,8 @@ class RegisterLessonAction(StepAction[RegisterLessonRequest, LessonRegistrationA
             curriculum,
             title=f"Lesson {lesson_number}: {chunk.theme.title()}",
             theme=chunk.theme,
-            nouns=chunk.nouns,
-            verbs=chunk.verbs,
+            nouns=[item.source.display_text for item in chunk.nouns],
+            verbs=[item.source.display_text for item in chunk.verbs],
             grammar_ids=chunk.grammar_ids,
             items_count=chunk.items_count,
         )
