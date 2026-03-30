@@ -11,6 +11,7 @@ import pytest
 from pathlib import Path
 from PIL import Image
 
+from jlesson.models import GeneralItem, Phase, Touch, TouchIntent, TouchType
 from jlesson.video.cards import CardRenderer, create_renderer
 
 
@@ -55,121 +56,92 @@ class TestCardRendererInit:
         assert isinstance(r, CardRenderer)
         assert r.bg_color == "#000000"
 
+    def test_wrap_text_breaks_long_spaced_text(self, renderer):
+        wrapped = renderer._wrap_text_to_width(
+            "This is a deliberately long source sentence that should wrap before it reaches the edge of the card.",
+            renderer.fonts["en_large"],
+            420,
+        )
+        assert "\n" in wrapped
+
+    def test_wrap_text_breaks_long_unspaced_text(self, renderer):
+        wrapped = renderer._wrap_text_to_width(
+            "これはとても長い日本語の文章で自動改行が必要ですこれはとても長い日本語の文章で自動改行が必要です",
+            renderer.fonts["jp_medium"],
+            420,
+        )
+        assert "\n" in wrapped
+
 
 # ─────────────────────────────────────────────────────────────────────────────
-# render_introduce_card
+# render_card
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestRenderIntroduceCard:
+class TestRenderCard:
     def test_returns_pil_image(self, renderer):
-        img = renderer.render_introduce_card("water", "水", "みず", "mizu", "1/30")
+        img = renderer.render_card(_make_item(), touch=None)
         assert isinstance(img, Image.Image)
 
     def test_correct_size(self, renderer):
-        img = renderer.render_introduce_card("water", "水", "みず", "mizu", "1/30")
+        img = renderer.render_card(_make_item(), touch=None)
         assert img.size == (1920, 1080)
 
     def test_rgb_mode(self, renderer):
-        img = renderer.render_introduce_card("water", "水", "みず", "mizu", "1/30")
+        img = renderer.render_card(_make_item(), touch=None)
         assert img.mode == "RGB"
 
     def test_background_color_applied(self, renderer):
-        img = renderer.render_introduce_card("water", "水", "みず", "mizu", "1/30")
-        # Top-left corner should be the background color
+        img = renderer.render_card(_make_item(), touch=None)
         bg_rgb = _hex_to_rgb(renderer.bg_color)
         assert img.getpixel((0, 0)) == bg_rgb
 
     def test_progress_zero_no_accent_bar(self, renderer):
-        img = renderer.render_introduce_card("water", "水", "みず", "mizu", "1/30", progress=0.0)
-        # Sample the middle of the progress bar on the right half — should not be accent color
+        img = renderer.render_card(_make_item(), touch=None, progress=0.0)
         accent_rgb = _hex_to_rgb(renderer.accent_color)
-        bar_y = renderer.height - 80 + 3  # centre of 6px bar
-        bar_x = renderer.width // 2 + 200  # right half
+        bar_y = renderer.height - 80 + 3
+        bar_x = renderer.width // 2 + 200
         assert img.getpixel((bar_x, bar_y)) != accent_rgb
 
-    def test_progress_full_has_accent_bar(self, renderer):
-        img = renderer.render_introduce_card("water", "水", "みず", "mizu", "1/30", progress=1.0)
-        accent_rgb = _hex_to_rgb(renderer.accent_color)
-        bar_y = renderer.height - 80 + 3
-        bar_x = renderer.width // 2  # middle — definitely filled at progress=1.0
-        assert img.getpixel((bar_x, bar_y)) == accent_rgb
-
-    def test_unicode_japanese_does_not_crash(self, renderer):
-        # Hiragana, katakana, kanji mix
-        renderer.render_introduce_card("to eat", "食べます", "たべます", "tabemasu", "2/30")
-
-    def test_long_english_does_not_crash(self, renderer):
-        renderer.render_introduce_card(
-            "This is a very long English sentence that should still render without error.",
-            "長い英語のテスト", "ながいえいごのてすと", "Nagai eigo no tesuto", "3/30",
-        )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# render_recall_card
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestRenderRecallCard:
-    def test_returns_pil_image(self, renderer):
-        img = renderer.render_recall_card("水", "みず", "mizu", "water", "5/30")
-        assert isinstance(img, Image.Image)
-
-    def test_correct_size(self, renderer):
-        img = renderer.render_recall_card("水", "みず", "mizu", "water", "5/30")
-        assert img.size == (1920, 1080)
-
-    def test_rgb_mode(self, renderer):
-        img = renderer.render_recall_card("水", "みず", "mizu", "water", "5/30")
-        assert img.mode == "RGB"
-
-    def test_background_color_applied(self, renderer):
-        img = renderer.render_recall_card("水", "みず", "mizu", "water", "5/30")
-        bg_rgb = _hex_to_rgb(renderer.bg_color)
-        assert img.getpixel((0, 0)) == bg_rgb
-
-    def test_unicode_does_not_crash(self, renderer):
-        renderer.render_recall_card("食べます", "たべます", "tabemasu", "to eat", "6/30")
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# render_translate_card
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestRenderTranslateCard:
-    def test_returns_pil_image(self, renderer):
-        img = renderer.render_translate_card(
-            "I eat fish.", "魚を食べます。", "Sakana o tabemasu.",
-            "I / present / affirmative", "10/30",
-        )
-        assert isinstance(img, Image.Image)
-
-    def test_correct_size(self, renderer):
-        img = renderer.render_translate_card(
-            "I eat fish.", "魚を食べます。", "Sakana o tabemasu.",
-            "I / present / affirmative", "10/30",
-        )
-        assert img.size == (1920, 1080)
-
-    def test_rgb_mode(self, renderer):
-        img = renderer.render_translate_card(
-            "I eat fish.", "魚を食べます。", "Sakana o tabemasu.",
-            "I / present / affirmative", "10/30",
-        )
-        assert img.mode == "RGB"
-
     def test_progress_partial_fills_left_half(self, renderer):
-        img = renderer.render_translate_card(
-            "I eat fish.", "魚を食べます。", "Sakana o tabemasu.",
-            "context", "10/30", progress=0.5,
-        )
+        img = renderer.render_card(_make_item(), touch=None, progress=0.5)
         accent_rgb = _hex_to_rgb(renderer.accent_color)
         bar_y = renderer.height - 80 + 3
-        # Left quarter of bar should be filled
         bar_x_left = (renderer.width - 800) // 2 + 50
         assert img.getpixel((bar_x_left, bar_y)) == accent_rgb
-        # Right quarter should NOT be filled
         bar_x_right = (renderer.width - 800) // 2 + 750
         assert img.getpixel((bar_x_right, bar_y)) != accent_rgb
+
+    @pytest.mark.parametrize(
+        "intent",
+        [
+            TouchIntent.INTRODUCE,
+            TouchIntent.RECALL,
+            TouchIntent.TRANSLATE,
+            TouchIntent.CONFIRM,
+            TouchIntent.UNKNOWN,
+        ],
+    )
+    def test_supported_intents_do_not_crash(self, renderer, intent):
+        renderer.render_card(_make_item(), touch=_make_touch(intent))
+
+    def test_long_text_does_not_crash(self, renderer):
+        renderer.render_card(
+            _make_item(
+                source="This is a very long English sentence that should still render without error.",
+                target="これはかなり長い日本語のテキストで、描画前に幅を測って自動改行しないとカード領域をはみ出してしまいます。",
+                pronunciation="Kore wa kanari nagai nihongo no tekisuto de, byouga mae ni haba o hatte jidou kaigyou shinai to kaado ryouiki o hamidashite shimaimasu.",
+            ),
+            touch=None,
+            label="3/30",
+        )
+
+    def test_long_extra_field_does_not_crash(self, renderer):
+        item = _make_item(source="water", target="水", pronunciation="みず")
+        item.target.extra["note"] = (
+            "This is an extra field with enough content to require wrapping when it is drawn "
+            "under the main target block."
+        )
+        renderer.render_card(item, touch=None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -178,19 +150,19 @@ class TestRenderTranslateCard:
 
 class TestSaveCard:
     def test_creates_file(self, renderer, tmp_path):
-        img = renderer.render_introduce_card("fish", "魚", "さかな", "sakana", "1/30")
+        img = renderer.render_card(_make_item(source="fish", target="魚", pronunciation="さかな"), touch=None)
         out = tmp_path / "card_001.png"
         renderer.save_card(img, out)
         assert out.exists()
 
     def test_file_is_nonzero(self, renderer, tmp_path):
-        img = renderer.render_introduce_card("fish", "魚", "さかな", "sakana", "1/30")
+        img = renderer.render_card(_make_item(source="fish", target="魚", pronunciation="さかな"), touch=None)
         out = tmp_path / "card_001.png"
         renderer.save_card(img, out)
         assert out.stat().st_size > 0
 
     def test_saved_file_is_readable_png(self, renderer, tmp_path):
-        img = renderer.render_introduce_card("fish", "魚", "さかな", "sakana", "1/30")
+        img = renderer.render_card(_make_item(source="fish", target="魚", pronunciation="さかな"), touch=None)
         out = tmp_path / "card_001.png"
         renderer.save_card(img, out)
         loaded = Image.open(out)
@@ -199,108 +171,18 @@ class TestSaveCard:
 
     def test_creates_parent_directories(self, renderer, tmp_path):
         out = tmp_path / "subdir" / "deep" / "card.png"
-        img = renderer.render_introduce_card("test", "テスト", "てすと", "tesuto", "1/1")
+        img = renderer.render_card(_make_item(source="test", target="テスト", pronunciation="てすと"), touch=None)
         renderer.save_card(img, out)
         assert out.exists()
 
-    def test_save_all_card_types(self, renderer, tmp_path):
-        """Smoke-test: all three card types can be saved."""
-        introduce = renderer.render_introduce_card("cat", "猫", "ねこ", "neko", "1/30")
-        recall = renderer.render_recall_card("猫", "ねこ", "neko", "cat", "2/30")
-        translate = renderer.render_translate_card(
-            "I see a cat.", "猫を見ます。", "Neko o mimasu.", "context", "3/30"
-        )
-        for name, card in [("introduce", introduce), ("recall", recall), ("translate", translate)]:
-            out = tmp_path / f"{name}.png"
-            renderer.save_card(card, out)
-            assert out.exists(), f"{name} card was not saved"
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# render_en_card (touch system)
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestRenderEnCard:
-    def test_returns_pil_image(self, renderer):
-        img = renderer.render_en_card("water")
-        assert isinstance(img, Image.Image)
-
-    def test_correct_size(self, renderer):
-        img = renderer.render_en_card("water")
-        assert img.size == (1920, 1080)
-
-    def test_rgb_mode(self, renderer):
-        assert renderer.render_en_card("cat").mode == "RGB"
-
-    def test_background_color(self, renderer):
-        img = renderer.render_en_card("dog")
-        assert img.getpixel((0, 0)) == _hex_to_rgb(renderer.bg_color)
-
-    def test_with_label(self, renderer):
-        img = renderer.render_en_card("cat", label="[INTRODUCE] 1/30")
-        assert isinstance(img, Image.Image)
-
-    def test_with_progress(self, renderer):
-        img = renderer.render_en_card("cat", progress=0.5)
-        assert isinstance(img, Image.Image)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# render_jp_card (touch system)
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestRenderJpCard:
-    def test_returns_pil_image(self, renderer):
-        img = renderer.render_jp_card("水")
-        assert isinstance(img, Image.Image)
-
-    def test_correct_size(self, renderer):
-        img = renderer.render_jp_card("猫")
-        assert img.size == (1920, 1080)
-
-    def test_with_kana_and_romaji(self, renderer):
-        img = renderer.render_jp_card("水", kana="みず", romaji="mizu")
-        assert isinstance(img, Image.Image)
-
-    def test_with_romaji_only(self, renderer):
-        img = renderer.render_jp_card("水", romaji="mizu")
-        assert isinstance(img, Image.Image)
-
-    def test_background_color(self, renderer):
-        img = renderer.render_jp_card("犬")
-        assert img.getpixel((0, 0)) == _hex_to_rgb(renderer.bg_color)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# render_bilingual_card (touch system)
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestRenderBilingualCard:
-    def test_returns_pil_image(self, renderer):
-        img = renderer.render_bilingual_card("water", "水")
-        assert isinstance(img, Image.Image)
-
-    def test_correct_size(self, renderer):
-        img = renderer.render_bilingual_card("cat", "猫")
-        assert img.size == (1920, 1080)
-
-    def test_with_all_fields(self, renderer):
-        img = renderer.render_bilingual_card(
-            "water", "水", kana="みず", romaji="mizu",
-            label="[LISTEN] 1/54", progress=0.3,
-        )
-        assert isinstance(img, Image.Image)
-
-    def test_background_color(self, renderer):
-        img = renderer.render_bilingual_card("dog", "犬")
-        assert img.getpixel((0, 0)) == _hex_to_rgb(renderer.bg_color)
-
-    def test_save_all_touch_card_types(self, renderer, tmp_path):
-        """Smoke-test: all three touch card types can be saved."""
-        en = renderer.render_en_card("cat")
-        jp = renderer.render_jp_card("猫", kana="ねこ", romaji="neko")
-        bi = renderer.render_bilingual_card("cat", "猫", kana="ねこ", romaji="neko")
-        for name, card in [("en", en), ("jp", jp), ("bilingual", bi)]:
+    def test_save_cards_for_multiple_intents(self, renderer, tmp_path):
+        """Smoke-test: generic cards for multiple intents can be saved."""
+        cards = [
+            ("introduce", renderer.render_card(_make_item(source="cat", target="猫", pronunciation="ねこ"), _make_touch(TouchIntent.INTRODUCE))),
+            ("recall", renderer.render_card(_make_item(source="cat", target="猫", pronunciation="ねこ"), _make_touch(TouchIntent.RECALL))),
+            ("translate", renderer.render_card(_make_item(source="I see a cat.", target="猫を見ます。", pronunciation="Neko o mimasu."), _make_touch(TouchIntent.TRANSLATE))),
+        ]
+        for name, card in cards:
             out = tmp_path / f"{name}.png"
             renderer.save_card(card, out)
             assert out.exists(), f"{name} card was not saved"
@@ -314,3 +196,31 @@ def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
     """Convert '#rrggbb' to (r, g, b) tuple."""
     h = hex_color.lstrip("#")
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+
+def _make_item(
+    source: str = "water",
+    target: str = "水",
+    pronunciation: str = "みず",
+) -> GeneralItem:
+    return GeneralItem.model_validate(
+        {
+            "source": {"display_text": source},
+            "target": {
+                "display_text": target,
+                "pronunciation": pronunciation,
+            },
+        }
+    )
+
+
+def _make_touch(intent: TouchIntent) -> Touch:
+    return Touch.model_validate(
+        {
+            "touch_index": 1,
+            "phase": Phase.NOUNS,
+            "item": _make_item().model_dump(),
+            "touch_type": TouchType.SOURCE_TARGET,
+            "intent": intent,
+        }
+    )

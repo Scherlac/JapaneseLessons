@@ -23,6 +23,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from jlesson.models import GeneralItem
 from jlesson.video.builder import VideoBuilder, create_video_builder
 
 
@@ -46,6 +47,19 @@ def _ffmpeg_available() -> bool:
         return result.returncode == 0
     except Exception:
         return False
+
+
+def _make_card_image(renderer, source: str = "fish", target: str = "魚", pronunciation: str = "さかな", progress: float = 0.0):
+    item = GeneralItem.model_validate(
+        {
+            "source": {"display_text": source},
+            "target": {
+                "display_text": target,
+                "pronunciation": pronunciation,
+            },
+        }
+    )
+    return renderer.render_card(item, touch=None, progress=progress)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -170,7 +184,7 @@ class TestCreateClip:
         from jlesson.video.cards import CardRenderer
 
         renderer = CardRenderer()
-        img = renderer.render_introduce_card("fish", "魚", "さかな", "sakana", "1/1")
+        img = _make_card_image(renderer, source="fish", target="魚", pronunciation="さかな")
         card_path = tmp_path / "card.png"
         renderer.save_card(img, card_path)
 
@@ -182,7 +196,7 @@ class TestCreateClip:
         from jlesson.video.cards import CardRenderer
 
         renderer = CardRenderer()
-        img = renderer.render_introduce_card("cat", "猫", "ねこ", "neko", "1/1")
+        img = _make_card_image(renderer, source="cat", target="猫", pronunciation="ねこ")
         card_path = tmp_path / "card.png"
         renderer.save_card(img, card_path)
 
@@ -195,7 +209,7 @@ class TestCreateClip:
         from jlesson.video.cards import CardRenderer
 
         renderer = CardRenderer()
-        img = renderer.render_introduce_card("dog", "犬", "いぬ", "inu", "1/1")
+        img = _make_card_image(renderer, source="dog", target="犬", pronunciation="いぬ")
         card_path = tmp_path / "card.png"
         renderer.save_card(img, card_path)
 
@@ -215,7 +229,7 @@ class TestCreateMultiAudioClip:
     def _make_card(self, tmp_path):
         from jlesson.video.cards import CardRenderer
         renderer = CardRenderer()
-        img = renderer.render_en_card("hello")
+        img = _make_card_image(renderer, source="hello", target="こんにちは", pronunciation="konnichiwa")
         card_path = tmp_path / "card.png"
         renderer.save_card(img, card_path)
         return card_path
@@ -261,7 +275,7 @@ class TestVideoRenderIntegration:
         from jlesson.video.cards import CardRenderer
 
         renderer = CardRenderer()
-        img = renderer.render_introduce_card("water", "水", "みず", "mizu", "1/1", progress=0.5)
+        img = _make_card_image(renderer, source="water", target="水", pronunciation="みず", progress=0.5)
         card_path = tmp_path / "card_001.png"
         renderer.save_card(img, card_path)
 
@@ -287,7 +301,7 @@ class TestVideoRenderIntegration:
             ("cat",   "猫", "ねこ", "neko", "3/3"),
         ]
         for i, (en, jp, kana, rm, label) in enumerate(cards_data, 1):
-            img = renderer.render_introduce_card(en, jp, kana, rm, label, progress=i / 3)
+            img = _make_card_image(renderer, source=en, target=jp, pronunciation=kana, progress=i / 3)
             cp = tmp_path / f"card_{i:03d}.png"
             renderer.save_card(img, cp)
             clips.append(vb.create_clip(cp, audio_path=None, duration=1.0))

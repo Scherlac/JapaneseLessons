@@ -138,6 +138,7 @@ async def _render_video_async(
     from jlesson.video.tts_engine import create_engine
     from jlesson.video.cards import CardRenderer
     from jlesson.video.builder import VideoBuilder
+    from jlesson.models import GeneralItem
 
     cards_dir.mkdir(parents=True, exist_ok=True)
     audio_dir.mkdir(parents=True, exist_ok=True)
@@ -176,18 +177,18 @@ async def _render_video_async(
     print(f"  Rendering cards ({total} items)...")
     for i, item in enumerate(items):
         progress = (i + 1) / total
-        if item["step"] == "INTRODUCE":
-            card = card_renderer.render_introduce_card(
-                english=item["prompt"], japanese=item["reveal"],
-                kana="", romaji="",
-                step_label=item["counter"], progress=progress,
-            )
-        else:
-            card = card_renderer.render_translate_card(
-                english=item["prompt"], japanese=item["reveal"],
-                romaji="", context=item["phase"].lower(),
-                step_label=item["counter"], progress=progress,
-            )
+        card_item = GeneralItem.model_validate(
+            {
+                "source": {"display_text": item["prompt"]},
+                "target": {"display_text": item["reveal"]},
+            }
+        )
+        card = card_renderer.render_card(
+            item=card_item,
+            touch=None,
+            label=item["counter"],
+            progress=progress,
+        )
         card_renderer.save_card(card, cards_dir / f"{i+1:03d}.png")
 
     # Assemble video

@@ -6,7 +6,7 @@ Renders text cards for Japanese lesson videos using Pillow.
 """
 
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -108,7 +108,7 @@ class CardRenderer:
 
     def _draw_progress_bar(
         self,
-        draw: ImageDraw.Draw,
+        draw: ImageDraw.ImageDraw,
         y: int,
         progress: float,
         total_width: int = 800
@@ -130,6 +130,134 @@ class CardRenderer:
                 [x_start, y, filled_end, y + bar_height],
                 radius=3, fill=self.accent_color
             )
+
+    @staticmethod
+    def _measure_text_width(text: str, font: ImageFont.FreeTypeFont) -> float:
+        """Return the rendered width of a single line of text."""
+        if not text:
+            return 0.0
+        if hasattr(font, "getlength"):
+            return float(font.getlength(text))
+        bbox = font.getbbox(text)
+        return float(bbox[2] - bbox[0])
+
+    def _split_token_to_fit(
+        self,
+        token: str,
+        font: ImageFont.FreeTypeFont,
+        max_width: int,
+    ) -> list[str]:
+        """Split one long token into width-constrained chunks."""
+        if not token:
+            return [""]
+
+        chunks: list[str] = []
+        current = ""
+        for char in token:
+            candidate = f"{current}{char}"
+            if current and self._measure_text_width(candidate, font) > max_width:
+                chunks.append(current)
+                current = char
+            else:
+                current = candidate
+
+        if current:
+            chunks.append(current)
+        return chunks or [token]
+
+    def _wrap_text_to_width(
+        self,
+        text: str,
+        font: ImageFont.FreeTypeFont,
+        max_width: int,
+    ) -> str:
+        """Insert newlines so text fits within *max_width* pixels."""
+        if not text or max_width <= 0:
+            return text
+
+        wrapped_lines: list[str] = []
+        for paragraph in str(text).splitlines() or [str(text)]:
+            if not paragraph:
+                wrapped_lines.append("")
+                continue
+
+            if self._measure_text_width(paragraph, font) <= max_width:
+                wrapped_lines.append(paragraph)
+                continue
+
+            if any(char.isspace() for char in paragraph):
+                current = ""
+                for token in paragraph.split():
+                    parts = (
+                        self._split_token_to_fit(token, font, max_width)
+                        if self._measure_text_width(token, font) > max_width
+                        else [token]
+                    )
+                    for part in parts:
+                        candidate = part if not current else f"{current} {part}"
+                        if current and self._measure_text_width(candidate, font) > max_width:
+                            wrapped_lines.append(current)
+                            current = part
+                        else:
+                            current = candidate
+                if current:
+                    wrapped_lines.append(current)
+                continue
+
+            current = ""
+            for char in paragraph:
+                candidate = f"{current}{char}"
+                if current and self._measure_text_width(candidate, font) > max_width:
+                    wrapped_lines.append(current)
+                    current = char
+                else:
+                    current = candidate
+            if current:
+                wrapped_lines.append(current)
+
+        return "\n".join(wrapped_lines)
+
+    def _draw_text_block(
+        self,
+        draw: ImageDraw.ImageDraw,
+        cx: int,
+        y_top: int,
+        text: str,
+        font: ImageFont.FreeTypeFont,
+        fill: str,
+        max_width: int,
+        spacing: int | None = None,
+    ) -> int:
+        """Draw a centered multiline text block and return its bottom y."""
+        if not text:
+            return y_top
+
+        if spacing is None:
+            spacing_px = float(max(8, getattr(font, "size", 40) // 5))
+        else:
+            spacing_px = float(spacing)
+
+        wrapped = self._wrap_text_to_width(text, font, max_width)
+        bbox = draw.multiline_textbbox(
+            (0, 0),
+            wrapped,
+            font=font,
+            spacing=spacing_px,
+            align="center",
+        )
+        width = bbox[2] - bbox[0]
+        height = bbox[3] - bbox[1]
+        x = int(cx - (width / 2) - bbox[0])
+        y = int(y_top - bbox[1])
+        draw.multiline_text(
+            (x, y),
+            wrapped,
+            font=font,
+            fill=fill,
+            spacing=spacing_px,
+            align="center",
+        )
+        return int(y_top + height)
 
     def render_card(
         self,
@@ -162,13 +290,21 @@ class CardRenderer:
         if header:
             draw.text((cx, 60), header, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
 
+        divider_y = 400
         if intent.show_source():
-            # English word (prompt)
-            draw.text((cx, 300), item.source.display_text, font=self.source_fonts["large"],
-                    anchor="mm", fill=self.accent_color)
+            source_bottom = self._draw_text_block(
+                draw,
+                cx,
+                220,
+                item.source.display_text,
+                self.source_fonts["large"],
+                self.accent_color,
+                max_width=self.width - 420,
+            )
+            divider_y = max(divider_y, source_bottom + 50)
 
         # Divider
-        draw.line([(cx - 200, 400), (cx + 200, 400)], fill="#333333", width=2)
+        draw.line([(cx - 200, divider_y), (cx + 200, divider_y)], fill="#333333", width=2)
 
         if intent.show_target():
             extra_keys = (
@@ -178,7 +314,7 @@ class CardRenderer:
                 lang_cfg.target_card_extra_font_keys if lang_cfg else {}
             )
             self._draw_target_block(
-                draw, cx, 440, item,
+                draw, cx, divider_y + 40, item,
                 self.target_fonts, self.fonts,
                 extra_font_keys, extra_keys,
                 self.text_color, self.dim_color,
@@ -189,9 +325,9 @@ class CardRenderer:
 
         return img
 
-    @staticmethod
     def _draw_target_block(
-        draw: ImageDraw.Draw,
+        self,
+        draw: ImageDraw.ImageDraw,
         cx: int,
         y_top: int,
         item: GeneralItem,
@@ -217,27 +353,23 @@ class CardRenderer:
             Unrecognised or absent keys fall back to ``"en_small"``.
         """
 
-        def _draw_line(y: int, text: str, font, fill: str) -> int:
-            """Draw *text* centred at *cx*, top-aligned to *y*. Returns new y."""
-            if not text or font is None:
-                return y
-            bbox = font.getbbox(text)
-            h = bbox[3] - bbox[1]
-            draw.text((cx, y + h // 2), text, font=font, anchor="mm", fill=fill)
-            return y + h
-
         y = y_top
+        max_width = self.width - 320
 
         # 1. Main target display text (large)
         font_main = target_fonts.get("large")
         if font_main and item.target.display_text:
-            y = _draw_line(y, item.target.display_text, font_main, text_color)
+            y = self._draw_text_block(
+                draw, cx, y, item.target.display_text, font_main, text_color, max_width
+            )
             y += gap_after_main
 
         # 2. Pronunciation / romaji
         font_pron = target_fonts.get("medium", font_main)
         if font_pron and item.target.pronunciation:
-            y = _draw_line(y, item.target.pronunciation, font_pron, dim_color)
+            y = self._draw_text_block(
+                draw, cx, y, item.target.pronunciation, font_pron, dim_color, max_width
+            )
             y += gap_after_line
 
         # 3. Extra fields — each may have its own font
@@ -248,155 +380,12 @@ class CardRenderer:
             if val:
                 fk = extra_font_keys.get(key, "en_small")
                 font_extra = all_fonts.get(fk, _fallback)
-                y = _draw_line(y, str(val), font_extra, dim_color)
+                if font_extra is None:
+                    continue
+                y = self._draw_text_block(
+                    draw, cx, y, str(val), font_extra, dim_color, max_width
+                )
                 y += gap_after_line
-
-    # ── Convenience render methods ──────────────────────────────────────────
-
-    def render_introduce_card(
-        self,
-        english: str,
-        japanese: str,
-        kana: str,
-        romaji: str,
-        label: str,
-        progress: float = 0.0,
-    ) -> Image.Image:
-        """Introduce card: show English prompt with full Japanese reveal."""
-        img = Image.new("RGB", (self.width, self.height), self.bg_color)
-        draw = ImageDraw.Draw(img)
-        cx = self.width // 2
-        if label:
-            draw.text((cx, 60), label, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
-        draw.text((cx, 280), english, font=self.fonts["en_large"], anchor="mm", fill=self.accent_color)
-        draw.line([(cx - 200, 380), (cx + 200, 380)], fill="#333333", width=2)
-        draw.text((cx, 480), japanese, font=self.fonts["jp_large"], anchor="mm", fill=self.text_color)
-        if kana and kana != japanese:
-            draw.text((cx, 600), kana, font=self.fonts["jp_medium"], anchor="mm", fill=self.dim_color)
-        if romaji:
-            draw.text((cx, 700), romaji, font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color)
-        if progress > 0:
-            self._draw_progress_bar(draw, self.height - 80, progress)
-        return img
-
-    def render_recall_card(
-        self,
-        japanese: str,
-        kana: str,
-        romaji: str,
-        english: str,
-        label: str,
-        progress: float = 0.0,
-    ) -> Image.Image:
-        """Recall card: show Japanese prompt, English translation below."""
-        img = Image.new("RGB", (self.width, self.height), self.bg_color)
-        draw = ImageDraw.Draw(img)
-        cx = self.width // 2
-        if label:
-            draw.text((cx, 60), label, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
-        draw.text((cx, 280), japanese, font=self.fonts["jp_large"], anchor="mm", fill=self.accent_color)
-        if kana and kana != japanese:
-            draw.text((cx, 400), kana, font=self.fonts["jp_medium"], anchor="mm", fill=self.dim_color)
-        if romaji:
-            draw.text((cx, 480), romaji, font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color)
-        draw.line([(cx - 200, 560), (cx + 200, 560)], fill="#333333", width=2)
-        draw.text((cx, 650), english, font=self.fonts["en_large"], anchor="mm", fill=self.text_color)
-        if progress > 0:
-            self._draw_progress_bar(draw, self.height - 80, progress)
-        return img
-
-    def render_translate_card(
-        self,
-        english: str,
-        japanese: str,
-        romaji: str,
-        context: str,
-        label: str,
-        progress: float = 0.0,
-    ) -> Image.Image:
-        """Translate card: English sentence to translate into Japanese."""
-        img = Image.new("RGB", (self.width, self.height), self.bg_color)
-        draw = ImageDraw.Draw(img)
-        cx = self.width // 2
-        if label:
-            draw.text((cx, 60), label, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
-        if context:
-            draw.text((cx, 160), context, font=self.fonts["en_small"], anchor="mm", fill=self.dim_color)
-        draw.text((cx, 300), english, font=self.fonts["en_large"], anchor="mm", fill=self.accent_color)
-        draw.line([(cx - 200, 400), (cx + 200, 400)], fill="#333333", width=2)
-        draw.text((cx, 520), japanese, font=self.fonts["jp_large"], anchor="mm", fill=self.text_color)
-        if romaji:
-            draw.text((cx, 660), romaji, font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color)
-        if progress > 0:
-            self._draw_progress_bar(draw, self.height - 80, progress)
-        return img
-
-    def render_en_card(
-        self,
-        english: str,
-        label: str = "",
-        progress: float = 0.0,
-    ) -> Image.Image:
-        """Card showing only the English (source) word."""
-        img = Image.new("RGB", (self.width, self.height), self.bg_color)
-        draw = ImageDraw.Draw(img)
-        cx = self.width // 2
-        if label:
-            draw.text((cx, 60), label, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
-        draw.text((cx, self.height // 2), english, font=self.fonts["en_large"], anchor="mm", fill=self.accent_color)
-        if progress > 0:
-            self._draw_progress_bar(draw, self.height - 80, progress)
-        return img
-
-    def render_jp_card(
-        self,
-        japanese: str,
-        kana: str = "",
-        romaji: str = "",
-        label: str = "",
-        progress: float = 0.0,
-    ) -> Image.Image:
-        """Card showing only the Japanese (target) content."""
-        img = Image.new("RGB", (self.width, self.height), self.bg_color)
-        draw = ImageDraw.Draw(img)
-        cx = self.width // 2
-        if label:
-            draw.text((cx, 60), label, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
-        y = self.height // 2 - 80
-        draw.text((cx, y), japanese, font=self.fonts["jp_large"], anchor="mm", fill=self.text_color)
-        if kana and kana != japanese:
-            draw.text((cx, y + 140), kana, font=self.fonts["jp_medium"], anchor="mm", fill=self.dim_color)
-        if romaji:
-            draw.text((cx, y + 220), romaji, font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color)
-        if progress > 0:
-            self._draw_progress_bar(draw, self.height - 80, progress)
-        return img
-
-    def render_bilingual_card(
-        self,
-        english: str,
-        japanese: str,
-        kana: str = "",
-        romaji: str = "",
-        label: str = "",
-        progress: float = 0.0,
-    ) -> Image.Image:
-        """Card showing both English and Japanese content side-by-side vertically."""
-        img = Image.new("RGB", (self.width, self.height), self.bg_color)
-        draw = ImageDraw.Draw(img)
-        cx = self.width // 2
-        if label:
-            draw.text((cx, 60), label, font=self.fonts["label"], anchor="mm", fill=self.dim_color)
-        draw.text((cx, 240), english, font=self.fonts["en_large"], anchor="mm", fill=self.accent_color)
-        draw.line([(cx - 200, 340), (cx + 200, 340)], fill="#333333", width=2)
-        draw.text((cx, 460), japanese, font=self.fonts["jp_large"], anchor="mm", fill=self.text_color)
-        if kana and kana != japanese:
-            draw.text((cx, 580), kana, font=self.fonts["jp_medium"], anchor="mm", fill=self.dim_color)
-        if romaji:
-            draw.text((cx, 660), romaji, font=self.fonts["en_medium"], anchor="mm", fill=self.dim_color)
-        if progress > 0:
-            self._draw_progress_bar(draw, self.height - 80, progress)
-        return img
 
     def save_card(self, img: Image.Image, path: Path) -> None:
         """Save a rendered card image to disk.
