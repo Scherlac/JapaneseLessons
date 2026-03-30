@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Date:** 2026-03-29  
-**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `select_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`, `register_lesson`, `persist_content`
+**Migrated steps:** `retrieve_material`, `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `select_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`, `register_lesson`, `persist_content`
 
 ---
 
@@ -62,10 +62,10 @@ class RuntimeServices(Protocol):
     def update_cache(self, key: str, value: dict[str, Any]) -> None: ...
 ```
 
-**Migration status** — `call_llm`, `load_vocab`, `read_curriculum`,
-`write_curriculum`, `read_content`, and `write_content` are wired in
+**Migration status** — `call_llm`, `query_retrieval`, `load_vocab`,
+`read_curriculum`, `write_curriculum`, `read_content`, and `write_content` are wired in
 `ContextRuntime`.
-Retrieval and cache operations still raise `NotImplementedError` until the
+Cache operations still raise `NotImplementedError` until the
 corresponding steps are migrated.
 
 ---
@@ -79,6 +79,7 @@ Constructed once per `execute` call inside `ActionStep.execute`.
 class ContextRuntime:
     def __init__(self, ctx: LessonContext) -> None: ...
     def call_llm(self, prompt: str) -> dict[str, Any]: ...
+    def query_retrieval(self, theme: str, **kwargs) -> RetrievalResult: ...
     def load_vocab(self, theme: str, vocab_dir: Path | None = None) -> VocabFile: ...
     def read_curriculum(self) -> CurriculumData: ...
     def write_curriculum(self, data: CurriculumData) -> None: ...
@@ -234,6 +235,7 @@ for custom chunk types.
 | Step | Chunk type | Pattern |
 |------|-----------|--------|
 | `generate_sentences` | `BlockChunk` | one LLM call per lesson block |
+| `retrieve_material` | `RetrieveMaterialRequest` | single retrieval query producing a typed retrieval seed artifact |
 | `grammar_select` | `GrammarSelectChunk` | single LLM call + pure post-processing |
 | `noun_practice` | `NounPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×25 |
 | `verb_practice` | `VerbPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×20 |
@@ -318,6 +320,22 @@ SelectVocabStep
 
 GrammarSelectStep
     Input chunk:   GrammarSelectChunk    (SelectedVocabSet + grammar progression state)
+```
+
+### `retrieve_material` — alternate early producer of `SelectedVocabSet`
+
+This migrates the retrieval branch into the same action-step pattern and gives
+it a typed output artifact rather than a large opaque context mutation.
+
+`RetrievedMaterialArtifact` extends `SelectedVocabSet`, so the retrieval path
+converges on the same vocabulary-layer semantics as `select_vocab` while also
+carrying retrieved sentences, grammar, and the retrieval trace envelope.
+
+```
+RetrieveLessonMaterialStep
+    Input chunk:   RetrieveMaterialRequest   (theme + query filters + requested language)
+    Output:        RetrievedMaterialArtifact (SelectedVocabSet + retrieved sentences + grammar + trace)
+    Action:        one retrieval query + deterministic coverage gate + item conversion
 ```
 
 ### `compile_touches` — render-side successor artifact (`CompiledItemSequence`)
@@ -496,6 +514,7 @@ current typed connections.
 | Producing step | Artifact type | Consuming step |
 |----------------|---------------|----------------|
 | `NarrativeGeneratorStep` | `NarrativeFrame` | `ExtractNarrativeVocabStep` |
+| `RetrieveLessonMaterialStep` | `RetrievedMaterialArtifact` (extends `SelectedVocabSet`) | Later generation steps via seeded vocab/sentence/grammar state |
 | `ExtractNarrativeVocabStep` | `NarrativeVocabPlan` | `GenerateNarrativeVocabStep` |
 | `GenerateNarrativeVocabStep` | `VocabFile` (via `SelectVocabRequest`) | `SelectVocabStep` |
 | `SelectVocabStep` | `SelectedVocabSet` | `GrammarSelectStep` |
@@ -592,5 +611,5 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `save_report` | `SaveReportRequest(RenderedVideoArtifact)` ← from `render_video` | 1 sink write | **done** — successor step; chunk type preserves `RenderedVideoArtifact` as the predecessor artifact |
 | `generate_narrative_vocab` | `ItemBatch[str]` | batched ×60 | not started |
 | `select_vocab` | `SelectVocabRequest` ← from `generate_narrative_vocab` | conditional vocab load + gap-fill | **done** — bridge step; emits `SelectedVocabSet` for `grammar_select` |
-| `retrieve_material` | single query | retrieval only | not started (needs `query_retrieval` wired) |
+| `retrieve_material` | `RetrieveMaterialRequest` | single query | **done** — predecessor step; emits `RetrievedMaterialArtifact` as an alternate early producer of `SelectedVocabSet`-compatible data |
 | `persist_content` | `PersistContentRequest` ← from `register_lesson` | storage only | **done** — successor step; request preserves `LessonRegistrationArtifact` as the predecessor artifact |

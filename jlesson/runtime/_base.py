@@ -9,9 +9,16 @@ from jlesson.lesson_store import load_lesson_content, save_lesson_content
 from jlesson.llm_cache import ask_llm_cached
 from jlesson.llm_client import ask_llm_json_free
 from jlesson.models import LessonContent, VocabFile
+from jlesson.retrieval import get_retrieval_service
 from jlesson.vocab_generator import generate_vocab, VOCAB_DIR
 
 _DEFAULT_VOCAB_DIR = VOCAB_DIR
+
+
+def _resolve_retrieval_store_path(config: Any) -> Path:
+    if config.retrieval_store_path is not None:
+        return Path(config.retrieval_store_path)
+    return Path(__file__).parent.parent / "output" / "retrieval" / "material_index.json"
 
 
 class PipelineRuntime:
@@ -96,7 +103,13 @@ class ContextRuntime:
     # ── Retrieval / vector store ──────────────────────────────────────────────
 
     def query_retrieval(self, theme: str, **kwargs: Any) -> Any:
-        raise NotImplementedError("query_retrieval not yet migrated to ContextRuntime")
+        service = get_retrieval_service(
+            self._ctx.config.retrieval_enabled,
+            _resolve_retrieval_store_path(self._ctx.config),
+            backend=self._ctx.config.retrieval_backend,
+            embedding_model=self._ctx.config.retrieval_embedding_model,
+        )
+        return service.search(theme, **kwargs)
 
     def update_retrieval(self, theme: str, items: list[Any]) -> None:
         raise NotImplementedError("update_retrieval not yet migrated to ContextRuntime")
