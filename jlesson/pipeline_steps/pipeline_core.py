@@ -77,6 +77,7 @@ class LessonContext:
     narrative_vocab_terms: list[NarrativeVocabBlock] = field(default_factory=list)
     selected_grammar: list[GrammarItem] = field(default_factory=list)
     selected_grammar_blocks: list[list[GrammarItem]] = field(default_factory=list)
+    lesson_outline: LessonOutline | None = None
     sentences: list[Sentence] = field(default_factory=list)
     noun_items: list[GeneralItem] = field(default_factory=list)
     verb_items: list[GeneralItem] = field(default_factory=list)
@@ -200,6 +201,34 @@ class NarrativeVocabPlan:
     """
 
     blocks: list[NarrativeVocabBlock]
+
+
+# ---------------------------------------------------------------------------
+# Lesson outline typed artifacts
+# ---------------------------------------------------------------------------
+
+@dataclass
+class BlockOutline:
+    """Planned content for a single lesson block."""
+
+    block_index: int
+    grammar_ids: list[str]
+    noun_suggestions: list[str]
+    verb_suggestions: list[str]
+    sentence_count: int
+    narrative_summary: str
+
+
+@dataclass
+class LessonOutline:
+    """Full lesson plan produced by the two-pass lesson planner.
+
+    Context field: ``LessonContext.lesson_outline``
+    """
+
+    blocks: list[BlockOutline]
+    grammar_ids: list[str]
+    rationale: str = ""
 
 
 @dataclass

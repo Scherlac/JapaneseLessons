@@ -1,9 +1,11 @@
 from importlib import import_module
 
 from .pipeline_core import (
+	BlockOutline,
 	CompiledItemSequence,
 	LessonConfig,
 	LessonContext,
+	LessonOutline,
 	LessonRegistrationArtifact,
 	NarrativeFrame,
 	NarrativeVocabPlan,
@@ -26,6 +28,7 @@ _STEP_EXPORTS = {
 	"GenerateNarrativeVocabStep": ".generate_narrative_vocab",
 	"NarrativeGrammarStep": ".generate_sentences",
 	"GrammarSelectStep": ".grammar_select",
+	"LessonPlannerStep": ".lesson_planner",
 	"NarrativeGeneratorStep": ".narrative_generator",
 	"NounPracticeStep": ".vocab_enhancement",
 	"PersistContentStep": ".persist_content",
@@ -57,6 +60,7 @@ __all__ = [
 	"GenerateNarrativeVocabStep",
 	"NarrativeGrammarStep",
 	"GrammarSelectStep",
+	"LessonPlannerStep",
 	"NarrativeGeneratorStep",
 	"NounPracticeStep",
 	"PersistContentStep",

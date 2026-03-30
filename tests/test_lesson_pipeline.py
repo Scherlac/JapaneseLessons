@@ -168,7 +168,7 @@ def test_grammar_select_picks_valid_grammar(ctx):
     }
     with patch("jlesson.runtime.PipelineRuntime.ask_llm", return_value=mock_result):
         ctx = GrammarSelectStep().execute(ctx)
-    assert len(ctx.selected_grammar) == 1
+    assert len(ctx.selected_grammar) == ctx.config.grammar_points_per_lesson
     assert ctx.selected_grammar[0].id == "action_present_affirmative"
 
 
@@ -1369,6 +1369,11 @@ def test_run_pipeline_retrieval_miss_falls_back_to_vocab(config, tmp_path):
         "verbs": _VERBS[:2],
     }
     mock_grammar = {"selected_ids": ["action_present_affirmative"]}
+    mock_grammar_pass2 = {
+        "grammar_ids": ["action_present_affirmative"],
+        "rationale": "test",
+        "blocks": [{"block_index": 1, "grammar_ids": ["action_present_affirmative"], "noun_suggestions": [], "verb_suggestions": [], "sentence_count": 3, "narrative_summary": "test"}],
+    }
     mock_sentences = {"sentences": []}
     mock_nouns = {"noun_items": []}
     mock_verbs = {"verb_items": []}
@@ -1382,6 +1387,7 @@ def test_run_pipeline_retrieval_miss_falls_back_to_vocab(config, tmp_path):
                 mock_narrative_vocab,
                 mock_generate_narrative_vocab,
                 mock_grammar,
+                mock_grammar_pass2,
                 mock_sentences,
                 mock_nouns,
                 mock_verbs,

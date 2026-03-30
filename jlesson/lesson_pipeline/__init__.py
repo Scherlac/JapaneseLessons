@@ -8,7 +8,7 @@ Orchestrates the full lesson workflow through fifteen sequential steps:
     step 3   extract_narrative_vocab — extract block-level vocab targets
     step 4   generate_narrative_vocab — LLM: generate Japanese vocab from narrative terms
     step 5   select_vocab            — pick fresh nouns/verbs from the vocab file
-    step 6   grammar_select          — LLM: pick grammar points for this lesson
+    step 6   lesson_planner          — LLM: two-pass lesson outline (grammar + pacing)
     step 7   narrative_grammar       — LLM: produce block-aware practice sentences
     step 8   review_sentences        — LLM: rate naturalness, rewrite awkward sentences
     step 9   vocab_enhancement       — LLM: enrich nouns and verbs together
@@ -43,9 +43,10 @@ from jlesson.pipeline_steps import (
     CompileTouchesStep,
     ExtractNarrativeVocabStep,
     GenerateNarrativeVocabStep,
-    GrammarSelectStep,
+    GrammarSelectStep,  # kept for backward-compatible re-export
     LessonConfig,
     LessonContext,
+    LessonPlannerStep,
     NarrativeGeneratorStep,
     NounPracticeStep,
     PersistContentStep,
@@ -71,7 +72,8 @@ def _build_pipeline() -> list[PipelineStep]:
         ExtractNarrativeVocabStep(),
         GenerateNarrativeVocabStep(),
         SelectVocabStep(),
-        GrammarSelectStep(),
+        LessonPlannerStep(),  # two-pass lesson outline (replaces GrammarSelectStep)
+        # GrammarSelectStep(),
         NarrativeGrammarStep(),
         ReviewSentencesStep(),
         VocabEnhancementStep(),

@@ -439,7 +439,7 @@ UNLOCKED GRAMMAR STEPS (prerequisites met, not yet taught):
 {grammar_lines}
 
 TASK:
-Select between 1 and {selection_count} grammar IDs from the unlocked list that are:
+Select exactly {selection_count} grammar IDs from the unlocked list (or all available if fewer than {selection_count}) that are:
 1. Appropriate difficulty for lesson {lesson_number} (prefer lower level first)
 2. Compatible with the available vocabulary (can form natural practice sentences)
 3. If this is an early lesson, prefer level-1 steps before level-2

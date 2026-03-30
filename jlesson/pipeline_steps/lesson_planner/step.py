@@ -1,0 +1,67 @@
+from __future__ import annotations
+
+from .action import LessonPlannerAction, LessonPlannerChunk, LessonPlannerResult, _project_grammar
+from ..pipeline_core import ActionStep, LessonContext
+
+
+class LessonPlannerStep(ActionStep[LessonPlannerChunk, LessonPlannerResult]):
+    """Two-pass lesson planner: draft outline then revise with Fibonacci pacing."""
+
+    name = "lesson_planner"
+    description = "LLM: plan lesson outline (two-pass)"
+    _action = LessonPlannerAction()
+
+    @property
+    def action(self) -> LessonPlannerAction:
+        return self._action
+
+    def should_skip(self, ctx: LessonContext) -> bool:
+        if ctx.lesson_outline is not None:
+            self._log(ctx, "       using existing lesson outline")
+            return True
+        return False
+
+    def build_chunks(self, ctx: LessonContext) -> list[LessonPlannerChunk]:
+        language_config = ctx.language_config
+        assert language_config is not None
+        progression = list(language_config.grammar_progression)
+        covered = ctx.curriculum.covered_grammar_ids
+        unlocked = _project_grammar(progression, covered, ctx.config.grammar_points_per_lesson)
+        if not unlocked:
+            self._log(ctx, "       (grammar exhausted — cycling back from start)")
+            covered = []
+            unlocked = _project_grammar(progression, covered, ctx.config.grammar_points_per_lesson)
+        lesson_number = len(ctx.curriculum.lessons) + 1
+        return [
+            LessonPlannerChunk(
+                vocab=ctx.vocab,
+                nouns=list(ctx.nouns),
+                verbs=list(ctx.verbs),
+                block_index=0,
+                lesson_number=lesson_number,
+                lesson_blocks=ctx.config.lesson_blocks,
+                narrative_blocks=list(ctx.narrative_blocks),
+                progression=progression,
+                unlocked=unlocked,
+                covered_grammar_ids=covered,
+            )
+        ]
+
+    def merge_outputs(
+        self,
+        ctx: LessonContext,
+        outputs: list[LessonPlannerResult],
+    ) -> LessonContext:
+        result = outputs[0]
+        ctx.lesson_outline = result.outline
+        ctx.selected_grammar = result.selected_grammar
+        ctx.selected_grammar_blocks = result.selected_grammar_blocks
+        self._log(ctx, f"       selected : {[g.id for g in ctx.selected_grammar]}")
+        self._log(ctx, f"       rationale: {result.outline.rationale}")
+        if ctx.selected_grammar_blocks:
+            block_lines = "\n".join(
+                f"         block {i + 1:>2}: {[g.id for g in block]}"
+                for i, block in enumerate(ctx.selected_grammar_blocks)
+            )
+            self._log(ctx, f"       by block :\n{block_lines}")
+        return ctx
