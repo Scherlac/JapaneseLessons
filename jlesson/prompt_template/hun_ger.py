@@ -554,6 +554,19 @@ Rate each sentence on a 1-5 scale for naturalness and child-friendliness:
 
 IMPORTANT: sentences must be understandable to children aged 8-12!
 
+CONTENT SAFETY — MANDATORY:
+This material is used by learners of all ages and cultural backgrounds,
+including young children in conservative families. Every sentence MUST be:
+- Free of sexual, violent, or drug-related content
+- Free of double meanings, innuendo, or slang that could be read as offensive
+  in EITHER language (source or target)
+- Culturally neutral — no politics, religion, or stereotypes
+- If a word has an innocent meaning AND a slang/offensive meaning in either
+  language, rewrite the sentence to avoid that word entirely.
+  Example: Hungarian "meleg" (warm) is also slang — avoid it completely;
+  use "forró" or rephrase.
+A sentence that violates any of these rules scores 1 regardless of grammar.
+
 For any sentence scoring BELOW 3, provide a revised version that:
 - Uses the SAME grammar pattern (grammar_id stays the same)
 - Uses vocabulary from the available pool above (may swap nouns/verbs for better fit)
