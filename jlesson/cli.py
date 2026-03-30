@@ -419,6 +419,12 @@ def lesson_next(
     help="Output directory (default: output/).",
 )
 @click.option(
+    "--theme",
+    default="",
+    show_default=False,
+    help="Theme subdirectory used when the lesson was generated (e.g. benjamin_blumchen).",
+)
+@click.option(
     "--profile",
     default="passive_video",
     show_default=True,
@@ -429,6 +435,7 @@ def lesson_next(
 def lesson_render(
     lesson_id: int,
     output_dir: str | None,
+    theme: str,
     profile: str,
     language: str,
 ) -> None:
@@ -439,6 +446,7 @@ def lesson_render(
         video_path = render_existing_lesson(
             lesson_id=lesson_id,
             output_dir=Path(output_dir) if output_dir else None,
+            theme=theme,
             profile=profile,
             language=language,
             verbose=True,

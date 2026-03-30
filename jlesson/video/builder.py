@@ -28,6 +28,25 @@ class VideoBuilder:
             fps: Frames per second for output video
         """
         self.fps = fps
+        self._ffmpeg_path = self._find_ffmpeg()
+
+    @staticmethod
+    def _find_ffmpeg() -> Optional[str]:
+        """Return the resolved ffmpeg executable path, or None if not found."""
+        import shutil
+        import subprocess
+        path = shutil.which("ffmpeg")
+        if path is None:
+            return None
+        try:
+            subprocess.run([path, "-version"], capture_output=True, check=True)
+            return path
+        except subprocess.CalledProcessError:
+            return None
+
+    @property
+    def _ffmpeg_available(self) -> bool:
+        return self._ffmpeg_path is not None
 
     def create_clip(
         self,
@@ -152,13 +171,15 @@ class VideoBuilder:
         # Ensure output directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if method == "ffmpeg":
+        if method == "ffmpeg" and self._ffmpeg_available:
             # Try FFmpeg concat with copy (much faster, no quality loss)
             success = self._build_video_ffmpeg(clips, output_path, codec, audio_codec)
             if success:
                 return
 
             print("FFmpeg method failed, falling back to MoviePy...")
+        elif method == "ffmpeg":
+            print("FFmpeg not found, falling back to MoviePy...")
 
         # Fallback to MoviePy (slower but more compatible)
         self._build_video_moviepy(clips, output_path, codec, audio_codec)
@@ -203,7 +224,7 @@ class VideoBuilder:
 
                 # FFmpeg concat with copy (no re-encoding)
                 cmd = [
-                    "ffmpeg",
+                    self._ffmpeg_path,
                     "-f", "concat",
                     "-safe", "0",
                     "-i", str(concat_list),

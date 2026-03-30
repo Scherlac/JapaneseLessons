@@ -98,6 +98,7 @@ def run_pipeline(config: LessonConfig) -> LessonContext:
 def render_existing_lesson(
     lesson_id: int,
     output_dir: Path | None = None,
+    theme: str = "",
     profile: str = "passive_video",
     language: str = "eng-jap",
     verbose: bool = True,
@@ -108,6 +109,7 @@ def render_existing_lesson(
     return _render_existing_lesson_impl(
         lesson_id=lesson_id,
         output_dir=output_dir,
+        theme=theme,
         profile=profile,
         language=language,
         verbose=verbose,
