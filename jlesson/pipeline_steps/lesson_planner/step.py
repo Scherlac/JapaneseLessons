@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections import Counter
+
 from .action import LessonPlannerAction, LessonPlannerChunk, LessonPlannerResult, _project_grammar
+from .prompt import GrammarCoverageInfo, fibonacci_stage_label
 from ..pipeline_core import ActionStep, LessonContext
 
 
@@ -31,6 +34,21 @@ class LessonPlannerStep(ActionStep[LessonPlannerChunk, LessonPlannerResult]):
             self._log(ctx, "       (grammar exhausted — cycling back from start)")
             covered = []
             unlocked = _project_grammar(progression, covered, ctx.config.grammar_points_per_lesson)
+
+        # Count how many completed lessons each grammar point appeared in
+        grammar_lesson_counts: Counter[str] = Counter()
+        for lesson in ctx.curriculum.lessons:
+            if lesson.status == "completed":
+                grammar_lesson_counts.update(lesson.grammar_ids)
+        covered_grammar = [
+            GrammarCoverageInfo(
+                grammar_id=gid,
+                lessons_seen=grammar_lesson_counts.get(gid, 0),
+                fibonacci_label=fibonacci_stage_label(grammar_lesson_counts.get(gid, 0)),
+            )
+            for gid in covered
+        ]
+
         lesson_number = len(ctx.curriculum.lessons) + 1
         return [
             LessonPlannerChunk(
@@ -44,6 +62,7 @@ class LessonPlannerStep(ActionStep[LessonPlannerChunk, LessonPlannerResult]):
                 progression=progression,
                 unlocked=unlocked,
                 covered_grammar_ids=covered,
+                covered_grammar=covered_grammar,
             )
         ]
 

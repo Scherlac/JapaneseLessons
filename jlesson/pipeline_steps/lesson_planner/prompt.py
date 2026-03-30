@@ -2,7 +2,39 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from jlesson.models import GrammarItem
+
+
+# ── Fibonacci learning-cycle stages ──────────────────────────────────────────
+
+FIBONACCI_THRESHOLDS: list[tuple[int, str]] = [
+    (21, "mastered — no further repetition needed"),
+    (13, "well-known — rare refresh every 13-21 blocks"),
+    (8, "reliable short-term — lighter refresh every 8-13 blocks"),
+    (5, "consolidating — repeat within 5-8 blocks"),
+    (3, "beginning to stick — repeat within 3-5 blocks"),
+    (2, "still fragile — repeat within 2-3 blocks"),
+    (1, "brand-new — needs immediate repetition in next 1-2 blocks"),
+]
+
+
+def fibonacci_stage_label(times_seen: int) -> str:
+    """Return a human-readable Fibonacci pacing label for *times_seen*."""
+    for threshold, label in FIBONACCI_THRESHOLDS:
+        if times_seen >= threshold:
+            return f"{times_seen}× seen: {label}"
+    return f"{times_seen}× seen: not yet introduced"
+
+
+@dataclass(frozen=True)
+class GrammarCoverageInfo:
+    """Covered grammar ID with Fibonacci pacing metadata."""
+
+    grammar_id: str
+    lessons_seen: int
+    fibonacci_label: str
 
 
 # ── Fibonacci learning-cycle reference ───────────────────────────────────────
@@ -21,7 +53,12 @@ FIBONACCI LEARNING CYCLE (block repetition guidance):
   Stage 21 — 21× seen: mastered item, no further repetition needed in this lesson
 
 IMPLICATION FOR PLANNING:
-  - A NEW grammar point should appear in many consecutive blocks at the start.
+  - Items at early stages (1-2× seen) from previous lessons should still
+    appear frequently if selected for this lesson.
+  - Items at later stages (8-13×) only need rare refreshes.
+  - Items at 21×+ can be omitted entirely.
+  - A NEW grammar point introduced in this lesson should appear in many
+    consecutive blocks at the start.
   - A grammar point introduced mid-lesson needs denser grouping in the blocks
     that follow its first appearance.
   - Multiple grammar points can share a block, but each should follow its own
@@ -35,7 +72,7 @@ def build_lesson_plan_prompt(
     lesson_blocks: int,
     narrative_blocks: list[str],
     unlocked_grammar: list[GrammarItem],
-    covered_grammar_ids: list[str],
+    covered_grammar: list[GrammarCoverageInfo],
     grammar_points_per_lesson: int,
     grammar_points_per_block: int,
     sentences_per_grammar: int,
@@ -55,7 +92,13 @@ def build_lesson_plan_prompt(
         f"    example: {g.example_source} → {g.example_target}"
         for g in unlocked_grammar
     )
-    covered_str = ", ".join(covered_grammar_ids) if covered_grammar_ids else "(none)"
+    if covered_grammar:
+        covered_lines = "\n".join(
+            f"  - {c.grammar_id}  ({c.fibonacci_label})"
+            for c in covered_grammar
+        )
+    else:
+        covered_lines = "  (none)"
     nouns_str = ", ".join(noun_names) if noun_names else "(none)"
     verbs_str = ", ".join(verb_names) if verb_names else "(none)"
 
@@ -88,8 +131,8 @@ You are planning lesson {lesson_number} which has {lesson_blocks} blocks.
 
 {FIBONACCI_CYCLE_DESCRIPTION}
 
-ALREADY COVERED GRAMMAR (from previous lessons):
-  {covered_str}
+ALREADY COVERED GRAMMAR (from previous lessons, with Fibonacci pacing stage):
+{covered_lines}
 
 AVAILABLE VOCABULARY:
   Nouns: {nouns_str}

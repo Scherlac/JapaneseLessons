@@ -13,7 +13,7 @@ from ..pipeline_core import (
     SelectedVocabSet,
     StepAction,
 )
-from .prompt import build_lesson_plan_prompt
+from .prompt import GrammarCoverageInfo, build_lesson_plan_prompt
 
 
 @dataclass
@@ -27,6 +27,7 @@ class LessonPlannerChunk(SelectedVocabSet):
     progression: list[GrammarItem]
     unlocked: list[GrammarItem]
     covered_grammar_ids: list[str]
+    covered_grammar: list[GrammarCoverageInfo]
 
 
 @dataclass
@@ -72,7 +73,7 @@ class LessonPlannerAction(StepAction[LessonPlannerChunk, LessonPlannerResult]):
             lesson_blocks=chunk.lesson_blocks,
             narrative_blocks=chunk.narrative_blocks,
             unlocked_grammar=chunk.unlocked,
-            covered_grammar_ids=chunk.covered_grammar_ids,
+            covered_grammar=chunk.covered_grammar,
             grammar_points_per_lesson=config.lesson.grammar_points_per_lesson,
             grammar_points_per_block=config.lesson.grammar_points_per_block,
             sentences_per_grammar=config.lesson.sentences_per_grammar,
