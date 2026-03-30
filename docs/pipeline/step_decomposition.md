@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Date:** 2026-03-29  
-**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`
+**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`
 
 ---
 
@@ -231,6 +231,7 @@ for custom chunk types.
 | `compile_assets` | `AssetCompileRequest` | single render compilation producing a typed successor artifact |
 | `compile_touches` | `CompiledItemSequence` | single pure transform from compiled items to touch sequence |
 | `render_video` | `RenderVideoRequest(TouchSequence)` | single render sink consuming the typed touch sequence |
+| `save_report` | `SaveReportRequest(RenderedVideoArtifact)` | single sink write consuming the rendered-video artifact |
 
 ---
 
@@ -351,6 +352,26 @@ RenderVideoStep
     Action:        one video builder call
 ```
 
+### `save_report` — successor aligned to `render_video`
+
+This extends the terminal render chain to the final report sink. The core
+predecessor artifact remains visible: `SaveReportRequest` extends
+`RenderedVideoArtifact`, so the step signature still declares that report
+finalisation follows the render-video result.
+
+`SaveReportAction` emits `ReportArtifact`, which is the terminal report-output
+artifact for the pipeline.
+
+```
+RenderVideoStep
+    Output:        RenderedVideoArtifact  (video_path + render side artifacts)
+
+SaveReportStep
+    Input chunk:   SaveReportRequest      (RenderedVideoArtifact + report state)
+    Output:        ReportArtifact         (report_path)
+    Action:        one markdown render + file write
+```
+
 ### `narrative_generator` / `extract_narrative_vocab` — inter-step typed artifact (`NarrativeFrame`)
 
 Demonstrates the dependency-aware flow goal: one generated artifact becomes the
@@ -402,6 +423,7 @@ current typed connections.
 | `NarrativeGrammarStep` | `Sentence` (via `SentenceReviewBatch`) | `ReviewSentencesStep` |
 | `CompileAssetsStep` | `CompiledItemSequence` | `CompileTouchesStep` |
 | `CompileTouchesStep` | `TouchSequence` | `RenderVideoStep` |
+| `RenderVideoStep` | `RenderedVideoArtifact` | `SaveReportStep` |
 
 Goal: extend this table as more steps are migrated so that the pipeline's
 dependency graph is expressed entirely through types, not through shared mutable
@@ -486,6 +508,7 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `compile_assets` | `AssetCompileRequest` | 1 sync/async render call | **done** — predecessor step; emits `CompiledItemSequence` for `compile_touches` |
 | `compile_touches` | `CompiledItemSequence` ← from `compile_assets` | 1 pure transform | **done** — successor step; chunk type wraps predecessor render artifact |
 | `render_video` | `RenderVideoRequest(TouchSequence)` ← from `compile_touches` | 1 sink render call | **done** — successor step; chunk type preserves `TouchSequence` as the predecessor artifact |
+| `save_report` | `SaveReportRequest(RenderedVideoArtifact)` ← from `render_video` | 1 sink write | **done** — successor step; chunk type preserves `RenderedVideoArtifact` as the predecessor artifact |
 | `generate_narrative_vocab` | `ItemBatch[str]` | batched ×60 | not started |
 | `select_vocab` | per-block + LLM gap-fill | conditional | not started |
 | `retrieve_material` | single query | retrieval only | not started (needs `query_retrieval` wired) |

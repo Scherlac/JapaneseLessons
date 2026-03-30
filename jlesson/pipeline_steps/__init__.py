@@ -23,6 +23,7 @@ from .pipeline_core import (
 	NarrativeFrame,
 	NarrativeVocabPlan,
 	PipelineStep,
+	ReportArtifact,
 	RenderedVideoArtifact,
 	StepInfo,
 	TouchSequence,

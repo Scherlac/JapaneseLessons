@@ -1,25 +1,51 @@
 from __future__ import annotations
 
 from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
-from jlesson.lesson_report import save_report
-from .pipeline_core import LessonContext, PipelineStep
+from jlesson.models import Phase
 from jlesson.profiles import get_profile
 from jlesson.touch_compiler import count_touches
 
-from jlesson.models import Phase
+from .action import SaveReportAction, SaveReportRequest
+from ..pipeline_core import ActionStep, LessonContext, RenderedVideoArtifact, ReportArtifact
 
 
-class SaveReportStep(PipelineStep):
+class SaveReportStep(ActionStep[SaveReportRequest, ReportArtifact]):
     """Step 12 — Finalize and save Markdown lesson report."""
 
     name = "save_report"
     description = "Finalize and save Markdown lesson report"
+    _action = SaveReportAction()
 
-    def execute(self, ctx: LessonContext) -> LessonContext:
-        ctx.report.add("summary", self._summary(ctx))
-        report = ctx.report.render()
-        report_path = resolve_lesson_dir(ctx.config, ctx.lesson_id) / "report.md"
-        ctx.report_path = save_report(report, report_path)
+    @property
+    def action(self) -> SaveReportAction:
+        return self._action
+
+    def should_skip(self, ctx: LessonContext) -> bool:
+        return bool(ctx.report_path)
+
+    def build_chunks(self, ctx: LessonContext) -> list[SaveReportRequest]:
+        lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
+        rendered = RenderedVideoArtifact(
+            video_path=ctx.video_path,
+            clip_count=len(ctx.touches),
+            cards_dir=(lesson_dir / "cards") if (lesson_dir / "cards").exists() else None,
+            audio_dir=(lesson_dir / "audio") if (lesson_dir / "audio").exists() else None,
+        )
+        return [
+            SaveReportRequest(
+                video_path=rendered.video_path,
+                clip_count=rendered.clip_count,
+                cards_dir=rendered.cards_dir,
+                audio_dir=rendered.audio_dir,
+                report=ctx.report,
+                report_path=lesson_dir / "report.md",
+                summary_markdown=self._summary(ctx),
+            )
+        ]
+
+    def merge_outputs(self, ctx: LessonContext, outputs: list[ReportArtifact]) -> LessonContext:
+        result = outputs[-1] if outputs else ReportArtifact(report_path=None)
+        ctx.report_path = result.report_path
         self._log(ctx, f"       {ctx.report_path}")
         return ctx
 

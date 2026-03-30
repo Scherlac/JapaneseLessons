@@ -249,6 +249,19 @@ class RenderedVideoArtifact:
     audio_dir: Path | None = None
 
 
+@dataclass
+class ReportArtifact:
+    """Typed output of ``SaveReportStep``.
+
+    This is the final sink artifact for the pipeline's report output. It lets
+    successor-oriented decomposition continue even for terminal steps.
+
+    Context field: ``LessonContext.report_path``
+    """
+
+    report_path: Path | None
+
+
 # ---------------------------------------------------------------------------
 # Per-invocation action configuration
 # ---------------------------------------------------------------------------
