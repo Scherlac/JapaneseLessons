@@ -23,6 +23,7 @@ from .pipeline_core import (
 	LessonRegistrationArtifact,
 	NarrativeFrame,
 	NarrativeVocabPlan,
+	PersistedContentArtifact,
 	PipelineStep,
 	ReportArtifact,
 	RenderedVideoArtifact,

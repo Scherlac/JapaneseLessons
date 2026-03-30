@@ -17,6 +17,7 @@ Mock / in-memory runtimes for unit testing action logic in isolation.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
@@ -62,8 +63,8 @@ class RuntimeServices(Protocol):
         """Load a persisted lesson content JSON by *lesson_id*."""
         ...
 
-    def write_content(self, lesson_id: int, data: dict[str, Any]) -> None:
-        """Persist lesson content *data* for *lesson_id* to the output dir."""
+    def write_content(self, lesson_id: int, data: dict[str, Any]) -> Path:
+        """Persist lesson content *data* for *lesson_id* and return the file path."""
         ...
 
     # ── Curriculum storage ────────────────────────────────────────────────────

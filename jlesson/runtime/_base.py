@@ -5,9 +5,11 @@ from pathlib import Path
 from typing import Any
 
 from jlesson.curriculum import load_curriculum, save_curriculum
+from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
+from jlesson.lesson_store import load_lesson_content, save_lesson_content
 from jlesson.llm_cache import ask_llm_cached
 from jlesson.llm_client import ask_llm_json_free
-from jlesson.models import VocabFile
+from jlesson.models import LessonContent, VocabFile
 from jlesson.vocab_generator import generate_vocab, VOCAB_DIR
 
 _DEFAULT_VOCAB_DIR = VOCAB_DIR
@@ -78,10 +80,9 @@ class ContextRuntime:
     ``RuntimeServices``-typed object to their ``StepAction`` without the action
     needing to know about the full pipeline context.
 
-    Only ``call_llm`` is fully wired; the remaining operations raise
-    ``NotImplementedError`` until the corresponding step migrations land.
-    Migrate each operation by replacing its ``raise`` with a real
-    implementation delegating to the appropriate existing service.
+    ``call_llm``, curriculum storage, and lesson-content storage are wired.
+    Retrieval and cache methods still raise ``NotImplementedError`` until the
+    corresponding migrations land.
     """
 
     def __init__(self, ctx: Any) -> None:
@@ -104,10 +105,14 @@ class ContextRuntime:
     # ── Lesson content storage ────────────────────────────────────────────────
 
     def read_content(self, lesson_id: int) -> dict[str, Any]:
-        raise NotImplementedError("read_content not yet migrated to ContextRuntime")
+        lesson_dir = resolve_lesson_dir(self._ctx.config, lesson_id)
+        content = load_lesson_content(lesson_id, lesson_dir)
+        return content.model_dump(mode="json", exclude_none=True)
 
-    def write_content(self, lesson_id: int, data: dict[str, Any]) -> None:
-        raise NotImplementedError("write_content not yet migrated to ContextRuntime")
+    def write_content(self, lesson_id: int, data: dict[str, Any]) -> Path:
+        lesson_dir = resolve_lesson_dir(self._ctx.config, lesson_id)
+        content = LessonContent.model_validate(data)
+        return save_lesson_content(content, lesson_dir)
 
     # ── Curriculum storage ────────────────────────────────────────────────────
 

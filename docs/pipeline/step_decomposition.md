@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Date:** 2026-03-29  
-**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`, `register_lesson`
+**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`, `register_lesson`, `persist_content`
 
 ---
 
@@ -60,9 +60,10 @@ class RuntimeServices(Protocol):
     def update_cache(self, key: str, value: dict[str, Any]) -> None: ...
 ```
 
-**Migration status** — only `call_llm` is fully wired in `ContextRuntime`;
-the remaining operations raise `NotImplementedError` until the corresponding
-steps are migrated.
+**Migration status** — `call_llm`, `read_curriculum`, `write_curriculum`,
+`read_content`, and `write_content` are wired in `ContextRuntime`.
+Retrieval and cache operations still raise `NotImplementedError` until the
+corresponding steps are migrated.
 
 ---
 
@@ -75,7 +76,11 @@ Constructed once per `execute` call inside `ActionStep.execute`.
 class ContextRuntime:
     def __init__(self, ctx: LessonContext) -> None: ...
     def call_llm(self, prompt: str) -> dict[str, Any]: ...
-    # remaining operations: NotImplementedError until migrated
+    def read_curriculum(self) -> CurriculumData: ...
+    def write_curriculum(self, data: CurriculumData) -> None: ...
+    def read_content(self, lesson_id: int) -> dict[str, Any]: ...
+    def write_content(self, lesson_id: int, data: dict[str, Any]) -> Path: ...
+    # retrieval/cache operations: NotImplementedError until migrated
 ```
 
 `call_llm` delegates to `PipelineRuntime.ask_llm(ctx, prompt)`, preserving the
@@ -233,6 +238,7 @@ for custom chunk types.
 | `compile_touches` | `CompiledItemSequence` | single pure transform from compiled items to touch sequence |
 | `render_video` | `RenderVideoRequest(TouchSequence)` | single render sink consuming the typed touch sequence |
 | `save_report` | `SaveReportRequest(RenderedVideoArtifact)` | single sink write consuming the rendered-video artifact |
+| `persist_content` | `PersistContentRequest` | single storage write consuming the typed registration artifact |
 
 ---
 
@@ -394,6 +400,26 @@ PersistContentStep
     Future input:  LessonRegistrationArtifact + finalized lesson content
 ```
 
+### `persist_content` — successor aligned to `register_lesson`
+
+This continues the storage-side typed chain. `PersistContentRequest` keeps the
+registration artifact visible while adding the finalized lesson content fields
+needed for persistence.
+
+`PersistContentAction` emits `PersistedContentArtifact`, which makes the
+content-write boundary explicit instead of relying only on
+`LessonContext.content_path`.
+
+```
+RegisterLessonStep
+    Output:        LessonRegistrationArtifact  (lesson_id + created_at + curriculum)
+
+PersistContentStep
+    Input chunk:   PersistContentRequest       (LessonRegistrationArtifact + finalized content)
+    Output:        PersistedContentArtifact    (created_at + content_path + vocab_path)
+    Action:        one lesson-content write + shared vocab update
+```
+
 ### `narrative_generator` / `extract_narrative_vocab` — inter-step typed artifact (`NarrativeFrame`)
 
 Demonstrates the dependency-aware flow goal: one generated artifact becomes the
@@ -536,4 +562,4 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `generate_narrative_vocab` | `ItemBatch[str]` | batched ×60 | not started |
 | `select_vocab` | per-block + LLM gap-fill | conditional | not started |
 | `retrieve_material` | single query | retrieval only | not started (needs `query_retrieval` wired) |
-| `persist_content` | no LLM | storage only | not started (needs `write_content` wired) |
+| `persist_content` | `PersistContentRequest` ← from `register_lesson` | storage only | **done** — successor step; request preserves `LessonRegistrationArtifact` as the predecessor artifact |

@@ -281,6 +281,24 @@ class LessonRegistrationArtifact:
     header_markdown: str
 
 
+@dataclass
+class PersistedContentArtifact:
+    """Typed output of ``PersistContentStep``.
+
+    This is the storage-side persistence result produced after lesson
+    registration. It keeps the content-write boundary explicit and gives later
+    successor-oriented refactors a concrete artifact instead of relying only on
+    ``LessonContext.content_path``.
+
+    Context field: ``LessonContext.content_path``
+    """
+
+    lesson_id: int
+    created_at: str
+    content_path: Path | None
+    vocab_path: Path | None = None
+
+
 # ---------------------------------------------------------------------------
 # Per-invocation action configuration
 # ---------------------------------------------------------------------------
