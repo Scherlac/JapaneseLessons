@@ -232,6 +232,23 @@ class TouchSequence:
     items: list[Touch]
 
 
+@dataclass
+class RenderedVideoArtifact:
+    """Typed output of ``RenderVideoStep``.
+
+    This is the render-side sink artifact produced from ``TouchSequence``.
+    A later ``SaveReportStep`` migration can use this typed result instead of
+    relying only on ``LessonContext.video_path``.
+
+    Context field: ``LessonContext.video_path``
+    """
+
+    video_path: Path | None
+    clip_count: int
+    cards_dir: Path | None = None
+    audio_dir: Path | None = None
+
+
 # ---------------------------------------------------------------------------
 # Per-invocation action configuration
 # ---------------------------------------------------------------------------
