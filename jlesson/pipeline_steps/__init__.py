@@ -16,4 +16,13 @@ from .save_report import SaveReportStep
 from .select_vocab import SelectVocabStep
 from .verb_practice import VerbPracticeStep
 
-from .pipeline_core import LessonConfig, LessonContext, NarrativeFrame, NarrativeVocabPlan, PipelineStep, StepInfo
+from .pipeline_core import (
+	CompiledItemSequence,
+	LessonConfig,
+	LessonContext,
+	NarrativeFrame,
+	NarrativeVocabPlan,
+	PipelineStep,
+	StepInfo,
+	TouchSequence,
+)

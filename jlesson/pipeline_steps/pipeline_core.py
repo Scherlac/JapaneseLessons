@@ -201,6 +201,38 @@ class NarrativeVocabPlan:
 
 
 # ---------------------------------------------------------------------------
+# Render inter-step typed artifacts
+# ---------------------------------------------------------------------------
+
+@dataclass
+class CompiledItemSequence:
+    """Typed render-ready output of ``CompileAssetsStep``.
+
+    Also serves as the input chunk for ``CompileTouchesStep``, making the
+    render-side successor dependency explicit even before ``compile_assets`` is
+    migrated to ``ActionStep`` form.
+
+    Context field: ``LessonContext.compiled_items``
+    """
+
+    items: list[CompiledItem]
+
+
+@dataclass
+class TouchSequence:
+    """Typed output of ``CompileTouchesStep``.
+
+    This is the natural successor artifact for later ``RenderVideoStep``
+    migration, where the video render step can consume the same typed artifact
+    rather than reading raw touch lists directly from ``LessonContext``.
+
+    Context field: ``LessonContext.touches``
+    """
+
+    items: list[Touch]
+
+
+# ---------------------------------------------------------------------------
 # Per-invocation action configuration
 # ---------------------------------------------------------------------------
 

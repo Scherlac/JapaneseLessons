@@ -132,12 +132,14 @@ class LanguageConfig:
     # ── Identity ──────────────────────────────────────────────────────────
     code: str
     display_name: str
-    canonical_language: str = "english"  # for prompt builders that need a single language
     source: PartialLanguageConfig
     target: PartialLanguageConfig
 
     # ── TTS voices ────────────────────────────────────────────────────────
     voices: dict[str, str]
+
+    # ── Prompt canonical language ────────────────────────────────────────
+    canonical_language: str = "english"  # for prompt builders that need a single language
 
     # ── Grammar & persons (may be populated later) ────────────────────────
     grammar_progression: tuple[GrammarItem, ...] = ()

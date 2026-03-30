@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Date:** 2026-03-29  
-**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `review_sentences`
+**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `review_sentences`, `compile_touches`
 
 ---
 
@@ -228,6 +228,7 @@ for custom chunk types.
 | `grammar_select` | `GrammarSelectChunk` | single LLM call + pure post-processing |
 | `noun_practice` | `NounPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×25 |
 | `verb_practice` | `VerbPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×20 |
+| `compile_touches` | `CompiledItemSequence` | single pure transform from compiled items to touch sequence |
 
 ---
 
@@ -280,6 +281,31 @@ Action:  one call_llm per batch chunk
 `merge_outputs` concatenates all batch outputs, applies phase + block_index
 assignment, and falls back to the raw input items when the LLM returns nothing.
 
+### `compile_touches` — render-side successor artifact (`CompiledItemSequence`)
+
+Demonstrates the same dependency-aware flow on the render side: compiled render
+items are wrapped in a typed artifact that becomes the direct input chunk of the
+successor step.
+
+**`CompiledItemSequence`** is defined in `pipeline_core.py` as the render-side
+handoff artifact. It is the natural output type of `CompileAssetsStep` and the
+direct input chunk for `CompileTouchesStep`.
+
+```
+CompileAssetsStep
+    Output field:  ctx.compiled_items
+    Target type:   CompiledItemSequence   (items: list[CompiledItem])
+
+CompileTouchesStep
+    Input chunk:   CompiledItemSequence   ← successor boundary made explicit
+    Output:        TouchSequence          (items: list[Touch])
+    Action:        one pure compile_touches call
+```
+
+This is an intermediate alignment step: `compile_assets` is not yet migrated to
+`ActionStep`, but the successor step already advertises the predecessor artifact
+it consumes instead of reading an untyped list from `LessonContext`.
+
 ### `narrative_generator` / `extract_narrative_vocab` — inter-step typed artifact (`NarrativeFrame`)
 
 Demonstrates the dependency-aware flow goal: one generated artifact becomes the
@@ -329,6 +355,7 @@ current typed connections.
 | `NarrativeGeneratorStep` | `NarrativeFrame` | `ExtractNarrativeVocabStep` |
 | `ExtractNarrativeVocabStep` | `NarrativeVocabPlan` | `GenerateNarrativeVocabStep` |
 | `NarrativeGrammarStep` | `Sentence` (via `SentenceReviewBatch`) | `ReviewSentencesStep` |
+| `CompileAssetsStep` | `CompiledItemSequence` | `CompileTouchesStep` |
 
 Goal: extend this table as more steps are migrated so that the pipeline's
 dependency graph is expressed entirely through types, not through shared mutable
@@ -410,6 +437,7 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `extract_narrative_vocab` | `NarrativeFrame` ← from `narrative_generator` | 1 | **done** — emits `NarrativeVocabPlan` |
 | `generate_narrative_vocab` | `NarrativeVocabPlan` ← from `extract_narrative_vocab` | 1 per batch | **done** — emits `VocabFile` |
 | `review_sentences` | `SentenceReviewBatch(ItemBatch[Sentence])` ← from `generate_sentences` | batched ×30 | **done** — successor step; chunk item type = `Sentence` (output of `NarrativeGrammarStep`) |
+| `compile_touches` | `CompiledItemSequence` ← from `compile_assets` | 1 pure transform | **done** — successor step; chunk type wraps predecessor render artifact |
 | `generate_narrative_vocab` | `ItemBatch[str]` | batched ×60 | not started |
 | `select_vocab` | per-block + LLM gap-fill | conditional | not started |
 | `retrieve_material` | single query | retrieval only | not started (needs `query_retrieval` wired) |
