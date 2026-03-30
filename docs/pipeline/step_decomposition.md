@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Date:** 2026-03-29  
-**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `review_sentences`, `compile_touches`
+**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `review_sentences`, `compile_assets`, `compile_touches`
 
 ---
 
@@ -228,6 +228,7 @@ for custom chunk types.
 | `grammar_select` | `GrammarSelectChunk` | single LLM call + pure post-processing |
 | `noun_practice` | `NounPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×25 |
 | `verb_practice` | `VerbPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×20 |
+| `compile_assets` | `AssetCompileRequest` | single render compilation producing a typed successor artifact |
 | `compile_touches` | `CompiledItemSequence` | single pure transform from compiled items to touch sequence |
 
 ---
@@ -305,6 +306,32 @@ CompileTouchesStep
 This is an intermediate alignment step: `compile_assets` is not yet migrated to
 `ActionStep`, but the successor step already advertises the predecessor artifact
 it consumes instead of reading an untyped list from `LessonContext`.
+
+### `compile_assets` — render predecessor aligned to `compile_touches`
+
+This completes the render-side seam by making the predecessor step emit the same
+typed artifact that the successor step consumes.
+
+`AssetCompileRequest` is a step-local composite chunk that gathers the lesson's
+reviewed sentences and enriched vocab into one render-compilation request. The
+important aligned boundary is the output: `CompileAssetsAction` returns
+`CompiledItemSequence`, and `CompileTouchesStep` consumes exactly that artifact
+type.
+
+```
+CompileAssetsStep
+    Input chunk:   AssetCompileRequest   (items_by_phase + lesson_dir + dry_run)
+    Output:        CompiledItemSequence  (items: list[CompiledItem])
+    Action:        one sync/async asset compiler call
+
+CompileTouchesStep
+    Input chunk:   CompiledItemSequence  ← direct output type of the preceding step
+    Output:        TouchSequence         (items: list[Touch])
+```
+
+This is the target pattern for later migrations: even when a step needs a
+composite request shape, its output should converge on a stable artifact that a
+successor can consume directly.
 
 ### `narrative_generator` / `extract_narrative_vocab` — inter-step typed artifact (`NarrativeFrame`)
 
@@ -437,6 +464,7 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `extract_narrative_vocab` | `NarrativeFrame` ← from `narrative_generator` | 1 | **done** — emits `NarrativeVocabPlan` |
 | `generate_narrative_vocab` | `NarrativeVocabPlan` ← from `extract_narrative_vocab` | 1 per batch | **done** — emits `VocabFile` |
 | `review_sentences` | `SentenceReviewBatch(ItemBatch[Sentence])` ← from `generate_sentences` | batched ×30 | **done** — successor step; chunk item type = `Sentence` (output of `NarrativeGrammarStep`) |
+| `compile_assets` | `AssetCompileRequest` | 1 sync/async render call | **done** — predecessor step; emits `CompiledItemSequence` for `compile_touches` |
 | `compile_touches` | `CompiledItemSequence` ← from `compile_assets` | 1 pure transform | **done** — successor step; chunk type wraps predecessor render artifact |
 | `generate_narrative_vocab` | `ItemBatch[str]` | batched ×60 | not started |
 | `select_vocab` | per-block + LLM gap-fill | conditional | not started |

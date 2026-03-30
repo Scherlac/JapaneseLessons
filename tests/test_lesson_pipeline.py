@@ -1038,7 +1038,7 @@ def test_compile_assets_step_full(ctx, tmp_path):
         "jlesson.asset_compiler.compile_assets",
         return_value=mock_compiled,
     ):
-        with patch("jlesson.pipeline_steps.compile_assets.asyncio.run", return_value=mock_compiled):
+        with patch("jlesson.pipeline_steps.compile_assets.action.asyncio.run", return_value=mock_compiled):
             ctx = CompileAssetsStep().execute(ctx)
     assert len(ctx.compiled_items) == 1
 
