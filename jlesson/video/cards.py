@@ -95,6 +95,7 @@ class CardRenderer:
         return {
             "jp_large": ImageFont.truetype(jp_font_path, 120),
             "jp_medium": ImageFont.truetype(jp_font_path, 64),
+            "jp_small": ImageFont.truetype(jp_font_path, 32),
             "en_large": ImageFont.truetype(en_bold_font_path, 56),
             "en_medium": ImageFont.truetype(en_font_path, 40),
             "en_small": ImageFont.truetype(en_font_path, 28),

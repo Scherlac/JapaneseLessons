@@ -45,7 +45,7 @@ class TestCardRendererInit:
 
     def test_fonts_loaded(self, renderer):
         expected_keys = {
-            "jp_large", "jp_medium", "en_large", "en_medium", "en_small", "label",
+            "jp_large", "jp_medium", "jp_small", "en_large", "en_medium", "en_small", "label",
             "hun_target_large", "hun_native_medium", "hun_pron",
         }
         assert expected_keys == set(renderer.fonts.keys())

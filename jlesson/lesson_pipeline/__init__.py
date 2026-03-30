@@ -101,6 +101,7 @@ def render_existing_lesson(
     theme: str = "",
     profile: str = "passive_video",
     language: str = "eng-jap",
+    recompile_cards: bool = False,
     verbose: bool = True,
 ) -> Path:
     """Render MP4 for an already-generated lesson content file."""
@@ -111,6 +112,7 @@ def render_existing_lesson(
         output_dir=output_dir,
         theme=theme,
         profile=profile,
+        recompile_cards=recompile_cards,
         language=language,
         verbose=verbose,
     )

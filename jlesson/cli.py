@@ -431,12 +431,19 @@ def lesson_next(
     type=click.Choice(["passive_video", "active_flash_cards", "simple_listen"]),
     help="Touch profile used to compile assets and render video.",
 )
+@click.option(
+    "--recompile-cards",
+    is_flag=True,
+    default=False,
+    help="Regenerate card images from lesson content before rendering video.",
+)
 @LANGUAGE_OPTION
 def lesson_render(
     lesson_id: int,
     output_dir: str | None,
     theme: str,
     profile: str,
+    recompile_cards: bool,
     language: str,
 ) -> None:
     """Render video for an existing lesson ID from saved content."""
@@ -448,6 +455,7 @@ def lesson_render(
             output_dir=Path(output_dir) if output_dir else None,
             theme=theme,
             profile=profile,
+            recompile_cards=recompile_cards,
             language=language,
             verbose=True,
         )

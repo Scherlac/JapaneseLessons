@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from jlesson.asset_compiler import compile_assets_sync
+from jlesson.language_config import get_language_config
 from jlesson.lesson_store import load_lesson_content
 from jlesson.models import GeneralItem, Phase
 from jlesson.pipeline_steps.pipeline_core import LessonConfig
@@ -69,6 +71,7 @@ def render_existing_lesson(
     theme: str = "",
     profile: str = "passive_video",
     language: str = "eng-jap",
+    recompile_cards: bool = False,
     verbose: bool = True,
 ) -> Path:
     """Render MP4 for an already-generated lesson content file."""
@@ -95,6 +98,19 @@ def render_existing_lesson(
     if verbose:
         print(f"  Lesson {lesson_id:03d}  |  {total_items} items  |  profile: {profile}")
         print(f"  Assets dir : {lesson_dir}")
+
+    if recompile_cards:
+        if verbose:
+            print("  Recompiling cards ...")
+        lang_cfg = get_language_config(language)
+        compile_assets_sync(
+            items_by_phase,
+            profile_obj,
+            output_dir=lesson_dir,
+            lang_cfg=lang_cfg,
+        )
+        if verbose:
+            print("  Cards done.")
 
     compiled_items = _wire_existing_assets(items_by_phase, profile_obj, lesson_dir)
     touches = compile_touches(compiled_items, profile_obj)
