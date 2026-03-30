@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from jlesson.curriculum import load_curriculum, save_curriculum
 from jlesson.llm_cache import ask_llm_cached
 from jlesson.llm_client import ask_llm_json_free
 from jlesson.models import VocabFile
@@ -111,10 +112,10 @@ class ContextRuntime:
     # ── Curriculum storage ────────────────────────────────────────────────────
 
     def read_curriculum(self) -> Any:
-        raise NotImplementedError("read_curriculum not yet migrated to ContextRuntime")
+        return load_curriculum(self._ctx.config.curriculum_path)
 
     def write_curriculum(self, data: Any) -> None:
-        raise NotImplementedError("write_curriculum not yet migrated to ContextRuntime")
+        save_curriculum(data, self._ctx.config.curriculum_path)
 
     # ── LLM response cache ────────────────────────────────────────────────────
 

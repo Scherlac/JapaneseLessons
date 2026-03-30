@@ -20,6 +20,7 @@ from .pipeline_core import (
 	CompiledItemSequence,
 	LessonConfig,
 	LessonContext,
+	LessonRegistrationArtifact,
 	NarrativeFrame,
 	NarrativeVocabPlan,
 	PipelineStep,

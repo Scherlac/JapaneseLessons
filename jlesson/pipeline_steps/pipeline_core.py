@@ -8,9 +8,10 @@ from typing import Generic, TypeVar
 from jlesson.language_config import LanguageConfig, get_language_config
 from jlesson.lesson_report import ReportBuilder
 from jlesson.models import CompiledItem, GeneralItem, GrammarItem, NarrativeVocabBlock, Sentence, Touch, VocabFile
+from jlesson.curriculum import CurriculumData
 from jlesson.retrieval import RetrievalResult
 from jlesson.runtime.interfaces import RuntimeServices
-from jlesson.curriculum import CurriculumData, create_curriculum
+from jlesson.curriculum import create_curriculum
 
 
 @dataclass
@@ -260,6 +261,24 @@ class ReportArtifact:
     """
 
     report_path: Path | None
+
+
+@dataclass
+class LessonRegistrationArtifact:
+    """Typed output of ``RegisterLessonStep``.
+
+    This is the storage-side handoff artifact produced before lesson-content
+    persistence. A later ``PersistContentStep`` migration can consume this
+    artifact instead of relying only on ``lesson_id`` and ``created_at`` on the
+    shared context.
+
+    Context fields: ``LessonContext.lesson_id``, ``LessonContext.created_at``
+    """
+
+    lesson_id: int
+    created_at: str
+    curriculum: CurriculumData
+    header_markdown: str
 
 
 # ---------------------------------------------------------------------------

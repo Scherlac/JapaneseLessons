@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Date:** 2026-03-29  
-**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`
+**Migrated steps:** `generate_sentences`, `grammar_select`, `noun_practice`, `verb_practice`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`, `register_lesson`
 
 ---
 
@@ -228,6 +228,7 @@ for custom chunk types.
 | `grammar_select` | `GrammarSelectChunk` | single LLM call + pure post-processing |
 | `noun_practice` | `NounPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×25 |
 | `verb_practice` | `VerbPracticeBatch(ItemBatch[GeneralItem])` | batched LLM enrichment ×20 |
+| `register_lesson` | `RegisterLessonRequest` | single storage write producing a typed registration artifact |
 | `compile_assets` | `AssetCompileRequest` | single render compilation producing a typed successor artifact |
 | `compile_touches` | `CompiledItemSequence` | single pure transform from compiled items to touch sequence |
 | `render_video` | `RenderVideoRequest(TouchSequence)` | single render sink consuming the typed touch sequence |
@@ -372,6 +373,27 @@ SaveReportStep
     Action:        one markdown render + file write
 ```
 
+### `register_lesson` — predecessor aligned to `persist_content`
+
+This opens the storage-side typed chain. `RegisterLessonAction` emits a
+`LessonRegistrationArtifact` that carries the stable lesson identity and
+creation timestamp needed by content persistence.
+
+`RegisterLessonRequest` is still a composite request because lesson
+registration depends on multiple finalized inputs, but the output is now a
+stable artifact that a later `PersistContentStep` migration can consume
+directly.
+
+```
+RegisterLessonStep
+    Input chunk:   RegisterLessonRequest   (theme + nouns + verbs + grammar + counts)
+    Output:        LessonRegistrationArtifact  (lesson_id + created_at + curriculum)
+    Action:        one curriculum update + save
+
+PersistContentStep
+    Future input:  LessonRegistrationArtifact + finalized lesson content
+```
+
 ### `narrative_generator` / `extract_narrative_vocab` — inter-step typed artifact (`NarrativeFrame`)
 
 Demonstrates the dependency-aware flow goal: one generated artifact becomes the
@@ -421,6 +443,7 @@ current typed connections.
 | `NarrativeGeneratorStep` | `NarrativeFrame` | `ExtractNarrativeVocabStep` |
 | `ExtractNarrativeVocabStep` | `NarrativeVocabPlan` | `GenerateNarrativeVocabStep` |
 | `NarrativeGrammarStep` | `Sentence` (via `SentenceReviewBatch`) | `ReviewSentencesStep` |
+| `RegisterLessonStep` | `LessonRegistrationArtifact` | `PersistContentStep` |
 | `CompileAssetsStep` | `CompiledItemSequence` | `CompileTouchesStep` |
 | `CompileTouchesStep` | `TouchSequence` | `RenderVideoStep` |
 | `RenderVideoStep` | `RenderedVideoArtifact` | `SaveReportStep` |
@@ -505,6 +528,7 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `extract_narrative_vocab` | `NarrativeFrame` ← from `narrative_generator` | 1 | **done** — emits `NarrativeVocabPlan` |
 | `generate_narrative_vocab` | `NarrativeVocabPlan` ← from `extract_narrative_vocab` | 1 per batch | **done** — emits `VocabFile` |
 | `review_sentences` | `SentenceReviewBatch(ItemBatch[Sentence])` ← from `generate_sentences` | batched ×30 | **done** — successor step; chunk item type = `Sentence` (output of `NarrativeGrammarStep`) |
+| `register_lesson` | `RegisterLessonRequest` | 1 storage write | **done** — predecessor step; emits `LessonRegistrationArtifact` for later `persist_content` alignment |
 | `compile_assets` | `AssetCompileRequest` | 1 sync/async render call | **done** — predecessor step; emits `CompiledItemSequence` for `compile_touches` |
 | `compile_touches` | `CompiledItemSequence` ← from `compile_assets` | 1 pure transform | **done** — successor step; chunk type wraps predecessor render artifact |
 | `render_video` | `RenderVideoRequest(TouchSequence)` ← from `compile_touches` | 1 sink render call | **done** — successor step; chunk type preserves `TouchSequence` as the predecessor artifact |
@@ -512,5 +536,4 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `generate_narrative_vocab` | `ItemBatch[str]` | batched ×60 | not started |
 | `select_vocab` | per-block + LLM gap-fill | conditional | not started |
 | `retrieve_material` | single query | retrieval only | not started (needs `query_retrieval` wired) |
-| `register_lesson` | no LLM | storage only | not started (needs `write_curriculum` wired) |
 | `persist_content` | no LLM | storage only | not started (needs `write_content` wired) |
