@@ -90,6 +90,8 @@ class LessonContext:
     report_path: Path | None = None
     language_config: LanguageConfig | None = None
     retrieval_result: RetrievalResult | None = None
+    completed_steps: list[str] = field(default_factory=list)
+    step_timings: dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.language_config is None:

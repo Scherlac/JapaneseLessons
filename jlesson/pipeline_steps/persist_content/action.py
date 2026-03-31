@@ -39,6 +39,14 @@ class PersistContentRequest:
     noun_items: list[GeneralItem | dict]
     verb_items: list[GeneralItem | dict]
     sentences: list[Sentence]
+    completed_steps: list[str] = None
+    step_timings: dict[str, float] = None
+
+    def __post_init__(self):
+        if self.completed_steps is None:
+            self.completed_steps = []
+        if self.step_timings is None:
+            self.step_timings = {}
 
 
 class PersistContentAction(StepAction[PersistContentRequest, PersistedContentArtifact]):
@@ -64,6 +72,8 @@ class PersistContentAction(StepAction[PersistContentRequest, PersistedContentArt
             words=words,
             sentences=chunk.sentences,
             created_at=created_at,
+            completed_steps=list(chunk.completed_steps),
+            step_timings=dict(chunk.step_timings),
         )
         content_path = config.runtime.write_content(
             chunk.registration.lesson_id,

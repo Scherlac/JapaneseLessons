@@ -315,7 +315,7 @@ def _run_lesson_generation(
         raise click.ClickException(_friendly_error(exc)) from exc
 
 
-@lesson.command("next")
+@lesson.command("add")
 @click.option("--theme", "-t", required=True, help="Vocabulary theme for this lesson.")
 @click.option("--nouns", default=4, show_default=True, help="Nouns per lesson.")
 @click.option("--verbs", default=3, show_default=True, help="Verbs per lesson.")
@@ -409,7 +409,7 @@ def _run_lesson_generation(
     help="Minimum retrieval coverage required before retrieved material is used.",
 )
 @LANGUAGE_OPTION
-def lesson_next(
+def lesson_add(
     theme: str,
     nouns: int,
     verbs: int,
@@ -465,9 +465,9 @@ def lesson_next(
     )
 
 
-@lesson.command("regenerate")
+@lesson.command("update")
 @click.argument("lesson_id", type=click.IntRange(1))
-@click.option("--theme", "-t", required=True, help="Vocabulary theme for this lesson.")
+@click.option("--theme", "-t", default=None, help="Vocabulary theme (required unless --video-only).")
 @click.option("--nouns", default=4, show_default=True, help="Nouns per lesson.")
 @click.option("--verbs", default=3, show_default=True, help="Verbs per lesson.")
 @click.option("--sentences", default=3, show_default=True, help="Sentences per grammar point.")
@@ -506,7 +506,7 @@ def lesson_next(
     type=click.Path(),
     help="Output directory (default: output/).",
 )
-@click.option("--no-video", is_flag=True, default=False, help="Skip video rendering.")
+@click.option("--no-video", is_flag=True, default=False, help="Skip video rendering (full pipeline only).")
 @click.option("--no-cache", is_flag=True, default=False, help="Disable LLM response cache (always call LLM).")
 @click.option("--dry-run", is_flag=True, default=False, help="Skip TTS/card/video — generate content and report only.")
 @click.option(
@@ -559,10 +559,22 @@ def lesson_next(
     show_default=True,
     help="Minimum retrieval coverage required before retrieved material is used.",
 )
+@click.option(
+    "--video-only",
+    is_flag=True,
+    default=False,
+    help="Render video from stored lesson context only — skip content regeneration.",
+)
+@click.option(
+    "--recompile-cards",
+    is_flag=True,
+    default=False,
+    help="Recompile card images from lesson content before rendering (--video-only only).",
+)
 @LANGUAGE_OPTION
-def lesson_regenerate(
+def lesson_update(
     lesson_id: int,
-    theme: str,
+    theme: str | None,
     nouns: int,
     verbs: int,
     sentences: int,
@@ -583,73 +595,113 @@ def lesson_regenerate(
     retrieval_backend: str,
     retrieval_embedding_model: str,
     retrieval_min_coverage: float,
+    video_only: bool,
+    recompile_cards: bool,
     language: str,
 ) -> None:
-    """Regenerate an existing lesson ID in place instead of appending a new lesson."""
+    """Run or re-render an existing lesson ID.
+
+    Without --video-only: re-runs the full generation pipeline for LESSON_ID
+    (requires --theme).
+
+    With --video-only: loads the stored lesson context from content.json and
+    renders the video without regenerating any content.
+    """
+    if video_only:
+        from .lesson_pipeline import render_existing_lesson
+        try:
+            video_path = render_existing_lesson(
+                lesson_id=lesson_id,
+                output_dir=Path(output_dir) if output_dir else None,
+                theme=theme or "",
+                profile=profile,
+                recompile_cards=recompile_cards,
+                language=language,
+                verbose=True,
+            )
+            click.echo(f"Video rendered: {video_path}")
+        except Exception as exc:
+            raise click.ClickException(_friendly_error(exc)) from exc
+    else:
+        if not theme:
+            raise click.UsageError("--theme is required unless --video-only is set.")
+        _run_lesson_generation(
+            theme=theme,
+            nouns=nouns,
+            verbs=verbs,
+            sentences=sentences,
+            grammar_points=grammar_points,
+            grammar_points_per_block=grammar_points_per_block,
+            blocks=blocks,
+            seed=seed,
+            curriculum_path=curriculum_path,
+            output_dir=output_dir,
+            no_video=no_video,
+            no_cache=no_cache,
+            dry_run=dry_run,
+            profile=profile,
+            narrative=narrative,
+            narrative_file=narrative_file,
+            retrieval=retrieval,
+            retrieval_store=retrieval_store,
+            retrieval_backend=retrieval_backend,
+            retrieval_embedding_model=retrieval_embedding_model,
+            retrieval_min_coverage=retrieval_min_coverage,
+            language=language,
+            regenerate_lesson_id=lesson_id,
+        )
+
+
+# kept for backward compatibility
+@lesson.command("regenerate", hidden=True, deprecated=True)
+@click.argument("lesson_id", type=click.IntRange(1))
+@click.option("--theme", "-t", required=True, help="Vocabulary theme for this lesson.")
+@click.option("--nouns", default=4, show_default=True, help="Nouns per lesson.")
+@click.option("--verbs", default=3, show_default=True, help="Verbs per lesson.")
+@click.option("--sentences", default=3, show_default=True, help="Sentences per grammar point.")
+@click.option("--grammar-points", default=2, show_default=True, type=click.IntRange(1))
+@click.option("--grammar-points-per-block", default=1, show_default=True, type=click.IntRange(1))
+@click.option("--blocks", default=1, show_default=True, type=click.IntRange(1))
+@click.option("--seed", type=int, default=None)
+@click.option("--curriculum", "curriculum_path", default=None, type=click.Path())
+@click.option("--output-dir", default=None, type=click.Path())
+@click.option("--no-video", is_flag=True, default=False)
+@click.option("--no-cache", is_flag=True, default=False)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--profile", default="passive_video", show_default=True, type=click.Choice(["passive_video", "active_flash_cards", "simple_listen"]))
+@click.option("--narrative", multiple=True)
+@click.option("--narrative-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), default=None)
+@click.option("--retrieval/--no-retrieval", default=True, show_default=True)
+@click.option("--retrieval-store", type=click.Path(dir_okay=False, path_type=Path), default=None)
+@click.option("--retrieval-backend", default="file", show_default=True, type=click.Choice(["file", "chroma"]))
+@click.option("--retrieval-embedding-model", default="text-embedding-3-small", show_default=True)
+@click.option("--retrieval-min-coverage", type=float, default=0.6, show_default=True)
+@LANGUAGE_OPTION
+def lesson_regenerate(lesson_id, theme, nouns, verbs, sentences, grammar_points, grammar_points_per_block, blocks, seed, curriculum_path, output_dir, no_video, no_cache, dry_run, profile, narrative, narrative_file, retrieval, retrieval_store, retrieval_backend, retrieval_embedding_model, retrieval_min_coverage, language):
+    """Deprecated: use `lesson update LESSON_ID --theme THEME` instead."""
     _run_lesson_generation(
-        theme=theme,
-        nouns=nouns,
-        verbs=verbs,
-        sentences=sentences,
-        grammar_points=grammar_points,
-        grammar_points_per_block=grammar_points_per_block,
-        blocks=blocks,
-        seed=seed,
-        curriculum_path=curriculum_path,
-        output_dir=output_dir,
-        no_video=no_video,
-        no_cache=no_cache,
-        dry_run=dry_run,
-        profile=profile,
-        narrative=narrative,
-        narrative_file=narrative_file,
-        retrieval=retrieval,
-        retrieval_store=retrieval_store,
-        retrieval_backend=retrieval_backend,
+        theme=theme, nouns=nouns, verbs=verbs, sentences=sentences,
+        grammar_points=grammar_points, grammar_points_per_block=grammar_points_per_block,
+        blocks=blocks, seed=seed, curriculum_path=curriculum_path, output_dir=output_dir,
+        no_video=no_video, no_cache=no_cache, dry_run=dry_run, profile=profile,
+        narrative=narrative, narrative_file=narrative_file, retrieval=retrieval,
+        retrieval_store=retrieval_store, retrieval_backend=retrieval_backend,
         retrieval_embedding_model=retrieval_embedding_model,
-        retrieval_min_coverage=retrieval_min_coverage,
-        language=language,
+        retrieval_min_coverage=retrieval_min_coverage, language=language,
         regenerate_lesson_id=lesson_id,
     )
 
 
-@lesson.command("render")
+# kept for backward compatibility
+@lesson.command("render", hidden=True, deprecated=True)
 @click.argument("lesson_id", type=int)
-@click.option(
-    "--output-dir",
-    default=None,
-    type=click.Path(),
-    help="Output directory (default: output/).",
-)
-@click.option(
-    "--theme",
-    default="",
-    show_default=False,
-    help="Theme subdirectory used when the lesson was generated (e.g. benjamin_blumchen).",
-)
-@click.option(
-    "--profile",
-    default="passive_video",
-    show_default=True,
-    type=click.Choice(["passive_video", "active_flash_cards", "simple_listen"]),
-    help="Touch profile used to compile assets and render video.",
-)
-@click.option(
-    "--recompile-cards",
-    is_flag=True,
-    default=False,
-    help="Regenerate card images from lesson content before rendering video.",
-)
+@click.option("--output-dir", default=None, type=click.Path())
+@click.option("--theme", default="", show_default=False)
+@click.option("--profile", default="passive_video", show_default=True, type=click.Choice(["passive_video", "active_flash_cards", "simple_listen"]))
+@click.option("--recompile-cards", is_flag=True, default=False)
 @LANGUAGE_OPTION
-def lesson_render(
-    lesson_id: int,
-    output_dir: str | None,
-    theme: str,
-    profile: str,
-    recompile_cards: bool,
-    language: str,
-) -> None:
-    """Render video for an existing lesson ID from saved content."""
+def lesson_render(lesson_id, output_dir, theme, profile, recompile_cards, language):
+    """Deprecated: use `lesson update LESSON_ID --video-only` instead."""
     from .lesson_pipeline import render_existing_lesson
 
     try:
@@ -665,6 +717,105 @@ def lesson_render(
         click.echo(f"Video rendered: {video_path}")
     except Exception as exc:
         raise click.ClickException(_friendly_error(exc)) from exc
+
+
+# kept for backward compatibility
+@lesson.command("next", hidden=True, deprecated=True)
+@click.option("--theme", "-t", required=True)
+@click.option("--nouns", default=4, show_default=True)
+@click.option("--verbs", default=3, show_default=True)
+@click.option("--sentences", default=3, show_default=True)
+@click.option("--grammar-points", default=2, show_default=True, type=click.IntRange(1))
+@click.option("--grammar-points-per-block", default=1, show_default=True, type=click.IntRange(1))
+@click.option("--blocks", default=1, show_default=True, type=click.IntRange(1))
+@click.option("--seed", type=int, default=None)
+@click.option("--curriculum", "curriculum_path", default=None, type=click.Path())
+@click.option("--output-dir", default=None, type=click.Path())
+@click.option("--no-video", is_flag=True, default=False)
+@click.option("--no-cache", is_flag=True, default=False)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--profile", default="passive_video", show_default=True, type=click.Choice(["passive_video", "active_flash_cards", "simple_listen"]))
+@click.option("--narrative", multiple=True)
+@click.option("--narrative-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), default=None)
+@click.option("--retrieval/--no-retrieval", default=True, show_default=True)
+@click.option("--retrieval-store", type=click.Path(dir_okay=False, path_type=Path), default=None)
+@click.option("--retrieval-backend", default="file", show_default=True, type=click.Choice(["file", "chroma"]))
+@click.option("--retrieval-embedding-model", default="text-embedding-3-small", show_default=True)
+@click.option("--retrieval-min-coverage", type=float, default=0.6, show_default=True)
+@LANGUAGE_OPTION
+def lesson_next(theme, nouns, verbs, sentences, grammar_points, grammar_points_per_block, blocks, seed, curriculum_path, output_dir, no_video, no_cache, dry_run, profile, narrative, narrative_file, retrieval, retrieval_store, retrieval_backend, retrieval_embedding_model, retrieval_min_coverage, language):
+    """Deprecated: use `lesson add --theme THEME` instead."""
+    _run_lesson_generation(
+        theme=theme, nouns=nouns, verbs=verbs, sentences=sentences,
+        grammar_points=grammar_points, grammar_points_per_block=grammar_points_per_block,
+        blocks=blocks, seed=seed, curriculum_path=curriculum_path, output_dir=output_dir,
+        no_video=no_video, no_cache=no_cache, dry_run=dry_run, profile=profile,
+        narrative=narrative, narrative_file=narrative_file, retrieval=retrieval,
+        retrieval_store=retrieval_store, retrieval_backend=retrieval_backend,
+        retrieval_embedding_model=retrieval_embedding_model,
+        retrieval_min_coverage=retrieval_min_coverage, language=language,
+        regenerate_lesson_id=None,
+    )
+
+
+# kept for backward compatibility
+@lesson.command("run", hidden=True, deprecated=True)
+@click.argument("lesson_id", type=click.IntRange(1))
+@click.option("--theme", "-t", default=None)
+@click.option("--nouns", default=4, show_default=True)
+@click.option("--verbs", default=3, show_default=True)
+@click.option("--sentences", default=3, show_default=True)
+@click.option("--grammar-points", default=2, show_default=True, type=click.IntRange(1))
+@click.option("--grammar-points-per-block", default=1, show_default=True, type=click.IntRange(1))
+@click.option("--blocks", default=1, show_default=True, type=click.IntRange(1))
+@click.option("--seed", type=int, default=None)
+@click.option("--curriculum", "curriculum_path", default=None, type=click.Path())
+@click.option("--output-dir", default=None, type=click.Path())
+@click.option("--no-video", is_flag=True, default=False)
+@click.option("--no-cache", is_flag=True, default=False)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--profile", default="passive_video", show_default=True, type=click.Choice(["passive_video", "active_flash_cards", "simple_listen"]))
+@click.option("--narrative", multiple=True)
+@click.option("--narrative-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), default=None)
+@click.option("--retrieval/--no-retrieval", default=True, show_default=True)
+@click.option("--retrieval-store", type=click.Path(dir_okay=False, path_type=Path), default=None)
+@click.option("--retrieval-backend", default="file", show_default=True, type=click.Choice(["file", "chroma"]))
+@click.option("--retrieval-embedding-model", default="text-embedding-3-small", show_default=True)
+@click.option("--retrieval-min-coverage", type=float, default=0.6, show_default=True)
+@click.option("--video-only", is_flag=True, default=False)
+@click.option("--recompile-cards", is_flag=True, default=False)
+@LANGUAGE_OPTION
+def lesson_run_compat(lesson_id, theme, nouns, verbs, sentences, grammar_points, grammar_points_per_block, blocks, seed, curriculum_path, output_dir, no_video, no_cache, dry_run, profile, narrative, narrative_file, retrieval, retrieval_store, retrieval_backend, retrieval_embedding_model, retrieval_min_coverage, video_only, recompile_cards, language):
+    """Deprecated: use `lesson update LESSON_ID` instead."""
+    if video_only:
+        from .lesson_pipeline import render_existing_lesson
+        try:
+            video_path = render_existing_lesson(
+                lesson_id=lesson_id,
+                output_dir=Path(output_dir) if output_dir else None,
+                theme=theme or "",
+                profile=profile,
+                recompile_cards=recompile_cards,
+                language=language,
+                verbose=True,
+            )
+            click.echo(f"Video rendered: {video_path}")
+        except Exception as exc:
+            raise click.ClickException(_friendly_error(exc)) from exc
+    else:
+        if not theme:
+            raise click.UsageError("--theme is required unless --video-only is set.")
+        _run_lesson_generation(
+            theme=theme, nouns=nouns, verbs=verbs, sentences=sentences,
+            grammar_points=grammar_points, grammar_points_per_block=grammar_points_per_block,
+            blocks=blocks, seed=seed, curriculum_path=curriculum_path, output_dir=output_dir,
+            no_video=no_video, no_cache=no_cache, dry_run=dry_run, profile=profile,
+            narrative=narrative, narrative_file=narrative_file, retrieval=retrieval,
+            retrieval_store=retrieval_store, retrieval_backend=retrieval_backend,
+            retrieval_embedding_model=retrieval_embedding_model,
+            retrieval_min_coverage=retrieval_min_coverage, language=language,
+            regenerate_lesson_id=lesson_id,
+        )
 
 
 @lesson.command("prompt")

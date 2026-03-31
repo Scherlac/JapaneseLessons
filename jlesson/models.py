@@ -199,6 +199,8 @@ class LessonContent(BaseModel):
     words: list[GeneralItem] = Field(default_factory=list)
     sentences: list[Sentence] = Field(default_factory=list)
     created_at: str = ""
+    completed_steps: list[str] = Field(default_factory=list)
+    step_timings: dict[str, float] = Field(default_factory=dict)
 
     @property
     def noun_items(self) -> list[GeneralItem]:
