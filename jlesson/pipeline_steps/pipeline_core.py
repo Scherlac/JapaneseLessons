@@ -492,12 +492,15 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         if self.should_skip(ctx):
+            self._last_chunks: list = []
+            self._last_outputs: list = []
             return ctx
 
         from jlesson.runtime._base import ContextRuntime  # local import avoids circularity
 
         rt = ContextRuntime(ctx)
         chunks = self.build_chunks(ctx)
+        self._last_chunks = chunks
         outputs: list[_O] = []
         for loop_index, chunk in enumerate(chunks):
             block_index = getattr(chunk, "block_index", loop_index)
@@ -510,4 +513,5 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
             )
             outputs.append(self.action.run(cfg, chunk))
 
+        self._last_outputs = outputs
         return self.merge_outputs(ctx, outputs)

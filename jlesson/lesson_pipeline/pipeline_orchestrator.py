@@ -307,17 +307,12 @@ def run_pipeline(
         )
         t_step = time.time()
 
-        # Capture chunks before execution for artifact saving
-        _chunks: list = []
-        _outputs: list = []
-
-        # Wrap ActionStep execution to capture chunks/outputs
-        from jlesson.pipeline_steps.pipeline_core import ActionStep
-        if isinstance(step, ActionStep) and not step.should_skip(ctx):
-            _chunks = step.build_chunks(ctx)
-
         ctx = step.execute(ctx)
 
+        # Read chunks/outputs stored by ActionStep.execute() for artifact saving
+        from jlesson.pipeline_steps.pipeline_core import ActionStep
+        _chunks = getattr(step, "_last_chunks", [])
+        _outputs = getattr(step, "_last_outputs", [])
         step_elapsed = time.time() - t_step
         ctx.report.record_time(step.name, step_elapsed)
         ctx.completed_steps.append(step.name)
