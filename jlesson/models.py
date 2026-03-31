@@ -199,8 +199,12 @@ class LessonContent(BaseModel):
     words: list[GeneralItem] = Field(default_factory=list)
     sentences: list[Sentence] = Field(default_factory=list)
     created_at: str = ""
+    # Pipeline execution metadata
+    pipeline_started_at: str = ""
     completed_steps: list[str] = Field(default_factory=list)
     step_timings: dict[str, float] = Field(default_factory=dict)
+    # Per-step detail records: {step_name: {index, description, started_at, elapsed_s, status}}
+    step_details: dict[str, dict] = Field(default_factory=dict)
 
     @property
     def noun_items(self) -> list[GeneralItem]:

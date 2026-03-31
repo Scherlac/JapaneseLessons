@@ -97,26 +97,18 @@ def run_pipeline(config: LessonConfig) -> LessonContext:
     )
 
 
-def render_existing_lesson(
-    lesson_id: int,
-    output_dir: Path | None = None,
-    theme: str = "",
-    profile: str = "passive_video",
-    language: str = "eng-jap",
-    recompile_cards: bool = False,
-    verbose: bool = True,
-) -> Path:
-    """Render MP4 for an already-generated lesson content file."""
-    from .pipeline_existing_lesson import render_existing_lesson as _render_existing_lesson_impl
+def restore_context_from_checkpoint(
+    config: LessonConfig,
+    *,
+    wire_assets: bool = True,
+) -> "LessonContext":
+    """Load a saved lesson checkpoint and return a renderable LessonContext."""
+    from .pipeline_orchestrator import restore_context_from_checkpoint as _restore_impl
 
-    return _render_existing_lesson_impl(
-        lesson_id=lesson_id,
-        output_dir=output_dir,
-        theme=theme,
-        profile=profile,
-        recompile_cards=recompile_cards,
-        language=language,
-        verbose=verbose,
+    return _restore_impl(
+        config,
+        load_curriculum_fn=load_curriculum,
+        wire_assets=wire_assets,
     )
 
 
@@ -156,6 +148,6 @@ __all__ = [
     "VocabEnhancementStep",
     "VerbPracticeStep",
     "load_curriculum",
-    "render_existing_lesson",
+    "restore_context_from_checkpoint",
     "run_pipeline",
 ]

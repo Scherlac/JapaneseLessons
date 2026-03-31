@@ -49,6 +49,8 @@ class PersistContentStep(ActionStep[PersistContentRequest, PersistedContentArtif
                 sentences=list(ctx.sentences),
                 completed_steps=list(ctx.completed_steps),
                 step_timings=dict(ctx.step_timings),
+                step_details=dict(ctx.step_details),
+                pipeline_started_at=ctx.pipeline_started_at,
             )
         ]
 

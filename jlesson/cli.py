@@ -271,6 +271,7 @@ def _run_lesson_generation(
     retrieval_min_coverage: float,
     language: str,
     regenerate_lesson_id: int | None,
+    from_step: str | None = None,
 ) -> None:
     """Run lesson generation, optionally overwriting an existing lesson ID."""
     from .lesson_pipeline import LessonConfig, run_pipeline
@@ -308,6 +309,7 @@ def _run_lesson_generation(
         retrieval_embedding_model=retrieval_embedding_model,
         retrieval_min_coverage=retrieval_min_coverage,
         regenerate_lesson_id=regenerate_lesson_id,
+        from_step=from_step,
     )
     try:
         run_pipeline(config)
@@ -560,16 +562,16 @@ def lesson_add(
     help="Minimum retrieval coverage required before retrieved material is used.",
 )
 @click.option(
-    "--video-only",
-    is_flag=True,
-    default=False,
-    help="Render video from stored lesson context only — skip content regeneration.",
-)
-@click.option(
-    "--recompile-cards",
-    is_flag=True,
-    default=False,
-    help="Recompile card images from lesson content before rendering (--video-only only).",
+    "--from-step",
+    "from_step",
+    default=None,
+    type=click.Choice(["compile_assets", "compile_touches", "render_video"]),
+    help=(
+        "Resume from a specific render step using the stored lesson checkpoint "
+        "(skips content regeneration). "
+        "'render_video' wires existing assets and re-renders; "
+        "'compile_assets' recompiles cards and TTS before rendering."
+    ),
 )
 @LANGUAGE_OPTION
 def lesson_update(
@@ -595,36 +597,47 @@ def lesson_update(
     retrieval_backend: str,
     retrieval_embedding_model: str,
     retrieval_min_coverage: float,
-    video_only: bool,
-    recompile_cards: bool,
+    from_step: str | None,
     language: str,
 ) -> None:
     """Run or re-render an existing lesson ID.
 
-    Without --video-only: re-runs the full generation pipeline for LESSON_ID
+    Without --from-step: re-runs the full generation pipeline for LESSON_ID
     (requires --theme).
 
-    With --video-only: loads the stored lesson context from content.json and
-    renders the video without regenerating any content.
+    With --from-step: loads the stored lesson checkpoint and runs only the
+    render sub-pipeline (compile_assets / render_video).
     """
-    if video_only:
-        from .lesson_pipeline import render_existing_lesson
-        try:
-            video_path = render_existing_lesson(
-                lesson_id=lesson_id,
-                output_dir=Path(output_dir) if output_dir else None,
-                theme=theme or "",
-                profile=profile,
-                recompile_cards=recompile_cards,
-                language=language,
-                verbose=True,
-            )
-            click.echo(f"Video rendered: {video_path}")
-        except Exception as exc:
-            raise click.ClickException(_friendly_error(exc)) from exc
+    if from_step is not None:
+        _run_lesson_generation(
+            theme=theme or "",
+            nouns=nouns,
+            verbs=verbs,
+            sentences=sentences,
+            grammar_points=grammar_points,
+            grammar_points_per_block=grammar_points_per_block,
+            blocks=blocks,
+            seed=seed,
+            curriculum_path=curriculum_path,
+            output_dir=output_dir,
+            no_video=False,
+            no_cache=no_cache,
+            dry_run=dry_run,
+            profile=profile,
+            narrative=narrative,
+            narrative_file=narrative_file,
+            retrieval=retrieval,
+            retrieval_store=retrieval_store,
+            retrieval_backend=retrieval_backend,
+            retrieval_embedding_model=retrieval_embedding_model,
+            retrieval_min_coverage=retrieval_min_coverage,
+            language=language,
+            regenerate_lesson_id=lesson_id,
+            from_step=from_step,
+        )
     else:
         if not theme:
-            raise click.UsageError("--theme is required unless --video-only is set.")
+            raise click.UsageError("--theme is required unless --from-step is set.")
         _run_lesson_generation(
             theme=theme,
             nouns=nouns,
@@ -701,22 +714,20 @@ def lesson_regenerate(lesson_id, theme, nouns, verbs, sentences, grammar_points,
 @click.option("--recompile-cards", is_flag=True, default=False)
 @LANGUAGE_OPTION
 def lesson_render(lesson_id, output_dir, theme, profile, recompile_cards, language):
-    """Deprecated: use `lesson update LESSON_ID --video-only` instead."""
-    from .lesson_pipeline import render_existing_lesson
-
-    try:
-        video_path = render_existing_lesson(
-            lesson_id=lesson_id,
-            output_dir=Path(output_dir) if output_dir else None,
-            theme=theme,
-            profile=profile,
-            recompile_cards=recompile_cards,
-            language=language,
-            verbose=True,
-        )
-        click.echo(f"Video rendered: {video_path}")
-    except Exception as exc:
-        raise click.ClickException(_friendly_error(exc)) from exc
+    """Deprecated: use `lesson update LESSON_ID --from-step render_video` instead."""
+    from_step = "compile_assets" if recompile_cards else "render_video"
+    _run_lesson_generation(
+        theme=theme or "",
+        nouns=4, verbs=3, sentences=3, grammar_points=2, grammar_points_per_block=1,
+        blocks=1, seed=None, curriculum_path=None, output_dir=output_dir,
+        no_video=False, no_cache=False, dry_run=False, profile=profile,
+        narrative=(), narrative_file=None, retrieval=True,
+        retrieval_store=None, retrieval_backend="file",
+        retrieval_embedding_model="text-embedding-3-small",
+        retrieval_min_coverage=0.6, language=language,
+        regenerate_lesson_id=lesson_id,
+        from_step=from_step,
+    )
 
 
 # kept for backward compatibility
@@ -782,29 +793,27 @@ def lesson_next(theme, nouns, verbs, sentences, grammar_points, grammar_points_p
 @click.option("--retrieval-backend", default="file", show_default=True, type=click.Choice(["file", "chroma"]))
 @click.option("--retrieval-embedding-model", default="text-embedding-3-small", show_default=True)
 @click.option("--retrieval-min-coverage", type=float, default=0.6, show_default=True)
-@click.option("--video-only", is_flag=True, default=False)
-@click.option("--recompile-cards", is_flag=True, default=False)
+@click.option("--from-step", "from_step", default=None, type=click.Choice(["compile_assets", "compile_touches", "render_video"]))
 @LANGUAGE_OPTION
-def lesson_run_compat(lesson_id, theme, nouns, verbs, sentences, grammar_points, grammar_points_per_block, blocks, seed, curriculum_path, output_dir, no_video, no_cache, dry_run, profile, narrative, narrative_file, retrieval, retrieval_store, retrieval_backend, retrieval_embedding_model, retrieval_min_coverage, video_only, recompile_cards, language):
+def lesson_run_compat(lesson_id, theme, nouns, verbs, sentences, grammar_points, grammar_points_per_block, blocks, seed, curriculum_path, output_dir, no_video, no_cache, dry_run, profile, narrative, narrative_file, retrieval, retrieval_store, retrieval_backend, retrieval_embedding_model, retrieval_min_coverage, from_step, language):
     """Deprecated: use `lesson update LESSON_ID` instead."""
-    if video_only:
-        from .lesson_pipeline import render_existing_lesson
-        try:
-            video_path = render_existing_lesson(
-                lesson_id=lesson_id,
-                output_dir=Path(output_dir) if output_dir else None,
-                theme=theme or "",
-                profile=profile,
-                recompile_cards=recompile_cards,
-                language=language,
-                verbose=True,
-            )
-            click.echo(f"Video rendered: {video_path}")
-        except Exception as exc:
-            raise click.ClickException(_friendly_error(exc)) from exc
+    if from_step is not None:
+        _run_lesson_generation(
+            theme=theme or "",
+            nouns=nouns, verbs=verbs, sentences=sentences,
+            grammar_points=grammar_points, grammar_points_per_block=grammar_points_per_block,
+            blocks=blocks, seed=seed, curriculum_path=curriculum_path, output_dir=output_dir,
+            no_video=False, no_cache=no_cache, dry_run=dry_run, profile=profile,
+            narrative=narrative, narrative_file=narrative_file, retrieval=retrieval,
+            retrieval_store=retrieval_store, retrieval_backend=retrieval_backend,
+            retrieval_embedding_model=retrieval_embedding_model,
+            retrieval_min_coverage=retrieval_min_coverage, language=language,
+            regenerate_lesson_id=lesson_id,
+            from_step=from_step,
+        )
     else:
         if not theme:
-            raise click.UsageError("--theme is required unless --video-only is set.")
+            raise click.UsageError("--theme is required unless --from-step is set.")
         _run_lesson_generation(
             theme=theme, nouns=nouns, verbs=verbs, sentences=sentences,
             grammar_points=grammar_points, grammar_points_per_block=grammar_points_per_block,

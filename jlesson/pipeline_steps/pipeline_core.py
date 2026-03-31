@@ -42,6 +42,8 @@ class LessonConfig:
     retrieval_min_coverage: float = 0.6
     retrieval_limit: int = 24
     regenerate_lesson_id: int | None = None
+    # Step name to resume from (loads checkpoint; skips content generation)
+    from_step: str | None = None
 
 
 @dataclass(frozen=True)
@@ -90,8 +92,11 @@ class LessonContext:
     report_path: Path | None = None
     language_config: LanguageConfig | None = None
     retrieval_result: RetrievalResult | None = None
+    pipeline_started_at: str = ""
     completed_steps: list[str] = field(default_factory=list)
     step_timings: dict[str, float] = field(default_factory=dict)
+    # Per-step detail records accumulated during run
+    step_details: dict[str, dict] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.language_config is None:
