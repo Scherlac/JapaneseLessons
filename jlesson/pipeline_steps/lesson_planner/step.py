@@ -50,11 +50,13 @@ class LessonPlannerStep(ActionStep[LessonPlannerChunk, LessonPlannerResult]):
         ]
 
         lesson_number = len(ctx.curriculum.lessons) + 1
+        if ctx.canonical_vocab is None:
+            raise RuntimeError(
+                "canonical_vocab is not set — CanonicalVocabSelectStep must run before LessonPlannerStep"
+            )
         return [
             LessonPlannerChunk(
-                vocab=ctx.vocab,
-                nouns=list(ctx.nouns),
-                verbs=list(ctx.verbs),
+                canonical=ctx.canonical_vocab,
                 block_index=0,
                 lesson_number=lesson_number,
                 lesson_blocks=ctx.config.lesson_blocks,
@@ -75,6 +77,7 @@ class LessonPlannerStep(ActionStep[LessonPlannerChunk, LessonPlannerResult]):
         ctx.lesson_outline = result.outline
         ctx.selected_grammar = result.selected_grammar
         ctx.selected_grammar_blocks = result.selected_grammar_blocks
+        ctx.canonical_plan = result.canonical_plan
         self._log(ctx, f"       selected : {[g.id for g in ctx.selected_grammar]}")
         self._log(ctx, f"       rationale: {result.outline.rationale}")
         if ctx.selected_grammar_blocks:

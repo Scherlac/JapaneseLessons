@@ -183,8 +183,12 @@ def normalize_vocab_item(item: dict, lc: "LanguageConfig") -> dict:
     source_text = item.get(src_key, "") if src_key else ""
     target_text = item.get(tgt_key, "") if tgt_key else ""
     phonetic_text = item.get(ph_key, "") if ph_key else ""
+    # Use the English canonical term as the stable identifier so that
+    # downstream vocab-selection can match against English narrative terms.
+    # Fall back to the source-language text only when English is absent.
+    canonical_id = item.get("english", "").strip().lower() or source_text.strip().lower()
     return {
-        "id": source_text.strip().lower(),
+        "id": canonical_id,
         "source": source_text,
         "target": target_text,
         "phonetic": phonetic_text,

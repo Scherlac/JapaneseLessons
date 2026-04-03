@@ -68,8 +68,8 @@ class PromptInterface(ABC):
     def build_grammar_select_prompt(
         self,
         unlocked_grammar: list[GrammarItem],
-        available_nouns: list[GeneralItem],
-        available_verbs: list[GeneralItem],
+        available_nouns: list[str],
+        available_verbs: list[str],
         lesson_number: int,
         covered_grammar_ids: list[str],
         selection_count: int = 2,

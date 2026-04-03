@@ -45,7 +45,23 @@ class PartialItem(BaseModel):
     pronunciation: str = ""
     extra: dict[str, Any] = Field(default_factory=dict)
     assets: dict[str, Path] = Field(default_factory=dict)
-    
+
+
+class CanonicalItem(BaseModel):
+    """Meaning-stable canonical representation of a lesson vocabulary term.
+
+    Language-neutral.  Source of truth for retrieval, embeddings, and
+    cross-language branch attachment.  ``text`` is the canonical English
+    word or phrase; ``gloss`` disambiguates when the same surface form has
+    multiple senses; ``context`` anchors meaning to the narrative passage
+    the term came from.
+    """
+
+    text: str = ""
+    concept_type: str = ""   # "noun" | "verb" | "sentence" | "phrase"
+    gloss: str = ""          # short disambiguation note
+    context: str = ""        # narrative context that anchors the intended meaning
+
 
 class GeneralItem(_NullStrCoerce):
     """A general lesson item with flexible fields for any language pair.
@@ -57,7 +73,7 @@ class GeneralItem(_NullStrCoerce):
     varying requirements.
     """
     id: str = ""
-    canonical_text: str = ""
+    canonical: CanonicalItem = Field(default_factory=CanonicalItem)
     source: PartialItem = Field(default_factory=PartialItem)
     target: PartialItem = Field(default_factory=PartialItem)
     assets: dict[str, Path] = Field(default_factory=dict)

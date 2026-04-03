@@ -4,22 +4,24 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from jlesson.models import GeneralItem, GrammarItem
+from jlesson.models import GrammarItem
 
 from ..pipeline_core import (
     ActionConfig,
     BlockOutline,
+    CanonicalLessonPlan,
+    CanonicalVocabSelection,
     LessonOutline,
-    SelectedVocabSet,
     StepAction,
 )
 from .prompt import GrammarCoverageInfo, build_lesson_plan_prompt
 
 
 @dataclass
-class LessonPlannerChunk(SelectedVocabSet):
+class LessonPlannerChunk:
     """All data the lesson planner needs for one planning call."""
 
+    canonical: CanonicalVocabSelection
     block_index: int
     lesson_number: int
     lesson_blocks: int
@@ -37,6 +39,7 @@ class LessonPlannerResult:
     outline: LessonOutline
     selected_grammar: list[GrammarItem]
     selected_grammar_blocks: list[list[GrammarItem]]
+    canonical_plan: CanonicalLessonPlan
 
 
 def _project_grammar(
@@ -77,8 +80,8 @@ class LessonPlannerAction(StepAction[LessonPlannerChunk, LessonPlannerResult]):
             grammar_points_per_lesson=config.lesson.grammar_points_per_lesson,
             grammar_points_per_block=config.lesson.grammar_points_per_block,
             sentences_per_grammar=config.lesson.sentences_per_grammar,
-            noun_names=[n.source.display_text for n in chunk.nouns],
-            verb_names=[v.source.display_text for v in chunk.verbs],
+            noun_names=[n.text for n in chunk.canonical.nouns],
+            verb_names=[v.text for v in chunk.canonical.verbs],
         )
 
         # ── Pass 1: draft outline ────────────────────────────────────────
@@ -115,6 +118,15 @@ class LessonPlannerAction(StepAction[LessonPlannerChunk, LessonPlannerResult]):
             outline=outline,
             selected_grammar=selected_grammar,
             selected_grammar_blocks=selected_grammar_blocks,
+            canonical_plan=CanonicalLessonPlan(
+                theme=config.lesson.theme,
+                lesson_number=chunk.lesson_number,
+                narrative_blocks=chunk.narrative_blocks,
+                canonical_vocab=chunk.canonical,
+                grammar_ids=[g.id for g in selected_grammar],
+                grammar_blocks=[[g.id for g in block] for block in selected_grammar_blocks],
+                lesson_outline=outline,
+            ),
         )
 
     @staticmethod

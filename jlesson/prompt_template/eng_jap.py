@@ -406,8 +406,8 @@ Return ONLY a raw JSON object — no markdown fences, no commentary:
 
 def build_grammar_select_prompt(
     unlocked_grammar: list[GrammarItem],
-    available_nouns: list[GeneralItem],
-    available_verbs: list[GeneralItem],
+    available_nouns: list[str],
+    available_verbs: list[str],
     lesson_number: int,
     covered_grammar_ids: list[str],
     selection_count: int = 2,
@@ -421,8 +421,8 @@ def build_grammar_select_prompt(
         f"    level: {g.level}"
         for g in unlocked_grammar
     )
-    noun_names = ", ".join(n.source.display_text for n in available_nouns)
-    verb_names = ", ".join(v.source.display_text for v in available_verbs)
+    noun_names = ", ".join(available_nouns)
+    verb_names = ", ".join(available_verbs)
     covered_str = ", ".join(covered_grammar_ids) if covered_grammar_ids else "(none)"
 
     return f"""\
@@ -683,8 +683,8 @@ class EngJapPrompts(PromptInterface):
     def build_grammar_select_prompt(
         self,
         unlocked_grammar: list[GrammarItem],
-        available_nouns: list[GeneralItem],
-        available_verbs: list[GeneralItem],
+        available_nouns: list[str],
+        available_verbs: list[str],
         lesson_number: int,
         covered_grammar_ids: list[str],
         selection_count: int = 2,

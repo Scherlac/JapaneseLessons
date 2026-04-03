@@ -26,6 +26,7 @@ from jlesson.lesson_pipeline import (
     run_pipeline,
 )
 from jlesson.models import CompiledItem, ItemAssets, NounItem, Phase, Touch, TouchIntent, TouchType, VerbItem, Sentence, GeneralItem, PartialItem, VocabFile, VocabItem
+from jlesson.pipeline_steps.pipeline_core import CanonicalItem, CanonicalVocabSelection
 from jlesson.item_generator.eng_jap import EngJapItemGenerator
 from jlesson.retrieval import CanonicalLessonNode, FileBackedRetrievalService, LanguageBranch
 
@@ -162,6 +163,10 @@ def test_select_vocab_with_seed_is_deterministic(config):
 def test_grammar_select_picks_valid_grammar(ctx):
     ctx.nouns = _NOUN_ITEMS[:2]
     ctx.verbs = _VERB_ITEMS[:2]
+    ctx.canonical_vocab = CanonicalVocabSelection(
+        nouns=[CanonicalItem(text=n.id, concept_type="noun") for n in _NOUN_ITEMS[:2]],
+        verbs=[CanonicalItem(text=v.id, concept_type="verb") for v in _VERB_ITEMS[:2]],
+    )
     mock_result = {
         "selected_ids": ["action_present_affirmative"],
         "rationale": "Good start",
@@ -175,6 +180,10 @@ def test_grammar_select_picks_valid_grammar(ctx):
 def test_grammar_select_falls_back_when_llm_empty(ctx):
     ctx.nouns = _NOUN_ITEMS[:2]
     ctx.verbs = _VERB_ITEMS[:2]
+    ctx.canonical_vocab = CanonicalVocabSelection(
+        nouns=[CanonicalItem(text=n.id, concept_type="noun") for n in _NOUN_ITEMS[:2]],
+        verbs=[CanonicalItem(text=v.id, concept_type="verb") for v in _VERB_ITEMS[:2]],
+    )
     with patch("jlesson.runtime.PipelineRuntime.ask_llm", return_value={}):
         ctx = GrammarSelectStep().execute(ctx)
     assert len(ctx.selected_grammar) >= 1
@@ -183,6 +192,10 @@ def test_grammar_select_falls_back_when_llm_empty(ctx):
 def test_grammar_select_skips_unknown_ids(ctx):
     ctx.nouns = _NOUN_ITEMS[:2]
     ctx.verbs = _VERB_ITEMS[:2]
+    ctx.canonical_vocab = CanonicalVocabSelection(
+        nouns=[CanonicalItem(text=n.id, concept_type="noun") for n in _NOUN_ITEMS[:2]],
+        verbs=[CanonicalItem(text=v.id, concept_type="verb") for v in _VERB_ITEMS[:2]],
+    )
     mock_result = {"selected_ids": ["nonexistent_grammar_id"]}
     with patch("jlesson.runtime.PipelineRuntime.ask_llm", return_value=mock_result):
         ctx = GrammarSelectStep().execute(ctx)

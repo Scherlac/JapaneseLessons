@@ -148,8 +148,8 @@ class TestBuildGrammarSelectPrompt:
     def test_returns_non_empty_string(self, level1_grammar, sample_nouns, sample_verbs):
         prompt = build_grammar_select_prompt(
             unlocked_grammar=level1_grammar,
-            available_nouns=sample_nouns,
-            available_verbs=sample_verbs,
+            available_nouns=[n.canonical.text for n in sample_nouns],
+            available_verbs=[v.canonical.text for v in sample_verbs],
             lesson_number=1,
             covered_grammar_ids=[],
         )
@@ -159,8 +159,8 @@ class TestBuildGrammarSelectPrompt:
     def test_contains_grammar_ids(self, level1_grammar, sample_nouns, sample_verbs):
         prompt = build_grammar_select_prompt(
             unlocked_grammar=level1_grammar,
-            available_nouns=sample_nouns,
-            available_verbs=sample_verbs,
+            available_nouns=[n.canonical.text for n in sample_nouns],
+            available_verbs=[v.canonical.text for v in sample_verbs],
             lesson_number=1,
             covered_grammar_ids=[],
         )
@@ -168,32 +168,34 @@ class TestBuildGrammarSelectPrompt:
             assert g.id in prompt
 
     def test_contains_noun_names(self, level1_grammar, sample_nouns, sample_verbs):
+        noun_names = [n.canonical.text for n in sample_nouns]
         prompt = build_grammar_select_prompt(
             unlocked_grammar=level1_grammar,
-            available_nouns=sample_nouns,
-            available_verbs=sample_verbs,
+            available_nouns=noun_names,
+            available_verbs=[v.canonical.text for v in sample_verbs],
             lesson_number=1,
             covered_grammar_ids=[],
         )
-        for noun in sample_nouns:
-            assert noun.source.display_text in prompt
+        for name in noun_names:
+            assert name in prompt
 
     def test_contains_verb_names(self, level1_grammar, sample_nouns, sample_verbs):
+        verb_names = [v.canonical.text for v in sample_verbs]
         prompt = build_grammar_select_prompt(
             unlocked_grammar=level1_grammar,
-            available_nouns=sample_nouns,
-            available_verbs=sample_verbs,
+            available_nouns=[n.canonical.text for n in sample_nouns],
+            available_verbs=verb_names,
             lesson_number=1,
             covered_grammar_ids=[],
         )
-        for verb in sample_verbs:
-            assert verb.source.display_text in prompt
+        for name in verb_names:
+            assert name in prompt
 
     def test_shows_covered_grammar_ids(self, level1_grammar, sample_nouns, sample_verbs):
         prompt = build_grammar_select_prompt(
             unlocked_grammar=level1_grammar,
-            available_nouns=sample_nouns,
-            available_verbs=sample_verbs,
+            available_nouns=[n.canonical.text for n in sample_nouns],
+            available_verbs=[v.canonical.text for v in sample_verbs],
             lesson_number=2,
             covered_grammar_ids=["action_present_affirmative"],
         )
@@ -202,8 +204,8 @@ class TestBuildGrammarSelectPrompt:
     def test_shows_none_when_no_covered_grammar(self, level1_grammar, sample_nouns, sample_verbs):
         prompt = build_grammar_select_prompt(
             unlocked_grammar=level1_grammar,
-            available_nouns=sample_nouns,
-            available_verbs=sample_verbs,
+            available_nouns=[n.canonical.text for n in sample_nouns],
+            available_verbs=[v.canonical.text for v in sample_verbs],
             lesson_number=1,
             covered_grammar_ids=[],
         )
@@ -212,8 +214,8 @@ class TestBuildGrammarSelectPrompt:
     def test_json_skeleton_has_selected_ids_key(self, level1_grammar, sample_nouns, sample_verbs):
         prompt = build_grammar_select_prompt(
             unlocked_grammar=level1_grammar,
-            available_nouns=sample_nouns,
-            available_verbs=sample_verbs,
+            available_nouns=[n.canonical.text for n in sample_nouns],
+            available_verbs=[v.canonical.text for v in sample_verbs],
             lesson_number=1,
             covered_grammar_ids=[],
         )

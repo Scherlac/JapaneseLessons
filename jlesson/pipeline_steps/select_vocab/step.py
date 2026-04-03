@@ -6,7 +6,7 @@ from typing import Callable
 from jlesson.models import GeneralItem, VocabItem
 from jlesson.runtime import PipelineRuntime
 
-from ..pipeline_core import ActionStep, LessonContext, NarrativeVocabPlan, SelectedVocabSet
+from ..pipeline_core import ActionStep, LessonContext, SelectedVocabSet
 from .action import SelectVocabAction, SelectVocabRequest
 
 
@@ -52,17 +52,12 @@ class SelectVocabStep(ActionStep[SelectVocabRequest, SelectedVocabSet]):
 
     def build_chunks(self, ctx: LessonContext) -> list[SelectVocabRequest]:
         vocab_dir = self._JLESSON_ROOT / ctx.language_config.vocab_dir
-        narrative_plan = (
-            NarrativeVocabPlan(blocks=ctx.narrative_vocab_terms)
-            if ctx.narrative_vocab_terms
-            else None
-        )
         return [
             SelectVocabRequest(
                 vocab=ctx.vocab,
                 vocab_dir=vocab_dir,
                 theme=ctx.config.theme,
-                narrative_plan=narrative_plan,
+                canonical_selection=ctx.canonical_vocab,
                 narrative_blocks=list(ctx.narrative_blocks),
                 covered_nouns=list(ctx.curriculum.covered_nouns),
                 covered_verbs=list(ctx.curriculum.covered_verbs),

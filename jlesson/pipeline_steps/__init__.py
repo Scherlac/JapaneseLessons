@@ -2,6 +2,8 @@ from importlib import import_module
 
 from .pipeline_core import (
 	BlockOutline,
+	CanonicalLessonPlan,
+	CanonicalVocabSelection,
 	CompiledItemSequence,
 	LessonConfig,
 	LessonContext,
@@ -22,6 +24,7 @@ from .pipeline_core import (
 
 
 _STEP_EXPORTS = {
+	"CanonicalVocabSelectStep": ".canonical_vocab_select",
 	"CompileAssetsStep": ".compile_assets",
 	"CompileTouchesStep": ".compile_touches",
 	"ExtractNarrativeVocabStep": ".extract_narrative_vocab",
@@ -54,6 +57,9 @@ def __getattr__(name: str):
 
 
 __all__ = [
+	"CanonicalLessonPlan",
+	"CanonicalVocabSelectStep",
+	"CanonicalVocabSelection",
 	"CompileAssetsStep",
 	"CompileTouchesStep",
 	"ExtractNarrativeVocabStep",

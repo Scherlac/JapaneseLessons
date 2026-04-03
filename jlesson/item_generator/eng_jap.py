@@ -1,4 +1,4 @@
-from ..models import GeneralItem, PartialItem, Sentence
+from ..models import CanonicalItem, GeneralItem, PartialItem, Sentence
 from ._base import ItemGenerator
 
 
@@ -44,8 +44,11 @@ class EngJapItemGenerator(ItemGenerator):
         )
 
     def convert_raw_noun(self, source_item: dict) -> GeneralItem:
+        english = source_item.get("english", "")
         return GeneralItem(
-            source=PartialItem(display_text=source_item["english"]),
+            id=english.strip().lower(),
+            canonical=CanonicalItem(text=english, concept_type="noun"),
+            source=PartialItem(display_text=english),
             target=PartialItem(
                 display_text=source_item.get("japanese", ""),
                 pronunciation=source_item.get("romaji", ""),
@@ -54,8 +57,11 @@ class EngJapItemGenerator(ItemGenerator):
         )
 
     def convert_raw_verb(self, source_item: dict) -> GeneralItem:
+        english = source_item.get("english", "")
         return GeneralItem(
-            source=PartialItem(display_text=source_item["english"]),
+            id=english.strip().lower(),
+            canonical=CanonicalItem(text=english, concept_type="verb"),
+            source=PartialItem(display_text=english),
             target=PartialItem(
                 display_text=source_item.get("japanese", ""),
                 pronunciation=source_item.get("romaji", ""),

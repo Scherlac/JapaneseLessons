@@ -1,4 +1,4 @@
-from ..models import GeneralItem, PartialItem, Sentence
+from ..models import CanonicalItem, GeneralItem, PartialItem, Sentence
 from ._base import ItemGenerator
 
 
@@ -10,10 +10,10 @@ class HunGerItemGenerator(ItemGenerator):
     """
 
     def convert_noun(self, llm_item: dict, base_item: GeneralItem) -> GeneralItem:
-        canonical = llm_item.get("english", "") or base_item.canonical_text
+        canonical = llm_item.get("english", "") or base_item.canonical.text
         return GeneralItem(
             id=base_item.id,
-            canonical_text=canonical,
+            canonical=CanonicalItem(text=canonical, concept_type="noun"),
             source=PartialItem(
                 display_text=base_item.source.display_text,
                 extra={
@@ -34,10 +34,10 @@ class HunGerItemGenerator(ItemGenerator):
         )
 
     def convert_verb(self, llm_item: dict, base_item: GeneralItem) -> GeneralItem:
-        canonical = llm_item.get("english", "") or base_item.canonical_text
+        canonical = llm_item.get("english", "") or base_item.canonical.text
         return GeneralItem(
             id=base_item.id,
-            canonical_text=canonical,
+            canonical=CanonicalItem(text=canonical, concept_type="verb"),
             source=PartialItem(
                 display_text=base_item.source.display_text,
                 extra=base_item.source.extra,
@@ -57,7 +57,7 @@ class HunGerItemGenerator(ItemGenerator):
 
     def convert_sentence(self, llm_item: dict) -> Sentence:
         return Sentence(
-            canonical_text=llm_item.get("english", ""),
+            canonical=CanonicalItem(text=llm_item.get("english", ""), concept_type="sentence"),
             source=PartialItem(display_text=llm_item.get("hungarian", "")),
             target=PartialItem(
                 display_text=llm_item.get("german", ""),
@@ -68,8 +68,10 @@ class HunGerItemGenerator(ItemGenerator):
         )
 
     def convert_raw_noun(self, source_item: dict) -> GeneralItem:
+        english = source_item.get("english", "")
         return GeneralItem(
-            canonical_text=source_item.get("english", ""),
+            id=english.strip().lower(),
+            canonical=CanonicalItem(text=english, concept_type="noun"),
             source=PartialItem(display_text=source_item.get("hungarian", "")),
             target=PartialItem(
                 display_text=source_item.get("german", ""),
@@ -79,8 +81,10 @@ class HunGerItemGenerator(ItemGenerator):
         )
 
     def convert_raw_verb(self, source_item: dict) -> GeneralItem:
+        english = source_item.get("english", "")
         return GeneralItem(
-            canonical_text=source_item.get("english", ""),
+            id=english.strip().lower(),
+            canonical=CanonicalItem(text=english, concept_type="verb"),
             source=PartialItem(display_text=source_item.get("hungarian", "")),
             target=PartialItem(
                 display_text=source_item.get("german", ""),

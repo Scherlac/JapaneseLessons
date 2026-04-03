@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from jlesson.models import GrammarItem
 
-from ..pipeline_core import ActionConfig, SelectedVocabSet, StepAction
+from ..pipeline_core import ActionConfig, CanonicalVocabSelection, StepAction
 
 
 def _project_grammar(
@@ -53,9 +53,10 @@ def _build_block_progression(
 
 
 @dataclass
-class GrammarSelectChunk(SelectedVocabSet):
+class GrammarSelectChunk:
     """All data the grammar select action needs for one lesson-wide selection call."""
 
+    canonical: CanonicalVocabSelection
     block_index: int
     progression: list[GrammarItem]
     unlocked: list[GrammarItem]
@@ -79,8 +80,8 @@ class GrammarSelectAction(StepAction[GrammarSelectChunk, GrammarSelectResult]):
 
         prompt = config.language.prompts.build_grammar_select_prompt(
             chunk.unlocked,
-            list(chunk.nouns),
-            list(chunk.verbs),
+            [n.text for n in chunk.canonical.nouns],
+            [v.text for v in chunk.canonical.verbs],
             chunk.lesson_number,
             covered_grammar_ids=chunk.covered_grammar_ids,
             selection_count=config.lesson.grammar_points_per_lesson,

@@ -8,6 +8,7 @@ from typing import Generic, TypeVar
 from jlesson.language_config import LanguageConfig, get_language_config
 from jlesson.lesson_report import ReportBuilder
 from jlesson.models import CompiledItem, GeneralItem, GrammarItem, NarrativeVocabBlock, Sentence, Touch, VocabFile
+from jlesson.models import CanonicalItem
 from jlesson.curriculum import CurriculumData
 from jlesson.retrieval import RetrievalResult
 from jlesson.runtime.interfaces import RuntimeServices
@@ -75,6 +76,8 @@ class LessonContext:
     vocab: VocabFile | None = None
     nouns: list[GeneralItem] = field(default_factory=list)
     verbs: list[GeneralItem] = field(default_factory=list)
+    canonical_vocab: CanonicalVocabSelection | None = None
+    canonical_plan: CanonicalLessonPlan | None = None
     narrative_blocks: list[str] = field(default_factory=list)
     narrative_vocab_terms: list[NarrativeVocabBlock] = field(default_factory=list)
     selected_grammar: list[GrammarItem] = field(default_factory=list)
@@ -253,6 +256,50 @@ class SelectedVocabSet:
     vocab: VocabFile | None
     nouns: list[GeneralItem]
     verbs: list[GeneralItem]
+
+
+@dataclass
+class CanonicalVocabSelection:
+    """Canonical (language-neutral) vocabulary selection for the planning phase.
+
+    All fields use English canonical terms only — no source or target language
+    forms.  This artifact is produced by ``CanonicalVocabSelectStep`` and
+    consumed by ``LessonPlannerStep`` and ``GrammarSelectStep`` so that the
+    entire planning phase stays free of language-specific content.
+
+    ``nouns_per_block`` and ``verbs_per_block`` record which canonical terms
+    are assigned to each lesson block.  ``SelectVocabStep`` uses these lists
+    during Phase 2 to look up the matching ``VocabItem`` rows in the
+    generated ``VocabFile`` and build ``GeneralItem`` objects.
+
+    Context field: ``LessonContext.canonical_vocab``
+    """
+
+    nouns: list[CanonicalItem] = field(default_factory=list)
+    verbs: list[CanonicalItem] = field(default_factory=list)
+    nouns_per_block: list[list[str]] = field(default_factory=list)  # canonical texts per block (index matches block_index)
+    verbs_per_block: list[list[str]] = field(default_factory=list)
+
+
+@dataclass
+class CanonicalLessonPlan:
+    """Fully-resolved lesson plan expressed in canonical (English) terms only.
+
+    Assembled by ``LessonPlannerStep.merge_outputs`` after the two-pass
+    planning LLM calls complete.  Persisting this artifact to disk is the
+    Phase-1 / Phase-2 boundary: the same plan can later be loaded to drive
+    a different language pair without repeating planning-phase LLM calls.
+
+    Context field: ``LessonContext.canonical_plan``
+    """
+
+    theme: str
+    lesson_number: int
+    narrative_blocks: list[str]
+    canonical_vocab: CanonicalVocabSelection
+    grammar_ids: list[str]
+    grammar_blocks: list[list[str]]
+    lesson_outline: "LessonOutline | None" = None
 
 
 @dataclass

@@ -39,6 +39,7 @@ from pathlib import Path
 
 from jlesson.curriculum import load_curriculum
 from jlesson.pipeline_steps import (
+    CanonicalVocabSelectStep,
     CompileAssetsStep,
     CompileTouchesStep,
     ExtractNarrativeVocabStep,
@@ -70,6 +71,7 @@ def _build_pipeline() -> list[PipelineStep]:
         RetrieveLessonMaterialStep(),
         NarrativeGeneratorStep(),
         ExtractNarrativeVocabStep(),
+        CanonicalVocabSelectStep(),
         GenerateNarrativeVocabStep(),
         SelectVocabStep(),
         LessonPlannerStep(),  # two-pass lesson outline (replaces GrammarSelectStep)

@@ -12,6 +12,7 @@ from jlesson.lesson_pipeline import (
     LessonContext,
     NarrativeGeneratorStep,
 )
+from jlesson.pipeline_steps.pipeline_core import CanonicalItem, CanonicalVocabSelection
 from jlesson.prompt_template import build_grammar_generate_prompt
 
 _GEN = EngJapItemGenerator()
@@ -195,6 +196,10 @@ def test_grammar_select_builds_block_progression(tmp_path: Path):
         "type": "う-verb",
         "masu_form": "飛びます",
     })]
+    ctx.canonical_vocab = CanonicalVocabSelection(
+        nouns=[CanonicalItem(text="cat", concept_type="noun")],
+        verbs=[CanonicalItem(text="to fly", concept_type="verb")],
+    )
 
     selected_ids = [
         "identity_present_affirmative",
@@ -234,6 +239,10 @@ def test_grammar_select_does_not_expand_lesson_count_for_many_blocks(tmp_path: P
         "type": "う-verb",
         "masu_form": "飛びます",
     })]
+    ctx.canonical_vocab = CanonicalVocabSelection(
+        nouns=[CanonicalItem(text="cat", concept_type="noun")],
+        verbs=[CanonicalItem(text="to fly", concept_type="verb")],
+    )
 
     with patch(
         "jlesson.runtime.PipelineRuntime.ask_llm",

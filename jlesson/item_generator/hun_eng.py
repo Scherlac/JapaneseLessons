@@ -1,4 +1,4 @@
-from ..models import GeneralItem, PartialItem, Sentence
+from ..models import CanonicalItem, GeneralItem, PartialItem, Sentence
 from ._base import ItemGenerator
 
 
@@ -46,19 +46,25 @@ class HunEngItemGenerator(ItemGenerator):
         )
 
     def convert_raw_noun(self, source_item: dict) -> GeneralItem:
+        english = source_item.get("english", "")
         return GeneralItem(
+            id=english.strip().lower(),
+            canonical=CanonicalItem(text=english, concept_type="noun"),
             source=PartialItem(display_text=source_item.get("hungarian", "")),
             target=PartialItem(
-                display_text=source_item["english"],
+                display_text=english,
                 pronunciation=source_item.get("pronunciation", "")
             )
         )
 
     def convert_raw_verb(self, source_item: dict) -> GeneralItem:
+        english = source_item.get("english", "")
         return GeneralItem(
+            id=english.strip().lower(),
+            canonical=CanonicalItem(text=english, concept_type="verb"),
             source=PartialItem(display_text=source_item.get("hungarian", "")),
             target=PartialItem(
-                display_text=source_item["english"],
+                display_text=english,
                 pronunciation=source_item.get("pronunciation", ""),
                 extra={"past_tense": source_item.get("past_tense", "")}
             )

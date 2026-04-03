@@ -6,7 +6,7 @@ from typing import Callable
 
 from jlesson.models import GeneralItem, VocabFile, VocabItem
 
-from ..pipeline_core import ActionConfig, NarrativeVocabPlan, SelectedVocabSet, StepAction
+from ..pipeline_core import ActionConfig, CanonicalVocabSelection, SelectedVocabSet, StepAction
 from .config import build_select_vocab_language_config
 from .prompt import build_vocab_gap_fill_prompt
 
@@ -18,7 +18,7 @@ class SelectVocabRequest:
     vocab: VocabFile | None
     vocab_dir: Path
     theme: str
-    narrative_plan: NarrativeVocabPlan | None
+    canonical_selection: CanonicalVocabSelection | None
     narrative_blocks: list[str]
     covered_nouns: list[str]
     covered_verbs: list[str]
@@ -42,9 +42,12 @@ class SelectVocabAction(StepAction[SelectVocabRequest, SelectedVocabSet]):
         requested_nouns = chunk.num_nouns_per_block * chunk.lesson_blocks
         requested_verbs = chunk.num_verbs_per_block * chunk.lesson_blocks
 
-        if chunk.narrative_plan and chunk.narrative_plan.blocks:
-            noun_terms = [block.nouns for block in chunk.narrative_plan.blocks]
-            verb_terms = [block.verbs for block in chunk.narrative_plan.blocks]
+        if chunk.canonical_selection is not None:
+            # Phase 2 path: use canonical English per-block terms.
+            # VocabItem.id is now the English canonical term so matching is
+            # language-neutral and consistent across language pairs.
+            noun_terms = chunk.canonical_selection.nouns_per_block
+            verb_terms = chunk.canonical_selection.verbs_per_block
             nouns = self._select_from_narrative(
                 vocab.nouns,
                 covered_items=chunk.covered_nouns,

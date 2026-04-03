@@ -30,11 +30,13 @@ class GrammarSelectStep(ActionStep[GrammarSelectChunk, GrammarSelectResult]):
             covered = []
             unlocked = _project_grammar(progression, covered, ctx.config.grammar_points_per_lesson)
         lesson_number = len(ctx.curriculum.lessons) + 1
+        if ctx.canonical_vocab is None:
+            raise RuntimeError(
+                "canonical_vocab is not set — CanonicalVocabSelectStep must run before GrammarSelectStep"
+            )
         return [
             GrammarSelectChunk(
-                vocab=ctx.vocab,
-                nouns=list(ctx.nouns),
-                verbs=list(ctx.verbs),
+                canonical=ctx.canonical_vocab,
                 block_index=0,
                 progression=progression,
                 unlocked=unlocked,

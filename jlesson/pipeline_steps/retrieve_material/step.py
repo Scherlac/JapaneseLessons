@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 from .action import RetrieveMaterialAction, RetrieveMaterialRequest
-from ..pipeline_core import ActionStep, LessonConfig, LessonContext, RetrievedMaterialArtifact
+from ..pipeline_core import (
+    ActionStep,
+    CanonicalVocabSelection,
+    LessonConfig,
+    LessonContext,
+    LessonOutline,
+    RetrievedMaterialArtifact,
+)
 
 
 class RetrieveLessonMaterialStep(ActionStep[RetrieveMaterialRequest, RetrievedMaterialArtifact]):
@@ -79,6 +86,17 @@ class RetrieveLessonMaterialStep(ActionStep[RetrieveMaterialRequest, RetrievedMa
             ctx.sentences = result.sentences
             ctx.selected_grammar = result.selected_grammar
             ctx.selected_grammar_blocks = result.selected_grammar_blocks
+            # Mark canonical planning as satisfied so planner/grammar-select guards pass.
+            if ctx.canonical_vocab is None:
+                ctx.canonical_vocab = CanonicalVocabSelection(
+                    nouns=[],
+                    verbs=[],
+                )
+            if ctx.lesson_outline is None:
+                ctx.lesson_outline = LessonOutline(
+                    blocks=[],
+                    grammar_ids=[g.id for g in ctx.selected_grammar],
+                )
             self._log(
                 ctx,
                 "       hit : "
