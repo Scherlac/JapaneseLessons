@@ -8,7 +8,6 @@ import jlesson.asset_compiler as asset_compiler
 from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
 from jlesson.models import GeneralItem, GeneralItem, Phase, Sentence
 from jlesson.profiles import get_profile
-from tests.test_lesson_pipeline import ctx
 
 from ..pipeline_core import ActionConfig, GeneralItemSequence, LessonBlock, StepAction
 

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from pydantic.v1 import BaseModel
+
 from .action import RegisterLessonAction, RegisterLessonRequest
-from ..pipeline_core import ActionStep, LessonContext, LessonRegistrationArtifact
+from ..pipeline_core import ActionStep, LessonContext, LessonPlan, LessonRegistrationArtifact
 
 
-class RegisterLessonStep(ActionStep[RegisterLessonRequest, LessonRegistrationArtifact]):
+class RegisterLessonStep(ActionStep[LessonPlan, BaseModel]):
     """Step 7 — Register and complete the lesson in curriculum.json."""
 
     name = "register_lesson"
@@ -16,27 +18,12 @@ class RegisterLessonStep(ActionStep[RegisterLessonRequest, LessonRegistrationArt
         return self._action
 
     def should_skip(self, ctx: LessonContext) -> bool:
-        return ctx.lesson_id > 0
+        if ctx.lesson_plan is None:
+            return False
+        return True
 
-    def build_input(self, ctx: LessonContext) -> RegisterLessonRequest:
-        return RegisterLessonRequest(
-            vocab=ctx.vocab,
-            nouns=list(ctx.nouns),
-            verbs=list(ctx.verbs),
-                noun_items=list(ctx.noun_items),
-                verb_items=list(ctx.verb_items),
-                theme=ctx.config.theme,
-                grammar_ids=[g.id for g in ctx.selected_grammar],
-                block_grammar_ids=[[g.id for g in block] for block in ctx.selected_grammar_blocks],
-                items_count=len(ctx.noun_items) + len(ctx.sentences),
-            )
-
-    def merge_output(self, ctx: LessonContext, outputs: LessonRegistrationArtifact) -> LessonContext:
-        result = outputs
-        ctx.lesson_registration = result
-        ctx.lesson_id = result.lesson_id
-        ctx.created_at = result.created_at
-        ctx.curriculum = result.curriculum
-        ctx.report.add("header", result.header_markdown)
-        self._log(ctx, f"       lesson #{ctx.lesson_id} -> {ctx.config.curriculum_path}")
+    def build_input(self, ctx: LessonContext) -> LessonPlan:
+        return ctx.lesson_plan
+    
+    def merge_output(self, ctx: LessonContext, outputs: BaseModel) -> LessonContext:
         return ctx

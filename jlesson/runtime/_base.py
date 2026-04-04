@@ -8,7 +8,7 @@ from jlesson.curriculum import load_curriculum, save_curriculum
 from jlesson.lesson_store import load_lesson_content, save_lesson_content
 from jlesson.llm_cache import ask_llm_cached
 from jlesson.llm_client import ask_llm_json_free
-from jlesson.models import LessonContent, VocabFile
+from jlesson.models import LessonContent
 from jlesson.retrieval import get_retrieval_service
 from jlesson.vocab_generator import generate_vocab, VOCAB_DIR
 
@@ -34,28 +34,6 @@ class PipelineRuntime:
         if ctx.config.use_cache:
             return ask_llm_cached(prompt)
         return ask_llm_json_free(prompt)
-
-    @staticmethod
-    def load_vocab(theme: str, vocab_dir: Path | None = None) -> VocabFile:
-        """Load vocab JSON for *theme*, generating via LLM if the file is absent.
-
-        File I/O is handled here (runtime concern).  When the file is missing,
-        generation is delegated to ``vocab_generator.generate_vocab`` (domain
-        concern) which validates, normalizes, and saves the result.
-        """
-        base_dir = Path(vocab_dir) if vocab_dir is not None else _DEFAULT_VOCAB_DIR
-        path = base_dir / f"{theme}.json"
-        if path.exists():
-            raw = json.loads(path.read_text(encoding="utf-8"))
-        else:
-            print(f"  [vocab] {theme}.json not found — generating via LLM...")
-            raw = generate_vocab(
-                theme=theme,
-                num_nouns=12,
-                num_verbs=10,
-                output_dir=base_dir,
-            )
-        return VocabFile.model_validate(raw)
 
     @staticmethod
     def read_json(path: Path, default: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -113,9 +91,6 @@ class ContextRuntime:
 
     def update_retrieval(self, theme: str, items: list[Any]) -> None:
         raise NotImplementedError("update_retrieval not yet migrated to ContextRuntime")
-
-    def load_vocab(self, theme: str, vocab_dir: Path | None = None) -> VocabFile:
-        return PipelineRuntime.load_vocab(theme, vocab_dir)
 
     # ── Lesson content storage ────────────────────────────────────────────────
 

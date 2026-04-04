@@ -22,7 +22,6 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from jlesson.curriculum import CurriculumData
-    from jlesson.models import VocabFile
     from jlesson.retrieval import RetrievalResult
 
 
@@ -58,9 +57,6 @@ class RuntimeServices(Protocol):
         """Index *items* into the retrieval store under *theme*."""
         ...
 
-    def load_vocab(self, theme: str, vocab_dir: Path | None = None) -> VocabFile:
-        """Load or generate the shared vocab file for *theme*."""
-        ...
 
     # ── Lesson content storage ────────────────────────────────────────────────
 
