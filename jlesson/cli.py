@@ -362,7 +362,7 @@ def _run_lesson_generation(
 @click.option("--dry-run", is_flag=True, default=False, help="Skip TTS/card/video — generate content and report only.")
 @click.option(
     "--profile",
-    default="passive_video",
+    default="simple_listen",
     show_default=True,
     type=click.Choice(["passive_video", "active_flash_cards", "simple_listen"]),
     help="Touch profile for asset compilation and video rendering.",

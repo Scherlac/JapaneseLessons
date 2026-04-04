@@ -18,7 +18,7 @@ class RenderVideoStep(ActionStep[RenderVideoRequest, RenderedVideoArtifact]):
         return self._action
 
     def should_skip(self, ctx: LessonContext) -> bool:
-        return bool(ctx.video_path)
+        return ctx.rendered_video is not None
 
     def build_input(self, ctx: LessonContext) -> RenderVideoRequest:
         if not ctx.config.render_video or ctx.config.dry_run:
@@ -26,8 +26,9 @@ class RenderVideoStep(ActionStep[RenderVideoRequest, RenderedVideoArtifact]):
             self._log(ctx, f"       ({reason})")
             return None
 
-        lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
-        return RenderVideoRequest(items=ctx.touches, lesson_dir=lesson_dir)
+        lesson_dir = resolve_lesson_dir(ctx.config)
+        touches = ctx.touch_sequence.items if ctx.touch_sequence else []
+        return RenderVideoRequest(items=touches, lesson_dir=lesson_dir)
 
     def merge_output(self, ctx: LessonContext, outputs: RenderedVideoArtifact) -> LessonContext:
         if not outputs:
@@ -35,12 +36,11 @@ class RenderVideoStep(ActionStep[RenderVideoRequest, RenderedVideoArtifact]):
 
         result = outputs
         ctx.rendered_video = result
-        lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
+        lesson_dir = resolve_lesson_dir(ctx.config)
         video_path = lesson_dir / "lesson.mp4"
 
         self._log(ctx, f"       {result.clip_count} clips -> {video_path.name}")
 
-        ctx.video_path = result.video_path
         if result.video_path is not None:
             size_kb = result.video_path.stat().st_size // 1024
             self._log(ctx, f"       OK  ({size_kb} KB)")

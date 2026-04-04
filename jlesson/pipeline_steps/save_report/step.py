@@ -21,15 +21,19 @@ class SaveReportStep(ActionStep[SaveReportRequest, ReportArtifact]):
         return self._action
 
     def should_skip(self, ctx: LessonContext) -> bool:
-        return bool(ctx.report_path)
+        return ctx.saved_report is not None
 
     def build_input(self, ctx: LessonContext) -> SaveReportRequest:
-        lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
+        lesson_dir = resolve_lesson_dir(ctx.config)
+        video_path = ctx.rendered_video.video_path if ctx.rendered_video else None
+        clip_count = ctx.rendered_video.clip_count if ctx.rendered_video else 0
+        cards_dir = ctx.rendered_video.cards_dir if ctx.rendered_video else None
+        audio_dir = ctx.rendered_video.audio_dir if ctx.rendered_video else None
         rendered = RenderedVideoArtifact(
-            video_path=ctx.video_path,
-            clip_count=len(ctx.touches),
-            cards_dir=(lesson_dir / "cards") if (lesson_dir / "cards").exists() else None,
-            audio_dir=(lesson_dir / "audio") if (lesson_dir / "audio").exists() else None,
+            video_path=video_path,
+            clip_count=clip_count,
+            cards_dir=cards_dir,
+            audio_dir=audio_dir,
         )
         return SaveReportRequest(
                 video_path=rendered.video_path,
@@ -44,15 +48,22 @@ class SaveReportStep(ActionStep[SaveReportRequest, ReportArtifact]):
     def merge_output(self, ctx: LessonContext, outputs: ReportArtifact) -> LessonContext:
         result = outputs if outputs else ReportArtifact(report_path=None)
         ctx.saved_report = result
-        ctx.report_path = result.report_path
-        self._log(ctx, f"       {ctx.report_path}")
+        self._log(ctx, f"       {result.report_path}")
         return ctx
 
     @staticmethod
     def _summary(ctx: LessonContext) -> str:
-        n_nouns = len(ctx.noun_items)
-        n_verbs = len(ctx.verb_items)
-        n_sentences = len(ctx.sentences)
+        noun_items = []
+        verb_items = []
+        sentences = []
+        if ctx.lesson_plan is not None:
+            for block in ctx.lesson_plan.blocks:
+                noun_items.extend(block.content_sequences.get(Phase.NOUNS, []))
+                verb_items.extend(block.content_sequences.get(Phase.VERBS, []))
+                sentences.extend(block.content_sequences.get(Phase.GRAMMAR, []))
+        n_nouns = len(noun_items)
+        n_verbs = len(verb_items)
+        n_sentences = len(sentences)
         total = n_nouns + n_verbs + n_sentences
         profile = get_profile(ctx.config.profile)
         counts = count_touches(n_nouns, n_verbs, n_sentences, profile)
