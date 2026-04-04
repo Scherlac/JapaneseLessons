@@ -11,6 +11,10 @@ the three-stage transformation: item_sequence → compiled_items → touch_seque
 from __future__ import annotations
 
 from enum import Enum
+import hashlib
+from random import random, sample
+import re
+
 from pathlib import Path
 from typing import Any, Union
 
@@ -81,6 +85,29 @@ class CanonicalItem(BaseModel):
         description=(
             """A brief gloss to disambiguate the meaning when the same surface form has multiple 
             senses, e.g. 'bank (river)' vs. 'bank (finance)'."""))
+    
+    SLUG_FILTER_REGEX: str = r'[^\w]+'
+    COMPILED_SLUG_FILTER_REGEX = re.compile(SLUG_FILTER_REGEX)
+
+    @staticmethod
+    def update_item(item: CanonicalItem, phase: Phase) -> None:
+        """Update the item's type and id based on its text, gloss, and phase."""
+        # Generate a stable ID based on the text, gloss, and phase
+        item.type = phase
+        
+        slug_text = CanonicalItem.COMPILED_SLUG_FILTER_REGEX.sub("_", item.text.lower().strip())
+        slug_gloss = CanonicalItem.COMPILED_SLUG_FILTER_REGEX.sub("_", item.gloss.lower().strip())
+        hash_input = f"{phase.value}_{slug_text}_{slug_gloss}"
+
+        gloss_hash = hashlib.sha1(hash_input.encode()).hexdigest()
+
+        slug_text_parts = slug_text.split("_")
+        if len(slug_text_parts) > 4:
+            short_slug_text = "_".join(slug_text_parts[:3] + slug_text_parts[-1:])
+        else:
+            short_slug_text = slug_text
+
+        item.id = f"{phase.value}_{short_slug_text}_{gloss_hash[:6]}"
 
 
 class GeneralItem(_NullStrCoerce):

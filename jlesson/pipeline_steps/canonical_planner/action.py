@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from dataclasses import dataclass
 from typing import Any, Tuple, List, Dict
 from collections import Counter
@@ -176,6 +177,10 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
                         )
                         for item in items_raw
                     ]
+
+                # Assign type and a stable id to every canonical item
+                for item in content_sequences[phase]:
+                    CanonicalItem.update_item(item, phase=phase)
 
             blocks.append(CanonicalLessonBlock(
                 theme=theme,

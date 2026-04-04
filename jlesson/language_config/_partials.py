@@ -22,6 +22,11 @@ ENGLISH_LANGUAGE = PartialLanguageConfig(
     primary_voice="english_female",
     alternate_voice="english_male",
     vocab_source_key="english",
+    llm_content_hints=(
+        "display_text: natural dictionary form (e.g. 'house', 'to move', 'big')",
+        "tts_text: full spoken form for TTS (e.g. 'the house', 'to move', 'big')",
+        "pronunciation: stressed syllable guide (e.g. 'HOW-ss', 'to MOOV', 'BIG')",
+    ),
 )
 
 
@@ -88,4 +93,12 @@ JAPANESE_LANGUAGE = PartialLanguageConfig(
     card_extra_font_keys={"kana": "jp_small", "masu_form": "jp_small"},
     vocab_source_key="japanese",
     vocab_phonetic_key="romaji",
+    llm_content_hints=(
+        "display_text: kanji/mixed-script form (e.g. '家', '引っ越す', '大きい')",
+        "tts_text: hiragana/katakana spaced for TTS (e.g. 'いえ', 'ひっこす', 'おおきい')",
+        "pronunciation: romaji romanisation using Hepburn style (e.g. 'ie', 'hikkōsu', 'ōkii')",
+        "extra.kana: hiragana/katakana reading (e.g. 'いえ', 'ひっこす')",
+        "extra.masu_form: polite -masu form for VERBS only (e.g. '引っ越します'); omit for nouns/adjectives",
+        "extra.type: for verbs — one of: る-verb, う-verb, irregular; for adjectives — one of: い-adj, な-adj; omit for nouns",
+    ),
 )

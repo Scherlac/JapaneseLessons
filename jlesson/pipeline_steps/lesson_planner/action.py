@@ -32,6 +32,8 @@ class LessonPlannerAction(StepAction[CanonicalLessonBlock, LessonBlock]):
             narrative_content=input.narrative.narrative,
             grammar_ids=input.grammar_ids,
             content_sequences=input.content_sequences,
+            source_config=config.language.source,
+            target_config=config.language.target,
         )
 
         raw = config.runtime.call_llm(prompt)
@@ -49,26 +51,31 @@ class LessonPlannerAction(StepAction[CanonicalLessonBlock, LessonBlock]):
             target_raw = item_raw.get("target", {})
             canonical_raw = item_raw.get("canonical", {})
 
+            item_phase = Phase(item_raw["phase"]) if item_raw.get("phase") else None
+            canonical_id = canonical_raw.get("id", "") or item_raw.get("id", "")
             general_item = GeneralItem(
-                id=item_raw.get("id", ""),
-                phase=Phase(item_raw["phase"]) if item_raw.get("phase") else None,
+                id=canonical_id,
+                phase=item_phase,
                 block_index=canonical_block.block_index,
                 canonical=CanonicalItem(
-                    id=canonical_raw.get("id", ""),
+                    id=canonical_id,
                     text=canonical_raw.get("text", ""),
                     gloss=canonical_raw.get("gloss", ""),
+                    type=item_phase or Phase.UNKNOWN,
                 ),
                 source=PartialItem(
                     text=source_raw.get("text", ""),
                     display_text=source_raw.get("display_text", ""),
                     tts_text=source_raw.get("tts_text", ""),
                     pronunciation=source_raw.get("pronunciation", ""),
+                    extra=source_raw.get("extra", {}),
                 ),
                 target=PartialItem(
                     text=target_raw.get("text", ""),
                     display_text=target_raw.get("display_text", ""),
                     tts_text=target_raw.get("tts_text", ""),
                     pronunciation=target_raw.get("pronunciation", ""),
+                    extra=target_raw.get("extra", {}),
                 ),
             )
             resolved_items.append(general_item)

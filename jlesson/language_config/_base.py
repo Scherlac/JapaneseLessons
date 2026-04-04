@@ -123,6 +123,11 @@ class PartialLanguageConfig:
     card_extra_font_keys: dict[str, str] = field(default_factory=dict)
     vocab_source_key: str = ""
     vocab_phonetic_key: str = ""
+    # LLM guidance: ordered list of per-field instructions sent to the resolver prompt.
+    # Each entry describes one output field the LLM must populate for this language, e.g.
+    # "pronunciation: romaji romanisation (e.g. 'hikkōsu')" or
+    # "extra.masu_form: polite -masu verb form (verbs only)".
+    llm_content_hints: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
