@@ -857,8 +857,21 @@ def test_build_video_items_total_count():
 def test_run_pipeline_no_video_completes(config):
     mock_narrative = {"blocks": [{"index": 1, "narrative": "A test narrative."}]}
     mock_narrative_vocab = {"blocks": [{"index": 1, "nouns": [], "verbs": []}]}
-    mock_generate_narrative_vocab = {"theme": "food", "nouns": [], "verbs": []}
-    mock_grammar = {"selected_ids": ["action_present_affirmative"]}
+    mock_lesson_plan_pass1 = {"selected_ids": ["action_present_affirmative"]}
+    mock_lesson_plan_pass2 = {
+        "grammar_ids": ["action_present_affirmative"],
+        "rationale": "test",
+        "blocks": [
+            {
+                "block_index": 1,
+                "grammar_ids": ["action_present_affirmative"],
+                "noun_suggestions": [],
+                "verb_suggestions": [],
+                "sentence_count": 2,
+                "narrative_summary": "test",
+            }
+        ],
+    }
     mock_review = {
         "reviews": [{"index": 0, "score": 5, "is_natural": True, "issue": None, "revised_sentence": None}],
         "overall_naturalness": 5,
@@ -924,10 +937,10 @@ def test_run_pipeline_no_video_completes(config):
     }
 
     with (
-        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB),
+        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE),
         patch(
             "jlesson.runtime.PipelineRuntime.ask_llm",
-            side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_review, mock_nouns, mock_verbs],
+            side_effect=[mock_narrative, mock_narrative_vocab, mock_lesson_plan_pass1, mock_lesson_plan_pass2, mock_sentences, mock_review, mock_nouns, mock_verbs],
         ),
     ):
         result = run_pipeline(config)
@@ -943,17 +956,30 @@ def test_run_pipeline_no_video_completes(config):
 def test_run_pipeline_persists_correct_theme(config, tmp_path):
     mock_narrative = {"blocks": [{"index": 1, "narrative": "A test narrative."}]}
     mock_narrative_vocab = {"blocks": [{"index": 1, "nouns": [], "verbs": []}]}
-    mock_generate_narrative_vocab = {"theme": "food", "nouns": [], "verbs": []}
-    mock_grammar = {"selected_ids": ["action_present_affirmative"]}
+    mock_lesson_plan_pass1 = {"selected_ids": ["action_present_affirmative"]}
+    mock_lesson_plan_pass2 = {
+        "grammar_ids": ["action_present_affirmative"],
+        "rationale": "test",
+        "blocks": [
+            {
+                "block_index": 1,
+                "grammar_ids": ["action_present_affirmative"],
+                "noun_suggestions": [],
+                "verb_suggestions": [],
+                "sentence_count": 2,
+                "narrative_summary": "test",
+            }
+        ],
+    }
     mock_sentences = {"sentences": []}
     mock_nouns = {"noun_items": []}
     mock_verbs = {"verb_items": []}
 
     with (
-        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB),
+        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE),
         patch(
             "jlesson.runtime.PipelineRuntime.ask_llm",
-            side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_nouns, mock_verbs],
+            side_effect=[mock_narrative, mock_narrative_vocab, mock_lesson_plan_pass1, mock_lesson_plan_pass2, mock_sentences, mock_nouns, mock_verbs],
         ),
     ):
         result = run_pipeline(config)
@@ -968,17 +994,30 @@ def test_run_pipeline_persists_correct_theme(config, tmp_path):
 def test_run_pipeline_curriculum_updated(config, tmp_path):
     mock_narrative = {"blocks": [{"index": 1, "narrative": "A test narrative."}]}
     mock_narrative_vocab = {"blocks": [{"index": 1, "nouns": [], "verbs": []}]}
-    mock_generate_narrative_vocab = {"theme": "food", "nouns": [], "verbs": []}
-    mock_grammar = {"selected_ids": ["action_present_affirmative"]}
+    mock_lesson_plan_pass1 = {"selected_ids": ["action_present_affirmative"]}
+    mock_lesson_plan_pass2 = {
+        "grammar_ids": ["action_present_affirmative"],
+        "rationale": "test",
+        "blocks": [
+            {
+                "block_index": 1,
+                "grammar_ids": ["action_present_affirmative"],
+                "noun_suggestions": [],
+                "verb_suggestions": [],
+                "sentence_count": 2,
+                "narrative_summary": "test",
+            }
+        ],
+    }
     mock_sentences = {"sentences": []}
     mock_nouns = {"noun_items": []}
     mock_verbs = {"verb_items": []}
 
     with (
-        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB),
+        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE),
         patch(
             "jlesson.runtime.PipelineRuntime.ask_llm",
-            side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_nouns, mock_verbs],
+            side_effect=[mock_narrative, mock_narrative_vocab, mock_lesson_plan_pass1, mock_lesson_plan_pass2, mock_sentences, mock_nouns, mock_verbs],
         ),
     ):
         run_pipeline(config)
@@ -995,8 +1034,21 @@ def test_run_pipeline_curriculum_updated(config, tmp_path):
 def test_run_pipeline_report_contains_all_sections(config):
     mock_narrative = {"blocks": [{"index": 1, "narrative": "A test narrative."}]}
     mock_narrative_vocab = {"blocks": [{"index": 1, "nouns": [], "verbs": []}]}
-    mock_generate_narrative_vocab = {"theme": "food", "nouns": [], "verbs": []}
-    mock_grammar = {"selected_ids": ["action_present_affirmative"]}
+    mock_lesson_plan_pass1 = {"selected_ids": ["action_present_affirmative"]}
+    mock_lesson_plan_pass2 = {
+        "grammar_ids": ["action_present_affirmative"],
+        "rationale": "test",
+        "blocks": [
+            {
+                "block_index": 1,
+                "grammar_ids": ["action_present_affirmative"],
+                "noun_suggestions": [],
+                "verb_suggestions": [],
+                "sentence_count": 2,
+                "narrative_summary": "test",
+            }
+        ],
+    }
     mock_review = {
         "reviews": [{"index": 0, "score": 5, "is_natural": True, "issue": None, "revised_sentence": None}],
         "overall_naturalness": 5,
@@ -1042,10 +1094,10 @@ def test_run_pipeline_report_contains_all_sections(config):
     }
 
     with (
-        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB),
+        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE),
         patch(
             "jlesson.runtime.PipelineRuntime.ask_llm",
-            side_effect=[mock_narrative, mock_narrative_vocab, mock_generate_narrative_vocab, mock_grammar, mock_sentences, mock_review, mock_nouns, mock_verbs],
+            side_effect=[mock_narrative, mock_narrative_vocab, mock_lesson_plan_pass1, mock_lesson_plan_pass2, mock_sentences, mock_review, mock_nouns, mock_verbs],
         ),
     ):
         result = run_pipeline(config)
@@ -1432,19 +1484,13 @@ def test_run_pipeline_uses_retrieval_hit_and_skips_vocab(config, tmp_path):
 
 
 def test_run_pipeline_retrieval_miss_falls_back_to_vocab(config, tmp_path):
-    # When retrieval misses, GenerateNarrativeVocabStep generates vocab from the
-    # narrative — no pre-existing vocab file is needed.
+    # When retrieval misses, SelectVocabStep falls back to load_vocab.
     config.retrieval_store_path = tmp_path / "missing.json"
 
     mock_narrative = {"blocks": [{"index": 1, "narrative": "A test narrative."}]}
     mock_narrative_vocab = {"blocks": [{"index": 1, "nouns": [], "verbs": []}]}
-    mock_generate_narrative_vocab = {
-        "theme": "food",
-        "nouns": _NOUNS[:2],
-        "verbs": _VERBS[:2],
-    }
-    mock_grammar = {"selected_ids": ["action_present_affirmative"]}
-    mock_grammar_pass2 = {
+    mock_lesson_plan_pass1 = {"selected_ids": ["action_present_affirmative"]}
+    mock_lesson_plan_pass2 = {
         "grammar_ids": ["action_present_affirmative"],
         "rationale": "test",
         "blocks": [{"block_index": 1, "grammar_ids": ["action_present_affirmative"], "noun_suggestions": [], "verb_suggestions": [], "sentence_count": 3, "narrative_summary": "test"}],
@@ -1454,15 +1500,14 @@ def test_run_pipeline_retrieval_miss_falls_back_to_vocab(config, tmp_path):
     mock_verbs = {"verb_items": []}
 
     with (
-        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB) as mock_load_vocab,
+        patch("jlesson.runtime.PipelineRuntime.load_vocab", return_value=_VOCAB_FILE) as mock_load_vocab,
         patch(
             "jlesson.runtime.PipelineRuntime.ask_llm",
             side_effect=[
                 mock_narrative,
                 mock_narrative_vocab,
-                mock_generate_narrative_vocab,
-                mock_grammar,
-                mock_grammar_pass2,
+                mock_lesson_plan_pass1,
+                mock_lesson_plan_pass2,
                 mock_sentences,
                 mock_nouns,
                 mock_verbs,
@@ -1471,13 +1516,10 @@ def test_run_pipeline_retrieval_miss_falls_back_to_vocab(config, tmp_path):
     ):
         ctx = run_pipeline(config)
 
-    # load_vocab is no longer called — narrative vocab generation is the fallback
-    assert mock_load_vocab.call_count == 0
+    assert mock_load_vocab.call_count >= 1
     assert ctx.retrieval_result is not None
     assert ctx.retrieval_result.used_retrieval is False
     assert "no retrieval candidates" in ctx.retrieval_result.fallback_reason
-    assert len(ctx.nouns) == 2
-    assert len(ctx.verbs) == 2
 
 
 # ---------------------------------------------------------------------------

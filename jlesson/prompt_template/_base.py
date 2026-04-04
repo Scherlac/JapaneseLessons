@@ -88,16 +88,6 @@ class PromptInterface(ABC):
         ...
 
     @abstractmethod
-    def build_narrative_vocab_generate_prompt(
-        self,
-        nouns: list[str],
-        verbs: list[str],
-        theme: str,
-    ) -> str:
-        """Build prompt to generate full target-language vocab entries for narrative terms."""
-        ...
-
-    @abstractmethod
     def build_grammar_generate_prompt(
         self,
         grammar_specs: list[GrammarItem],

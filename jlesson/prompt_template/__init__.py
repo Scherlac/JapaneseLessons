@@ -28,7 +28,6 @@ from .eng_jap import (
     build_grammar_generate_prompt,
     build_content_validate_prompt,
     build_sentence_review_prompt,
-    build_narrative_vocab_generate_prompt,
 )
 
 # Hungarian-English
@@ -38,7 +37,6 @@ from .hun_eng import (
     HunEngPrompts,
     hungarian_build_lesson_prompt,
     hungarian_build_vocab_prompt,
-    hungarian_build_narrative_vocab_generate_prompt,
     hungarian_build_noun_practice_prompt,
     hungarian_build_verb_practice_prompt,
     hungarian_build_grammar_select_prompt,
@@ -53,7 +51,6 @@ from .hun_ger import (
     HunGerPrompts,
     german_build_lesson_prompt,
     german_build_vocab_prompt,
-    german_build_narrative_vocab_generate_prompt,
     german_build_noun_practice_prompt,
     german_build_verb_practice_prompt,
     german_build_grammar_select_prompt,
@@ -78,14 +75,12 @@ __all__ = [
     "build_grammar_generate_prompt",
     "build_content_validate_prompt",
     "build_sentence_review_prompt",
-    "build_narrative_vocab_generate_prompt",
     # hun-eng
     "HUNGARIAN_PERSONS",
     "HUNGARIAN_GRAMMAR_PATTERNS",
     "HunEngPrompts",
     "hungarian_build_lesson_prompt",
     "hungarian_build_vocab_prompt",
-    "hungarian_build_narrative_vocab_generate_prompt",
     "hungarian_build_noun_practice_prompt",
     "hungarian_build_verb_practice_prompt",
     "hungarian_build_grammar_select_prompt",
@@ -97,7 +92,6 @@ __all__ = [
     "HunGerPrompts",
     "german_build_lesson_prompt",
     "german_build_vocab_prompt",
-    "german_build_narrative_vocab_generate_prompt",
     "german_build_noun_practice_prompt",
     "german_build_verb_practice_prompt",
     "german_build_grammar_select_prompt",

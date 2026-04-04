@@ -227,53 +227,6 @@ Now generate the complete JSON for theme "{theme}" with {count_line}.
 """.strip()
 
 
-def german_build_narrative_vocab_generate_prompt(
-    nouns: list[str],
-    verbs: list[str],
-    theme: str,
-) -> str:
-    """Build a prompt to generate Hungarian-German vocab entries for narrative terms.
-
-    The input nouns/verbs are in English (canonical narrative language).
-    The LLM must translate them into both Hungarian AND German.
-    """
-    noun_lines = "\n".join(f"  {i + 1}. {n}" for i, n in enumerate(nouns))
-    verb_lines = "\n".join(f"  {i + 1}. {v}" for i, v in enumerate(verbs))
-    total = len(nouns) + len(verbs)
-    return f"""\
-You are a language expert building vocabulary for a Hungarian children's lesson about "{theme}".
-
-The following words were extracted from an English narrative text.
-Provide BOTH the Hungarian AND the German translations plus German pronunciation.
-
-ENGLISH NOUNS ({len(nouns)}):
-{noun_lines}
-
-ENGLISH VERBS ({len(verbs)}):
-{verb_lines}
-
-Rules:
-- Output exactly {total} entries — one per word above, in the same order.
-- Each noun entry must have: english (the original), german, hungarian,
-  pronunciation (German IPA), article (der/die/das).
-- Each verb entry must have: english (the original), german, hungarian,
-  pronunciation (German IPA), partizip_ii (the German past participle),
-  hilfsverb ("haben" or "sein").
-- Use beginner-appropriate vocabulary suitable for children aged 8-12.
-- For German nouns always capitalise the first letter (e.g. "Hund", not "hund").
-- Output ONLY a raw JSON object in this exact schema:
-{{
-  "theme": "{theme}",
-  "nouns": [
-    {{"english": "...", "german": "...", "hungarian": "...", "pronunciation": "...", "article": "der|die|das"}}
-  ],
-  "verbs": [
-    {{"english": "...", "german": "...", "hungarian": "...", "pronunciation": "...", "partizip_ii": "...", "hilfsverb": "haben|sein"}}
-  ]
-}}
-""".strip()
-
-
 def german_build_noun_practice_prompt(
     nouns: list[GeneralItem],
     lesson_number: int = 1,
@@ -639,14 +592,6 @@ class HunGerPrompts(PromptInterface):
             nouns_per_block=nouns_per_block,
             verbs_per_block=verbs_per_block,
         )
-
-    def build_narrative_vocab_generate_prompt(
-        self,
-        nouns: list[str],
-        verbs: list[str],
-        theme: str,
-    ) -> str:
-        return german_build_narrative_vocab_generate_prompt(nouns, verbs, theme)
 
     def build_grammar_generate_prompt(
         self,

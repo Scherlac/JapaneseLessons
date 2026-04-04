@@ -203,11 +203,8 @@ class NarrativeFrame:
 class NarrativeVocabPlan:
     """Typed output of ``ExtractNarrativeVocabStep``.
 
-    Also serves as the input chunk for ``GenerateNarrativeVocabStep``,
-    continuing the typed inter-step dependency chain:
-
-        NarrativeFrame → ExtractNarrativeVocabStep → NarrativeVocabPlan
-                      → GenerateNarrativeVocabStep → VocabFile
+    Consumed by ``CanonicalVocabSelectStep`` to pick canonical English vocab
+    terms for the planning phase.
 
     Context field: ``LessonContext.narrative_vocab_terms``
     """

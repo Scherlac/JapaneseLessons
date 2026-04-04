@@ -6,18 +6,17 @@ Orchestrates the full lesson workflow through fifteen sequential steps:
     step 1   retrieve_material  — optional retrieval with safe fallback
     step 2   narrative_generator     — create block-by-block story progression
     step 3   extract_narrative_vocab — extract block-level vocab targets
-    step 4   generate_narrative_vocab — LLM: generate Japanese vocab from narrative terms
-    step 5   select_vocab            — pick fresh nouns/verbs from the vocab file
-    step 6   lesson_planner          — LLM: two-pass lesson outline (grammar + pacing)
-    step 7   narrative_grammar       — LLM: produce block-aware practice sentences
-    step 8   review_sentences        — LLM: rate naturalness, rewrite awkward sentences
-    step 9   vocab_enhancement       — LLM: enrich nouns and verbs together
-    step 10  register_lesson         — add+complete the lesson in curriculum.json
-    step 11  persist_content         — save LessonContent to output/<id>/content.json
-    step 12  compile_assets          — render card images + TTS audio per item (Stage 2)
-    step 13  compile_touches         — profile-driven touch sequencing (Stage 3)
-    step 14  render_video            — assemble MP4 from touch sequence
-    step 15  save_report             — finalize and save Markdown lesson report
+    step 4   select_vocab            — pick fresh nouns/verbs from the vocab file
+    step 5   lesson_planner          — LLM: two-pass lesson outline (grammar + pacing)
+    step 6   narrative_grammar       — LLM: produce block-aware practice sentences
+    step 7   review_sentences        — LLM: rate naturalness, rewrite awkward sentences
+    step 8   vocab_enhancement       — LLM: enrich nouns and verbs together
+    step 9   register_lesson         — add+complete the lesson in curriculum.json
+    step 10  persist_content         — save LessonContent to output/<id>/content.json
+    step 11  compile_assets          — render card images + TTS audio per item (Stage 2)
+    step 12  compile_touches         — profile-driven touch sequencing (Stage 3)
+    step 13  render_video            — assemble MP4 from touch sequence
+    step 14  save_report             — finalize and save Markdown lesson report
 
 Each step is a PipelineStep subclass with an execute(ctx) method,
 making them individually testable and easy to extend.
@@ -43,7 +42,6 @@ from jlesson.pipeline_steps import (
     CompileAssetsStep,
     CompileTouchesStep,
     ExtractNarrativeVocabStep,
-    GenerateNarrativeVocabStep,
     GrammarSelectStep,  # kept for backward-compatible re-export
     LessonConfig,
     LessonContext,
@@ -72,7 +70,6 @@ def _build_pipeline() -> list[PipelineStep]:
         NarrativeGeneratorStep(),
         ExtractNarrativeVocabStep(),
         CanonicalVocabSelectStep(),
-        GenerateNarrativeVocabStep(),
         SelectVocabStep(),
         LessonPlannerStep(),  # two-pass lesson outline (replaces GrammarSelectStep)
         # GrammarSelectStep(),
