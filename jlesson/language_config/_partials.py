@@ -70,7 +70,7 @@ JAPANESE_LANGUAGE = PartialLanguageConfig(
     field_map=PartialFieldMap(
         text_path="display_text",
         phonetic_path="pronunciation",
-        example_sentence_path="extra.example_sentence_jp",
+        example_sentence_path="extra.example_sentence",
         special_paths={"kanji": "extra.kanji", "masu_form": "extra.masu_form"},
         special_labels={"masu_form": "Polite form"},
     ),
