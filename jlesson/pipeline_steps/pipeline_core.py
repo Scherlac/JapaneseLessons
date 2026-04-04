@@ -30,6 +30,7 @@ class LessonConfig:
     output_dir: Path | None = None
     num_nouns: int = 4
     num_verbs: int = 3
+    num_adjectives: int = 0
     sentences_per_grammar: int = 3
     grammar_points_per_lesson: int = 2
     grammar_points_per_block: int = 1
@@ -216,7 +217,7 @@ class CanonicalLessonBlock(BaseModel):
         content is too complex for certain grammar points or to avoid spoilers for later narrative blocks.""" ))
     sentiment: str = Field(default="", 
         description= (
-        """Optional sentiment or tone label for the block, e.g. 'mishievous', 'heartwarming', 'tense', etc."""))
+        """Optional sentiment or tone label for the block, e.g. 'misetorse', 'heartwarming', 'tense', etc."""))
     grammar_ids: list[str]
     content_sequences: dict[Phase, list[CanonicalItem]]
 

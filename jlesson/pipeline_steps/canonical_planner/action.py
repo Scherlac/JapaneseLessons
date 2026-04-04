@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Tuple, List, Dict
 from collections import Counter
-from .prompt import GrammarCoverageInfo, fibonacci_stage_label
+from .prompt import PHASE_PARSE_DETAILS, GrammarCoverageInfo, fibonacci_stage_label
 
 from jlesson.models import GrammarItem, CanonicalItem
 
@@ -107,9 +107,14 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
             covered_grammar=covered_grammar,
             grammar_points_per_lesson=config.lesson.grammar_points_per_lesson,
             grammar_points_per_block=config.lesson.grammar_points_per_block,
-            sentences_per_grammar=config.lesson.sentences_per_grammar,
-            noun_names=[n.text for n in canonical.content_sequences.get(Phase.NOUNS, [])],
-            verb_names=[v.text for v in canonical.content_sequences.get(Phase.VERBS, [])],
+            content_counts={
+                Phase.NOUNS: config.lesson.num_nouns,
+                Phase.VERBS: config.lesson.num_verbs,
+                Phase.ADJECTIVES: config.lesson.num_adjectives,
+                Phase.GRAMMAR: config.lesson.sentences_per_grammar * config.lesson.grammar_points_per_block,
+                Phase.NARRATIVE: 0,
+            },
+            content_sequences=canonical.content_sequences,
             canonical_language=config.language.canonical_language,
         )
 
@@ -127,6 +132,7 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
             result_2,
             config.lesson.lesson_blocks,
             config.lesson.sentences_per_grammar,
+            narrative_frame=input,
             theme=config.lesson.theme,
             lesson_number=input.lesson_number,
         )
@@ -136,8 +142,7 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
     def _parse_outline(
         raw: dict,
         expected_blocks: int,
-        default_sentence_count: int,
-        *,
+        narrative_frame: NarrativeFrame,
         theme: str = "",
         lesson_number: int = 0,
     ) -> CanonicalLessonPlan:
@@ -147,20 +152,42 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
         blocks: List[CanonicalLessonBlock] = []
         for block_raw in raw.get("blocks", []):
 
+            block_index = block_raw.get("block_index", 0)
+            narrative_item = narrative_frame.blocks[block_index - 1] if block_index - 1 < len(narrative_frame.blocks) else ""
+            narrative_content = block_raw.get("narrative_content", narrative_item)
+            alignment_notes = block_raw.get("alignment_notes", "")
+            sentiment = block_raw.get("sentiment", "")    
             content_sequences = {}
-            if "noun_suggestions" in block_raw:
-                content_sequences[Phase.NOUNS] = [CanonicalItem(id=nid, text=nid) for nid in block_raw.get("noun_suggestions", [])]
-            if "verb_suggestions" in block_raw:
-                content_sequences[Phase.VERBS] = [CanonicalItem(id=vid, text=vid) for vid in block_raw.get("verb_suggestions", [])]
-            if "adjective_suggestions" in block_raw:
-                content_sequences[Phase.ADJECTIVES] = [CanonicalItem(id=aid, text=aid) for aid in block_raw.get("adjective_suggestions", [])]
+            # using PHASE_PARSE_DETAILS
+            for phase in Phase:
+                items_raw = block_raw.get(PHASE_PARSE_DETAILS[phase]["field"], [])
+                # vocab items has vocab and gloss 
+                if PHASE_PARSE_DETAILS[phase]["is_vocab"]:
+                    content_sequences[phase] = [
+                        CanonicalItem(
+                            text=vocab,
+                            gloss=gloss
+                        )
+                        for vocab, gloss in items_raw.items()
+
+                    ]
+                else:
+                    content_sequences[phase] = [
+                        CanonicalItem(
+                            text=item,
+                            gloss="",
+                        )
+                        for item in items_raw
+                    ]
 
             blocks.append(CanonicalLessonBlock(
                 theme=theme,
                 lesson_number=lesson_number,
                 block_index=block_raw.get("block_index", len(blocks) + 1),
                 grammar_ids=block_raw.get("grammar_ids", []),
-                narrative_content=block_raw.get("narrative_summary", ""),
+                narrative_content=narrative_content,
+                alignment_notes=alignment_notes,
+                sentiment=sentiment,
                 content_sequences=content_sequences,
             ))
         # Pad missing blocks
@@ -174,6 +201,9 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
                 content_sequences={
                     Phase.NOUNS: [],
                     Phase.VERBS: [],
+                    Phase.ADJECTIVES: [],
+                    Phase.GRAMMAR: [],
+                    Phase.NARRATIVE: [],
                 },
                 narrative_content="",
             ))

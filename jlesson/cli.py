@@ -251,6 +251,7 @@ def _run_lesson_generation(
     theme: str,
     nouns: int,
     verbs: int,
+    adjectives: int,
     sentences: int,
     grammar_points: int,
     grammar_points_per_block: int,
@@ -292,7 +293,8 @@ def _run_lesson_generation(
         output_dir=Path(output_dir) if output_dir else None,
         num_nouns=nouns,
         num_verbs=verbs,
-        sentences_per_grammar=sentences,
+        num_adjectives=adjectives,
+        sentences_per_grammar=sentences / grammar_points_per_block if grammar_points_per_block else sentences,
         grammar_points_per_lesson=grammar_points,
         grammar_points_per_block=grammar_points_per_block,
         lesson_blocks=blocks,
@@ -319,8 +321,9 @@ def _run_lesson_generation(
 
 @lesson.command("add")
 @click.option("--theme", "-t", required=True, help="Vocabulary theme for this lesson.")
-@click.option("--nouns", default=4, show_default=True, help="Nouns per lesson.")
-@click.option("--verbs", default=3, show_default=True, help="Verbs per lesson.")
+@click.option("--nouns", default=4, show_default=True, help="Nouns per block.")
+@click.option("--verbs", default=3, show_default=True, help="Verbs per block.")
+@click.option("--adjectives", default=0, show_default=True, help="Adjectives per block.")
 @click.option("--sentences", default=3, show_default=True, help="Sentences per grammar point.")
 @click.option(
     "--grammar-points",
@@ -415,6 +418,7 @@ def lesson_add(
     theme: str,
     nouns: int,
     verbs: int,
+    adjectives: int,
     sentences: int,
     grammar_points: int,
     grammar_points_per_block: int,
@@ -444,6 +448,7 @@ def lesson_add(
         theme=theme,
         nouns=nouns,
         verbs=verbs,
+        adjectives=adjectives,
         sentences=sentences,
         grammar_points=grammar_points,
         grammar_points_per_block=grammar_points_per_block,
@@ -470,26 +475,27 @@ def lesson_add(
 @lesson.command("update")
 @click.argument("lesson_id", type=click.IntRange(1))
 @click.option("--theme", "-t", default=None, help="Vocabulary theme (required unless --video-only).")
-@click.option("--nouns", default=4, show_default=True, help="Nouns per lesson.")
-@click.option("--verbs", default=3, show_default=True, help="Verbs per lesson.")
-@click.option("--sentences", default=3, show_default=True, help="Sentences per grammar point.")
+@click.option("--nouns", default=4, show_default=True, help="Nouns per block.")
+@click.option("--verbs", default=3, show_default=True, help="Verbs per block.")
+@click.option("--adjectives", default=1, show_default=True, help="Adjectives per block.")
+@click.option("--sentences", default=4, show_default=True, help="Sentences per grammar point.")
 @click.option(
     "--grammar-points",
-    default=2,
+    default=3,
     show_default=True,
     type=click.IntRange(1),
     help="How many grammar progression points to include in the lesson.",
 )
 @click.option(
     "--grammar-points-per-block",
-    default=1,
+    default=2,
     show_default=True,
     type=click.IntRange(1),
     help="How many grammar points each block should actively practice from the lesson progression.",
 )
 @click.option(
     "--blocks",
-    default=1,
+    default=5,
     show_default=True,
     type=click.IntRange(1),
     help="Generate this many fresh content blocks within the lesson.",
@@ -579,6 +585,7 @@ def lesson_update(
     theme: str | None,
     nouns: int,
     verbs: int,
+    adjectives: int,
     sentences: int,
     grammar_points: int,
     grammar_points_per_block: int,
@@ -613,6 +620,7 @@ def lesson_update(
             theme=theme or "",
             nouns=nouns,
             verbs=verbs,
+            adjectives=adjectives,
             sentences=sentences,
             grammar_points=grammar_points,
             grammar_points_per_block=grammar_points_per_block,
@@ -642,6 +650,7 @@ def lesson_update(
             theme=theme,
             nouns=nouns,
             verbs=verbs,
+            adjectives=adjectives,
             sentences=sentences,
             grammar_points=grammar_points,
             grammar_points_per_block=grammar_points_per_block,
@@ -693,7 +702,7 @@ def lesson_update(
 def lesson_regenerate(lesson_id, theme, nouns, verbs, sentences, grammar_points, grammar_points_per_block, blocks, seed, curriculum_path, output_dir, no_video, no_cache, dry_run, profile, narrative, narrative_file, retrieval, retrieval_store, retrieval_backend, retrieval_embedding_model, retrieval_min_coverage, language):
     """Deprecated: use `lesson update LESSON_ID --theme THEME` instead."""
     _run_lesson_generation(
-        theme=theme, nouns=nouns, verbs=verbs, sentences=sentences,
+        theme=theme, nouns=nouns, verbs=verbs, adjectives=0, sentences=sentences,
         grammar_points=grammar_points, grammar_points_per_block=grammar_points_per_block,
         blocks=blocks, seed=seed, curriculum_path=curriculum_path, output_dir=output_dir,
         no_video=no_video, no_cache=no_cache, dry_run=dry_run, profile=profile,
@@ -718,7 +727,7 @@ def lesson_render(lesson_id, output_dir, theme, profile, recompile_cards, langua
     from_step = "compile_assets" if recompile_cards else "render_video"
     _run_lesson_generation(
         theme=theme or "",
-        nouns=4, verbs=3, sentences=3, grammar_points=2, grammar_points_per_block=1,
+        nouns=4, verbs=3, adjectives=0, sentences=3, grammar_points=2, grammar_points_per_block=1,
         blocks=1, seed=None, curriculum_path=None, output_dir=output_dir,
         no_video=False, no_cache=False, dry_run=False, profile=profile,
         narrative=(), narrative_file=None, retrieval=True,
@@ -757,7 +766,7 @@ def lesson_render(lesson_id, output_dir, theme, profile, recompile_cards, langua
 def lesson_next(theme, nouns, verbs, sentences, grammar_points, grammar_points_per_block, blocks, seed, curriculum_path, output_dir, no_video, no_cache, dry_run, profile, narrative, narrative_file, retrieval, retrieval_store, retrieval_backend, retrieval_embedding_model, retrieval_min_coverage, language):
     """Deprecated: use `lesson add --theme THEME` instead."""
     _run_lesson_generation(
-        theme=theme, nouns=nouns, verbs=verbs, sentences=sentences,
+        theme=theme, nouns=nouns, verbs=verbs, adjectives=0, sentences=sentences,
         grammar_points=grammar_points, grammar_points_per_block=grammar_points_per_block,
         blocks=blocks, seed=seed, curriculum_path=curriculum_path, output_dir=output_dir,
         no_video=no_video, no_cache=no_cache, dry_run=dry_run, profile=profile,
@@ -800,7 +809,7 @@ def lesson_run_compat(lesson_id, theme, nouns, verbs, sentences, grammar_points,
     if from_step is not None:
         _run_lesson_generation(
             theme=theme or "",
-            nouns=nouns, verbs=verbs, sentences=sentences,
+            nouns=nouns, verbs=verbs, adjectives=0, sentences=sentences,
             grammar_points=grammar_points, grammar_points_per_block=grammar_points_per_block,
             blocks=blocks, seed=seed, curriculum_path=curriculum_path, output_dir=output_dir,
             no_video=False, no_cache=no_cache, dry_run=dry_run, profile=profile,
@@ -815,7 +824,7 @@ def lesson_run_compat(lesson_id, theme, nouns, verbs, sentences, grammar_points,
         if not theme:
             raise click.UsageError("--theme is required unless --from-step is set.")
         _run_lesson_generation(
-            theme=theme, nouns=nouns, verbs=verbs, sentences=sentences,
+            theme=theme, nouns=nouns, verbs=verbs, adjectives=0, sentences=sentences,
             grammar_points=grammar_points, grammar_points_per_block=grammar_points_per_block,
             blocks=blocks, seed=seed, curriculum_path=curriculum_path, output_dir=output_dir,
             no_video=no_video, no_cache=no_cache, dry_run=dry_run, profile=profile,
