@@ -147,10 +147,12 @@ def build_lesson_plan_prompt(
 
 
     narrative_section = "\n\n".join(
-        f"--- Block {i + 1} ---\n"
-        f"    Narrative: {block.narrative}\n" if block.narrative else ""
-        f"    Alignment Notes: {block.alignment_notes}\n" if block.alignment_notes else ""
-        f"    Sentiment: {block.sentiment}" if block.sentiment else ""
+        "\n".join(filter(None, [
+            f"--- Block {i + 1} ---",
+            f"    Narrative: {block.narrative}" if block.narrative else None,
+            f"    Alignment Notes: {block.alignment_notes}" if block.alignment_notes else None,
+            f"    Sentiment: {block.sentiment}" if block.sentiment else None,
+        ]))
         for i, block in enumerate(narrative_blocks)
     )
 
@@ -160,16 +162,25 @@ def build_lesson_plan_prompt(
         if ( content_counts.get(phase, 0) > 0 
             and PHASE_PARSE_DETAILS[phase]["is_vocab"] )
     )
-    dynamic_vocab_str = "\n".join(
-        f"  - {PHASE_PARSE_DETAILS[phase]['name'].capitalize()}s:\n"
-        + "\n".join(
-            f"    - {item.text}: {item.gloss}"
-            for item in content_sequences.get(phase, [])
-        )
+    _has_vocab_pool = any(
+        len(content_sequences.get(phase, [])) > 0
         for phase in Phase
-        if (content_counts.get(phase, 0) > 0 
-            and PHASE_PARSE_DETAILS[phase]["is_vocab"] )
+        if phase in PHASE_PARSE_DETAILS and PHASE_PARSE_DETAILS[phase]["is_vocab"]
     )
+    if _has_vocab_pool:
+        dynamic_vocab_str = "\n".join(
+            f"  - {PHASE_PARSE_DETAILS[phase]['name'].capitalize()}s:\n"
+            + "\n".join(
+                f"    - {item.text}: {item.gloss}"
+                for item in content_sequences.get(phase, [])
+            )
+            for phase in Phase
+            if (content_counts.get(phase, 0) > 0
+                and phase in PHASE_PARSE_DETAILS
+                and PHASE_PARSE_DETAILS[phase]["is_vocab"])
+        )
+    else:
+        dynamic_vocab_str = "  (no pre-selected vocabulary — generate narrative-appropriate items for each block)"
 
     dynamic_json_template_example = ",\n      ".join(
         PHASE_PARSE_DETAILS[phase]["json_template_example"]
@@ -183,12 +194,24 @@ def build_lesson_plan_prompt(
         if content_counts.get(phase, 0) > 0
     )
 
-    dynamic_planning_constraints = "\n".join(
-        f"- Plan {content_counts.get(phase, 0)} {PHASE_PARSE_DETAILS[phase]['description']} according to the lesson narrative "
-        f"and distribute them across the blocks using the {PHASE_PARSE_DETAILS[phase]['field']} field in the JSON response."
+    _vocab_constraints = "\n".join(
+        f"- Assign exactly {content_counts.get(phase, 0)} {PHASE_PARSE_DETAILS[phase]['name']}(s) per block "
+        f"in the {PHASE_PARSE_DETAILS[phase]['field']} field. "
+        f"Choose vocabulary specific to each block's narrative — each block should use different items."
         for phase in Phase
-        if content_counts.get(phase, 0) > 0
+        if (content_counts.get(phase, 0) > 0
+            and phase in PHASE_PARSE_DETAILS
+            and PHASE_PARSE_DETAILS[phase]["is_vocab"])
     )
+    _grammar_constraints = "\n".join(
+        f"- Plan {content_counts.get(phase, 0)} {PHASE_PARSE_DETAILS[phase]['description']} per block "
+        f"using the {PHASE_PARSE_DETAILS[phase]['field']} field."
+        for phase in Phase
+        if (content_counts.get(phase, 0) > 0
+            and phase in PHASE_PARSE_DETAILS
+            and not PHASE_PARSE_DETAILS[phase]["is_vocab"])
+    )
+    dynamic_planning_constraints = "\n".join(filter(None, [_vocab_constraints, _grammar_constraints]))
     
     revision_section = ""
     if previous_outline_json is not None:
