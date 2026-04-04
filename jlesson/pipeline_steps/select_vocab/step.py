@@ -6,11 +6,11 @@ from typing import Callable
 from jlesson.models import GeneralItem, VocabItem
 from jlesson.runtime import PipelineRuntime
 
-from ..pipeline_core import ActionStep, LessonContext, SelectedVocabSet
+from ..pipeline_core import ActionStep, LessonContext, VocabSet
 from .action import SelectVocabAction, SelectVocabRequest
 
 
-class SelectVocabStep(ActionStep[SelectVocabRequest, SelectedVocabSet]):
+class SelectVocabStep(ActionStep[SelectVocabRequest, VocabSet]):
     """Step — Load vocab file and select fresh nouns/verbs.
 
     Selection is guided by the ``narrative_vocab_terms`` produced by
@@ -68,7 +68,7 @@ class SelectVocabStep(ActionStep[SelectVocabRequest, SelectedVocabSet]):
             )
         ]
 
-    def merge_outputs(self, ctx: LessonContext, outputs: list[SelectedVocabSet]) -> LessonContext:
+    def merge_outputs(self, ctx: LessonContext, outputs: list[VocabSet]) -> LessonContext:
         result = outputs[-1]
         ctx.selected_vocab = result
         self._log(ctx, f"       nouns : {[n.source.display_text for n in ctx.nouns]}")

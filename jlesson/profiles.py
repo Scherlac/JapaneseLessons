@@ -43,7 +43,7 @@ class Profile:
     def required_assets(self, phase: Phase) -> set[str]:
         """Return the set of asset keys needed by all touches in *phase*.
 
-        Asset keys match ItemAssets field names:
+        Asset keys match GeneralItem field names:
         card_en, card_jp, card_en_jp, audio_en, audio_jp_f, audio_jp_m.
         """
         assets: set[str] = set()

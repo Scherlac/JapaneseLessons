@@ -1,7 +1,7 @@
 """
 Touch compiler — Stage 3 of the compilation pipeline.
 
-Takes a list of CompiledItem objects and a Profile, and produces a flat,
+Takes a list of GeneralItem objects and a Profile, and produces a flat,
 ordered list of Touch objects — interleaved by round — ready for output
 rendering.
 

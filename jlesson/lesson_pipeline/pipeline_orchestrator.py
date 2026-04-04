@@ -128,7 +128,7 @@ def _save_context_checkpoint(ctx: LessonContext) -> None:
 
 def _wire_assets_from_disk(ctx: LessonContext) -> LessonContext:
     """Attach on-disk asset paths to items, then populate ctx.compiled_items."""
-    from jlesson.models import CompiledItem, Phase
+    from jlesson.models import GeneralItem, Phase
     from jlesson.pipeline_steps.pipeline_core import LessonContext
     from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
     from jlesson.profiles import get_profile
@@ -151,7 +151,7 @@ def _wire_assets_from_disk(ctx: LessonContext) -> LessonContext:
         Phase.GRAMMAR: ctx.sentences,
     }
 
-    compiled: list[CompiledItem] = []
+    compiled: list[GeneralItem] = []
     item_index = 0
     for phase in (Phase.NOUNS, Phase.VERBS, Phase.GRAMMAR):
         items = items_by_phase.get(phase, [])
@@ -175,7 +175,7 @@ def _wire_assets_from_disk(ctx: LessonContext) -> LessonContext:
                             item.source.assets[asset_key] = path
                         else:
                             item.target.assets[asset_key] = path
-            compiled_item = CompiledItem(**item.model_dump())
+            compiled_item = GeneralItem(**item.model_dump())
             compiled_item.phase = phase
             compiled.append(compiled_item)
 

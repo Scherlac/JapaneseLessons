@@ -25,8 +25,8 @@ from jlesson.lesson_pipeline import (
     VerbPracticeStep,
     run_pipeline,
 )
-from jlesson.models import CompiledItem, ItemAssets, NounItem, Phase, Touch, TouchIntent, TouchType, VerbItem, Sentence, GeneralItem, PartialItem, VocabFile, VocabItem
-from jlesson.pipeline_steps.pipeline_core import CanonicalItem, CanonicalVocabSelection
+from jlesson.models import GeneralItem, GeneralItem, GeneralItem, Phase, Touch, TouchIntent, TouchType, GeneralItem, Sentence, GeneralItem, PartialItem, VocabFile, VocabItem
+from jlesson.pipeline_steps.pipeline_core import CanonicalItem, CanonicalVocabSet
 from jlesson.pipeline_steps.pipeline_core import ActionStep, StepAction
 from jlesson.item_generator.eng_jap import EngJapItemGenerator
 
@@ -203,7 +203,7 @@ def test_select_vocab_with_seed_is_deterministic(config):
 def test_grammar_select_picks_valid_grammar(ctx):
     ctx.nouns = _NOUN_ITEMS[:2]
     ctx.verbs = _VERB_ITEMS[:2]
-    ctx.canonical_vocab = CanonicalVocabSelection(
+    ctx.canonical_vocab = CanonicalVocabSet(
         nouns=[CanonicalItem(text=n.id, concept_type="noun") for n in _NOUN_ITEMS[:2]],
         verbs=[CanonicalItem(text=v.id, concept_type="verb") for v in _VERB_ITEMS[:2]],
     )
@@ -220,7 +220,7 @@ def test_grammar_select_picks_valid_grammar(ctx):
 def test_grammar_select_falls_back_when_llm_empty(ctx):
     ctx.nouns = _NOUN_ITEMS[:2]
     ctx.verbs = _VERB_ITEMS[:2]
-    ctx.canonical_vocab = CanonicalVocabSelection(
+    ctx.canonical_vocab = CanonicalVocabSet(
         nouns=[CanonicalItem(text=n.id, concept_type="noun") for n in _NOUN_ITEMS[:2]],
         verbs=[CanonicalItem(text=v.id, concept_type="verb") for v in _VERB_ITEMS[:2]],
     )
@@ -232,7 +232,7 @@ def test_grammar_select_falls_back_when_llm_empty(ctx):
 def test_grammar_select_skips_unknown_ids(ctx):
     ctx.nouns = _NOUN_ITEMS[:2]
     ctx.verbs = _VERB_ITEMS[:2]
-    ctx.canonical_vocab = CanonicalVocabSelection(
+    ctx.canonical_vocab = CanonicalVocabSet(
         nouns=[CanonicalItem(text=n.id, concept_type="noun") for n in _NOUN_ITEMS[:2]],
         verbs=[CanonicalItem(text=v.id, concept_type="verb") for v in _VERB_ITEMS[:2]],
     )
@@ -1154,9 +1154,9 @@ def test_build_items_by_phase_empty(ctx):
 # ---------------------------------------------------------------------------
 
 
-def _make_compiled_items(count: int, phase: Phase) -> list[CompiledItem]:
+def _make_compiled_items(count: int, phase: Phase) -> list[GeneralItem]:
     """Create mock compiled items for testing."""
-    return [CompiledItem(phase=phase) for _ in range(count)]
+    return [GeneralItem(phase=phase) for _ in range(count)]
 
 
 def test_compile_assets_step_dry_run(ctx, tmp_path):

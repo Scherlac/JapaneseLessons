@@ -10,7 +10,7 @@ from ..pipeline_core import (
     ActionConfig,
     BlockOutline,
     CanonicalLessonPlan,
-    CanonicalVocabSelection,
+    CanonicalVocabSet,
     LessonOutline,
     StepAction,
 )
@@ -21,7 +21,7 @@ from .prompt import GrammarCoverageInfo, build_lesson_plan_prompt
 class LessonPlannerChunk:
     """All data the lesson planner needs for one planning call."""
 
-    canonical: CanonicalVocabSelection
+    canonical: CanonicalVocabSet
     block_index: int
     lesson_number: int
     lesson_blocks: int

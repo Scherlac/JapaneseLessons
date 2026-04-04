@@ -4,10 +4,10 @@ from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
 from jlesson.models import GeneralItem, Phase, Sentence
 
 from .action import AssetCompileRequest, CompileAssetsAction
-from ..pipeline_core import ActionStep, CompiledItemSequence, LessonContext
+from ..pipeline_core import ActionStep, GeneralItemSequence, LessonContext
 
 
-class CompileAssetsStep(ActionStep[AssetCompileRequest, CompiledItemSequence]):
+class CompileAssetsStep(ActionStep[AssetCompileRequest, GeneralItemSequence]):
     """Step 9 — Render card images + TTS audio per item (Stage 2)."""
 
     name = "compile_assets"
@@ -47,8 +47,8 @@ class CompileAssetsStep(ActionStep[AssetCompileRequest, CompiledItemSequence]):
             )
         ]
 
-    def merge_outputs(self, ctx: LessonContext, outputs: list[CompiledItemSequence]) -> LessonContext:
-        result = outputs[-1] if outputs else CompiledItemSequence(items=[])
+    def merge_outputs(self, ctx: LessonContext, outputs: list[GeneralItemSequence]) -> LessonContext:
+        result = outputs[-1] if outputs else GeneralItemSequence(items=[])
         ctx.compiled_sequence = result
         self._log(ctx, f"       {len(ctx.compiled_items)} compiled items")
         return ctx

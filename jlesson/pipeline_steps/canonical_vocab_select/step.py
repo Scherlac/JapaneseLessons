@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from ..pipeline_core import (
     ActionStep,
-    CanonicalVocabSelection,
+    CanonicalVocabSet,
     LessonContext,
     NarrativeVocabPlan,
 )
 from .action import CanonicalVocabSelectAction, CanonicalVocabSelectRequest
 
 
-class CanonicalVocabSelectStep(ActionStep[CanonicalVocabSelectRequest, CanonicalVocabSelection]):
+class CanonicalVocabSelectStep(ActionStep[CanonicalVocabSelectRequest, CanonicalVocabSet]):
     """Select canonical English vocabulary terms for the planning phase.
 
     Input (from ``LessonContext``)
@@ -21,7 +21,7 @@ class CanonicalVocabSelectStep(ActionStep[CanonicalVocabSelectRequest, Canonical
 
     Output
     ------
-    canonical_vocab  CanonicalVocabSelection
+    canonical_vocab  CanonicalVocabSet
         English-only canonical item lists, one set per lesson block.
         No LLM calls are made; selection is purely deterministic
         (curriculum-coverage aware).
@@ -62,7 +62,7 @@ class CanonicalVocabSelectStep(ActionStep[CanonicalVocabSelectRequest, Canonical
     def merge_outputs(
         self,
         ctx: LessonContext,
-        outputs: list[CanonicalVocabSelection],
+        outputs: list[CanonicalVocabSet],
     ) -> LessonContext:
         ctx.canonical_vocab = outputs[0]
         noun_names = [n.text for n in ctx.canonical_vocab.nouns]

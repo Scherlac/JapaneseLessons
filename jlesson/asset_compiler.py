@@ -1,11 +1,11 @@
 """
 Asset compiler — Stage 2 of the compilation pipeline.
 
-Takes a list of lesson items (NounItem, VerbItem, Sentence) grouped by phase,
+Takes a list of lesson items (GeneralItem, GeneralItem, Sentence) grouped by phase,
 determines which assets are needed based on the selected profile, and renders
 card images + TTS audio for each item.
 
-Produces a list of CompiledItem objects with populated asset paths.
+Produces a list of GeneralItem objects with populated asset paths.
 
 Usage:
     from jlesson.asset_compiler import compile_assets
@@ -22,7 +22,7 @@ from jlesson.language_config import LanguageConfig
 from jlesson.video.cards import CardRenderer
 
 from .models import (
-    CompiledItem,
+    GeneralItem,
     GeneralItem,
     Phase,
 )
@@ -142,7 +142,7 @@ def compile_assets_sync(
     output_dir: Path | None = None,
     renderer=None,
     lang_cfg=None,
-) -> list[CompiledItem]:
+) -> list[GeneralItem]:
     """Compile card assets only (synchronous). TTS audio paths are left as None.
 
     Useful for dry-run or report-only modes. For full compilation with TTS,
@@ -165,7 +165,7 @@ def compile_assets_sync(
     cards_dir = output_dir / "cards"
     cards_dir.mkdir(parents=True, exist_ok=True)
 
-    compiled: list[CompiledItem] = []
+    compiled: list[GeneralItem] = []
     item_index = 0
 
     for phase in (Phase.NOUNS, Phase.VERBS, Phase.GRAMMAR):
@@ -192,7 +192,7 @@ async def compile_assets(
     renderer=None,
     create_engine_fn=None,
     lang_cfg: LanguageConfig | None =None,
-) -> list[CompiledItem]:
+) -> list[GeneralItem]:
     """Full asset compilation: card images + TTS audio.
 
     Parameters
@@ -221,7 +221,7 @@ async def compile_assets(
     cards_dir.mkdir(parents=True, exist_ok=True)
     audio_dir.mkdir(parents=True, exist_ok=True)
 
-    compiled: list[CompiledItem] = []
+    compiled: list[GeneralItem] = []
     item_index = 0
 
     for phase in (Phase.NOUNS, Phase.VERBS, Phase.GRAMMAR):

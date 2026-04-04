@@ -235,11 +235,11 @@ for custom chunk types.
 |------|-----------|--------|
 | `generate_sentences` | `BlockChunk` | one LLM call per lesson block |
 | `grammar_select` | `GrammarSelectChunk` | single LLM call + pure post-processing |
-| `vocab_enhancement` | `VocabEnhancementRequest(SelectedVocabSet)` | merged noun/verb enrichment with typed successor artifact |
+| `vocab_enhancement` | `VocabEnhancementRequest(VocabSet)` | merged noun/verb enrichment with typed successor artifact |
 | `select_vocab` | `SelectVocabRequest` | single vocab selection pass producing a typed successor artifact |
 | `register_lesson` | `RegisterLessonRequest` | single storage write producing a typed registration artifact |
 | `compile_assets` | `AssetCompileRequest` | single render compilation producing a typed successor artifact |
-| `compile_touches` | `CompiledItemSequence` | single pure transform from compiled items to touch sequence |
+| `compile_touches` | `GeneralItemSequence` | single pure transform from compiled items to touch sequence |
 | `render_video` | `RenderVideoRequest(TouchSequence)` | single render sink consuming the typed touch sequence |
 | `save_report` | `SaveReportRequest(RenderedVideoArtifact)` | single sink write consuming the rendered-video artifact |
 | `persist_content` | `PersistContentRequest` | single storage write consuming the typed registration artifact |
@@ -282,7 +282,7 @@ which needs `_project_grammar` to compute the unlocked set before the LLM call).
 ### `vocab_enhancement` — merged noun/verb enrichment after `select_vocab`
 
 This generalizes the former noun and verb practice steps into one typed
-successor of `SelectedVocabSet`. `VocabEnhancementRequest` keeps the selected
+successor of `VocabSet`. `VocabEnhancementRequest` keeps the selected
 vocab artifact visible while carrying the lesson ordinal and the set of parts
 that still need enrichment.
 
@@ -292,10 +292,10 @@ predecessor artifact for `RegisterLessonStep`.
 
 ```
 SelectVocabStep
-    Output:        SelectedVocabSet     (vocab + nouns + verbs)
+    Output:        VocabSet     (vocab + nouns + verbs)
 
 VocabEnhancementStep
-    Input chunk:   VocabEnhancementRequest   (SelectedVocabSet + lesson_number + pending parts)
+    Input chunk:   VocabEnhancementRequest   (VocabSet + lesson_number + pending parts)
     Output:        VocabEnhancementArtifact  (noun_items + verb_items)
     Action:        noun and verb enrichment via shared batch helpers
 
@@ -314,37 +314,37 @@ context-only mutation. `SelectVocabRequest` keeps the predecessor `VocabFile`
 visible while carrying the narrative term plan and curriculum coverage needed
 to choose fresh lesson vocab.
 
-`SelectVocabAction` emits `SelectedVocabSet`, and `GrammarSelectChunk` now
+`SelectVocabAction` emits `VocabSet`, and `GrammarSelectChunk` now
 extends that artifact so the successor step advertises the dependency in its
 type signature.
 
 ```
 SelectVocabStep
     Input chunk:   SelectVocabRequest    (VocabFile + canonical selection + curriculum coverage)
-    Output:        SelectedVocabSet      (vocab + nouns + verbs)
+    Output:        VocabSet      (vocab + nouns + verbs)
     Action:        load-or-reuse vocab + select fresh items
 
 GrammarSelectStep
-    Input chunk:   GrammarSelectChunk    (SelectedVocabSet + grammar progression state)
+    Input chunk:   GrammarSelectChunk    (VocabSet + grammar progression state)
 ```
 
-### `compile_touches` — render-side successor artifact (`CompiledItemSequence`)
+### `compile_touches` — render-side successor artifact (`GeneralItemSequence`)
 
 Demonstrates the same dependency-aware flow on the render side: compiled render
 items are wrapped in a typed artifact that becomes the direct input chunk of the
 successor step.
 
-**`CompiledItemSequence`** is defined in `pipeline_core.py` as the render-side
+**`GeneralItemSequence`** is defined in `pipeline_core.py` as the render-side
 handoff artifact. It is the natural output type of `CompileAssetsStep` and the
 direct input chunk for `CompileTouchesStep`.
 
 ```
 CompileAssetsStep
     Output field:  ctx.compiled_items
-    Target type:   CompiledItemSequence   (items: list[CompiledItem])
+    Target type:   GeneralItemSequence   (items: list[GeneralItem])
 
 CompileTouchesStep
-    Input chunk:   CompiledItemSequence   ← successor boundary made explicit
+    Input chunk:   GeneralItemSequence   ← successor boundary made explicit
     Output:        TouchSequence          (items: list[Touch])
     Action:        one pure compile_touches call
 ```
@@ -357,17 +357,17 @@ typed artifact that the successor step consumes.
 `AssetCompileRequest` is a step-local composite chunk that gathers the lesson's
 reviewed sentences and enriched vocab into one render-compilation request. The
 important aligned boundary is the output: `CompileAssetsAction` returns
-`CompiledItemSequence`, and `CompileTouchesStep` consumes exactly that artifact
+`GeneralItemSequence`, and `CompileTouchesStep` consumes exactly that artifact
 type.
 
 ```
 CompileAssetsStep
     Input chunk:   AssetCompileRequest   (items_by_phase + lesson_dir + dry_run)
-    Output:        CompiledItemSequence  (items: list[CompiledItem])
+    Output:        GeneralItemSequence  (items: list[GeneralItem])
     Action:        one sync/async asset compiler call
 
 CompileTouchesStep
-    Input chunk:   CompiledItemSequence  ← direct output type of the preceding step
+    Input chunk:   GeneralItemSequence  ← direct output type of the preceding step
     Output:        TouchSequence         (items: list[Touch])
 ```
 
@@ -505,12 +505,12 @@ current typed connections.
 |----------------|---------------|----------------|
 | `NarrativeGeneratorStep` | `NarrativeFrame` | `ExtractNarrativeVocabStep` |
 | `ExtractNarrativeVocabStep` | `NarrativeVocabPlan` | `CanonicalVocabSelectStep` |
-| `SelectVocabStep` | `SelectedVocabSet` | `GrammarSelectStep` |
-| `SelectVocabStep` | `SelectedVocabSet` | `VocabEnhancementStep` |
+| `SelectVocabStep` | `VocabSet` | `GrammarSelectStep` |
+| `SelectVocabStep` | `VocabSet` | `VocabEnhancementStep` |
 | `VocabEnhancementStep` | `VocabEnhancementArtifact` | `RegisterLessonStep` |
 | `NarrativeGrammarStep` | `Sentence` (via `SentenceReviewBatch`) | `ReviewSentencesStep` |
 | `RegisterLessonStep` | `LessonRegistrationArtifact` | `PersistContentStep` |
-| `CompileAssetsStep` | `CompiledItemSequence` | `CompileTouchesStep` |
+| `CompileAssetsStep` | `GeneralItemSequence` | `CompileTouchesStep` |
 | `CompileTouchesStep` | `TouchSequence` | `RenderVideoStep` |
 | `RenderVideoStep` | `RenderedVideoArtifact` | `SaveReportStep` |
 
@@ -593,9 +593,9 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `extract_narrative_vocab` | `NarrativeFrame` ← from `narrative_generator` | 1 | **done** — emits `NarrativeVocabPlan` |
 | `review_sentences` | `SentenceReviewBatch(ItemBatch[Sentence])` ← from `generate_sentences` | batched ×30 | **done** — successor step; chunk item type = `Sentence` (output of `NarrativeGrammarStep`) |
 | `register_lesson` | `RegisterLessonRequest` | 1 storage write | **done** — predecessor step; emits `LessonRegistrationArtifact` for later `persist_content` alignment |
-| `compile_assets` | `AssetCompileRequest` | 1 sync/async render call | **done** — predecessor step; emits `CompiledItemSequence` for `compile_touches` |
-| `compile_touches` | `CompiledItemSequence` ← from `compile_assets` | 1 pure transform | **done** — successor step; chunk type wraps predecessor render artifact |
+| `compile_assets` | `AssetCompileRequest` | 1 sync/async render call | **done** — predecessor step; emits `GeneralItemSequence` for `compile_touches` |
+| `compile_touches` | `GeneralItemSequence` ← from `compile_assets` | 1 pure transform | **done** — successor step; chunk type wraps predecessor render artifact |
 | `render_video` | `RenderVideoRequest(TouchSequence)` ← from `compile_touches` | 1 sink render call | **done** — successor step; chunk type preserves `TouchSequence` as the predecessor artifact |
 | `save_report` | `SaveReportRequest(RenderedVideoArtifact)` ← from `render_video` | 1 sink write | **done** — successor step; chunk type preserves `RenderedVideoArtifact` as the predecessor artifact |
-| `select_vocab` | `SelectVocabRequest` | conditional vocab load + gap-fill | **done** — bridge step; emits `SelectedVocabSet` for `grammar_select` and `vocab_enhancement` |
+| `select_vocab` | `SelectVocabRequest` | conditional vocab load + gap-fill | **done** — bridge step; emits `VocabSet` for `grammar_select` and `vocab_enhancement` |
 | `persist_content` | `PersistContentRequest` ← from `register_lesson` | storage only | **done** — successor step; request preserves `LessonRegistrationArtifact` as the predecessor artifact |

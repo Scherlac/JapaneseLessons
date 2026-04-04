@@ -6,7 +6,7 @@ from typing import Callable
 
 from jlesson.models import GeneralItem, VocabFile, VocabItem
 
-from ..pipeline_core import ActionConfig, CanonicalVocabSelection, SelectedVocabSet, StepAction
+from ..pipeline_core import ActionConfig, CanonicalVocabSet, VocabSet, StepAction
 from .config import build_select_vocab_language_config
 from .prompt import build_vocab_gap_fill_prompt
 
@@ -18,7 +18,7 @@ class SelectVocabRequest:
     vocab: VocabFile | None
     vocab_dir: Path
     theme: str
-    canonical_selection: CanonicalVocabSelection | None
+    canonical_selection: CanonicalVocabSet | None
     narrative_blocks: list[str]
     covered_nouns: list[str]
     covered_verbs: list[str]
@@ -28,10 +28,10 @@ class SelectVocabRequest:
     seed: int | None
 
 
-class SelectVocabAction(StepAction[SelectVocabRequest, SelectedVocabSet]):
+class SelectVocabAction(StepAction[SelectVocabRequest, VocabSet]):
     """Select fresh lesson vocab from a typed vocab source."""
 
-    def run(self, config: ActionConfig, chunk: SelectVocabRequest) -> SelectedVocabSet:
+    def run(self, config: ActionConfig, chunk: SelectVocabRequest) -> VocabSet:
         vocab = chunk.vocab
         if vocab is None:
             vocab = config.runtime.load_vocab(chunk.theme, chunk.vocab_dir)
@@ -86,7 +86,7 @@ class SelectVocabAction(StepAction[SelectVocabRequest, SelectedVocabSet]):
                 generator=generator,
             )
 
-        return SelectedVocabSet(vocab=vocab, nouns=nouns, verbs=verbs)
+        return VocabSet(vocab=vocab, nouns=nouns, verbs=verbs)
 
     @classmethod
     def _select_from_narrative(

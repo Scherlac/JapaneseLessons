@@ -2,7 +2,7 @@
 
 Selects English canonical vocabulary terms for the lesson planning phase
 without any language-specific LLM calls.  The output is a
-``CanonicalVocabSelection`` that drives ``LessonPlannerStep`` and
+``CanonicalVocabSet`` that drives ``LessonPlannerStep`` and
 ``GrammarSelectStep`` entirely in English.
 """
 
@@ -14,7 +14,7 @@ from jlesson.models import CanonicalItem, NarrativeVocabBlock
 
 from ..pipeline_core import (
     ActionConfig,
-    CanonicalVocabSelection,
+    CanonicalVocabSet,
     NarrativeVocabPlan,
     StepAction,
 )
@@ -38,7 +38,7 @@ class CanonicalVocabSelectRequest:
 
 
 class CanonicalVocabSelectAction(
-    StepAction[CanonicalVocabSelectRequest, CanonicalVocabSelection]
+    StepAction[CanonicalVocabSelectRequest, CanonicalVocabSet]
 ):
     """Select canonical English vocabulary terms — no LLM calls.
 
@@ -51,7 +51,7 @@ class CanonicalVocabSelectAction(
 
     def run(
         self, config: ActionConfig, chunk: CanonicalVocabSelectRequest
-    ) -> CanonicalVocabSelection:
+    ) -> CanonicalVocabSet:
         covered_nouns = {self._normalize(t) for t in chunk.covered_nouns}
         covered_verbs = {self._normalize(t) for t in chunk.covered_verbs}
 
@@ -96,7 +96,7 @@ class CanonicalVocabSelectAction(
             nouns_per_block.append([item.text for item in block_nouns])
             verbs_per_block.append([item.text for item in block_verbs])
 
-        return CanonicalVocabSelection(
+        return CanonicalVocabSet(
             nouns=all_nouns,
             verbs=all_verbs,
             nouns_per_block=nouns_per_block,

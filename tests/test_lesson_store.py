@@ -10,7 +10,7 @@ from jlesson.lesson_store import load_lesson_content, save_lesson_content
 def _ldir(base, lesson_id: int):
     """Return the lesson dir path for a given lesson_id under base."""
     return base / f"lesson_{lesson_id:03d}"
-from jlesson.models import LessonContent, NounItem, Sentence, VerbItem, GeneralItem, PartialItem, Phase
+from jlesson.models import LessonContent, GeneralItem, Sentence, GeneralItem, GeneralItem, PartialItem, Phase
 
 
 @pytest.fixture()

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from .action import CompileTouchesAction
-from ..pipeline_core import ActionStep, CompiledItemSequence, LessonContext, TouchSequence
+from ..pipeline_core import ActionStep, GeneralItemSequence, LessonContext, TouchSequence
 
 
-class CompileTouchesStep(ActionStep[CompiledItemSequence, TouchSequence]):
+class CompileTouchesStep(ActionStep[GeneralItemSequence, TouchSequence]):
     """Step 10 — Profile-driven touch sequencing (Stage 3)."""
 
     name = "compile_touches"
@@ -18,8 +18,8 @@ class CompileTouchesStep(ActionStep[CompiledItemSequence, TouchSequence]):
     def should_skip(self, ctx: LessonContext) -> bool:
         return bool(ctx.touches)
 
-    def build_chunks(self, ctx: LessonContext) -> list[CompiledItemSequence]:
-        return [CompiledItemSequence(items=ctx.compiled_items)]
+    def build_chunks(self, ctx: LessonContext) -> list[GeneralItemSequence]:
+        return [GeneralItemSequence(items=ctx.compiled_items)]
 
     def merge_outputs(self, ctx: LessonContext, outputs: list[TouchSequence]) -> LessonContext:
         result = outputs[-1] if outputs else TouchSequence(items=[])

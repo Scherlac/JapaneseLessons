@@ -4,11 +4,11 @@ from dataclasses import dataclass
 
 from jlesson.models import GeneralItem
 
-from ..pipeline_core import ActionConfig, SelectedVocabSet, StepAction, VocabEnhancementArtifact
+from ..pipeline_core import ActionConfig, VocabSet, StepAction, VocabEnhancementArtifact
 
 
 @dataclass
-class VocabEnhancementRequest(SelectedVocabSet):
+class VocabEnhancementRequest(VocabSet):
     """Composite request for merged noun/verb vocab enrichment."""
 
     lesson_number: int

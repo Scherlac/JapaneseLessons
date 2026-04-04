@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import jlesson.asset_compiler as asset_compiler
-from jlesson.models import CompiledItem, GeneralItem, Phase, Sentence
+from jlesson.models import GeneralItem, GeneralItem, Phase, Sentence
 from jlesson.profiles import get_profile
 
-from ..pipeline_core import ActionConfig, CompiledItemSequence, StepAction
+from ..pipeline_core import ActionConfig, GeneralItemSequence, StepAction
 
 
 @dataclass
@@ -20,10 +20,10 @@ class AssetCompileRequest:
     dry_run: bool
 
 
-class CompileAssetsAction(StepAction[AssetCompileRequest, CompiledItemSequence]):
+class CompileAssetsAction(StepAction[AssetCompileRequest, GeneralItemSequence]):
     """Render cards/audio and return the compiled-item sequence artifact."""
 
-    def run(self, config: ActionConfig, chunk: AssetCompileRequest) -> CompiledItemSequence:
+    def run(self, config: ActionConfig, chunk: AssetCompileRequest) -> GeneralItemSequence:
         profile = get_profile(config.lesson.profile)
 
         if chunk.dry_run:
@@ -45,4 +45,4 @@ class CompileAssetsAction(StepAction[AssetCompileRequest, CompiledItemSequence])
                 )
             )
 
-        return CompiledItemSequence(items=items)
+        return GeneralItemSequence(items=items)

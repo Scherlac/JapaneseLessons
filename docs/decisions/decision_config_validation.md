@@ -243,8 +243,8 @@ models.py
   Verb            — vocab verb entry
   VocabFile       — full vocab JSON file
   GrammarSpec     — one grammar progression entry (mirrors GRAMMAR_PROGRESSION dicts)
-  NounItem        — LLM-generated noun practice item (with example_sentence, memory_tip)
-  VerbItem        — LLM-generated verb practice item (with polite_forms)
+  GeneralItem        — LLM-generated noun practice item (with example_sentence, memory_tip)
+  GeneralItem        — LLM-generated verb practice item (with polite_forms)
   Sentence        — LLM-generated grammar sentence
   LessonContent   — full lesson payload (noun_items + verb_items + sentences)
 ```
