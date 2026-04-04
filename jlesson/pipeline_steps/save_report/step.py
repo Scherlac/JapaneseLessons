@@ -23,7 +23,7 @@ class SaveReportStep(ActionStep[SaveReportRequest, ReportArtifact]):
     def should_skip(self, ctx: LessonContext) -> bool:
         return bool(ctx.report_path)
 
-    def build_input(self, ctx: LessonContext) -> list[SaveReportRequest]:
+    def build_input(self, ctx: LessonContext) -> SaveReportRequest:
         lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
         rendered = RenderedVideoArtifact(
             video_path=ctx.video_path,
@@ -31,8 +31,7 @@ class SaveReportStep(ActionStep[SaveReportRequest, ReportArtifact]):
             cards_dir=(lesson_dir / "cards") if (lesson_dir / "cards").exists() else None,
             audio_dir=(lesson_dir / "audio") if (lesson_dir / "audio").exists() else None,
         )
-        return [
-            SaveReportRequest(
+        return SaveReportRequest(
                 video_path=rendered.video_path,
                 clip_count=rendered.clip_count,
                 cards_dir=rendered.cards_dir,
@@ -41,10 +40,9 @@ class SaveReportStep(ActionStep[SaveReportRequest, ReportArtifact]):
                 report_path=lesson_dir / "report.md",
                 summary_markdown=self._summary(ctx),
             )
-        ]
 
-    def merge_output(self, ctx: LessonContext, outputs: list[ReportArtifact]) -> LessonContext:
-        result = outputs[-1] if outputs else ReportArtifact(report_path=None)
+    def merge_output(self, ctx: LessonContext, outputs: ReportArtifact) -> LessonContext:
+        result = outputs if outputs else ReportArtifact(report_path=None)
         ctx.saved_report = result
         ctx.report_path = result.report_path
         self._log(ctx, f"       {ctx.report_path}")

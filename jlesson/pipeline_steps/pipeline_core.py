@@ -85,6 +85,12 @@ class LessonContext:
     canonical_plan: CanonicalLessonPlan | None = None
     lesson_plan: LessonPlan | None = None
 
+    compiled_sequence: CompiledSequence | None = None
+    touch_sequence: TouchSequence | None = None
+
+    rendered_video: RenderedVideoArtifact | None = None
+    saved_report: ReportArtifact | None = None
+
 class PipelineStep(ABC):
     """Abstract base class for pipeline steps."""
 

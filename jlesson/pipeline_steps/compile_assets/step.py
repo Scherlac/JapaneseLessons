@@ -4,10 +4,10 @@ from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
 from jlesson.models import GeneralItem, Phase, Sentence
 
 from .action import AssetCompileRequest, CompileAssetsAction
-from ..pipeline_core import ActionStep, GeneralItemSequence, LessonContext
+from ..pipeline_core import ActionStep, GeneralItemSequence, LessonBlock, LessonContext, LessonPlan
 
 
-class CompileAssetsStep(ActionStep[AssetCompileRequest, GeneralItemSequence]):
+class CompileAssetsStep(ActionStep[LessonBlock, LessonBlock]):
     """Step 9 — Render card images + TTS audio per item (Stage 2)."""
 
     name = "compile_assets"
@@ -18,35 +18,27 @@ class CompileAssetsStep(ActionStep[AssetCompileRequest, GeneralItemSequence]):
     def action(self) -> CompileAssetsAction:
         return self._action
 
-    @staticmethod
-    def build_items_by_phase(ctx: LessonContext) -> dict[Phase, list[GeneralItem | Sentence]]:
-        return {
-            Phase.NOUNS: ctx.noun_items,
-            Phase.VERBS: ctx.verb_items,
-            Phase.GRAMMAR: ctx.sentences,
-        }
 
     def should_skip(self, ctx: LessonContext) -> bool:
-        return bool(ctx.compiled_items)
+        if ctx.lesson_plan is None:
+            self._log(ctx, "       no lesson plan — cannot compile assets")
+            return False
+        return True
 
-    def build_input(self, ctx: LessonContext) -> AssetCompileRequest:
-        items_by_phase = self.build_items_by_phase(ctx)
-        total_items = sum(len(items) for items in items_by_phase.values())
-        lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
+    def build_input_list(self, ctx: LessonContext) -> list[LessonBlock]:
+        items_by_phase = ctx.lesson_plan.blocks
+        total_items = sum(len(seq_list) for items in items_by_phase for seq_list in items.content_sequences.values())
 
         if ctx.config.dry_run:
             self._log(ctx, f"       (dry-run) {total_items} items - cards only")
         else:
             self._log(ctx, f"       {total_items} items -> cards + TTS")
 
-        return AssetCompileRequest(
-            items_by_phase=items_by_phase,
-            lesson_dir=lesson_dir,
-            dry_run=ctx.config.dry_run,
-        )
+        return items_by_phase
 
-    def merge_output(self, ctx: LessonContext, outputs: GeneralItemSequence) -> LessonContext:
-        result = outputs if outputs else GeneralItemSequence(items=[])
-        ctx.compiled_sequence = result
-        self._log(ctx, f"       {len(ctx.compiled_items)} compiled items")
+    def merge_output_list(self, ctx: LessonContext, outputs: list[LessonBlock]) -> LessonContext:
+        items_by_phase = ctx.lesson_plan.blocks
+        total_items = sum(len(seq_list) for items in items_by_phase for seq_list in items.content_sequences.values())
+
+        self._log(ctx, f"       {total_items} compiled items")
         return ctx

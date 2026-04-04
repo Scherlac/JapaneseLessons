@@ -142,7 +142,7 @@ def compile_assets_sync(
     output_dir: Path | None = None,
     renderer=None,
     lang_cfg=None,
-) -> list[GeneralItem]:
+) -> dict[Phase, list[GeneralItem]]:
     """Compile card assets only (synchronous). TTS audio paths are left as None.
 
     Useful for dry-run or report-only modes. For full compilation with TTS,
@@ -165,7 +165,6 @@ def compile_assets_sync(
     cards_dir = output_dir / "cards"
     cards_dir.mkdir(parents=True, exist_ok=True)
 
-    compiled: list[GeneralItem] = []
     item_index = 0
 
     for phase in (Phase.NOUNS, Phase.VERBS, Phase.GRAMMAR):
@@ -179,27 +178,24 @@ def compile_assets_sync(
             )
             compiled_item = item.model_copy()
             compiled_item.phase = phase
-            compiled.append(compiled_item)
 
-    return compiled
+    return items_by_phase
 
 
 async def compile_assets(
     items_by_phase: dict[Phase, list[GeneralItem]],
     profile: Profile,
-    step_info=None,
     output_dir: Path | None = None,
     renderer=None,
     create_engine_fn=None,
     lang_cfg: LanguageConfig | None =None,
-) -> list[GeneralItem]:
+) -> dict[Phase, list[GeneralItem]]:
     """Full asset compilation: card images + TTS audio.
 
     Parameters
     ----------
     items_by_phase : dict mapping Phase → list of items
     profile : Profile rulebook determining which assets to render
-    step_info : retained for call-site compatibility; ignored for static cards
     output_dir : base directory for cards/ and audio/ subdirectories
     renderer : optional CardRenderer instance (created if None)
     create_engine_fn : optional factory ``(voice_key, rate) → TTSEngine``
@@ -221,7 +217,6 @@ async def compile_assets(
     cards_dir.mkdir(parents=True, exist_ok=True)
     audio_dir.mkdir(parents=True, exist_ok=True)
 
-    compiled: list[GeneralItem] = []
     item_index = 0
 
     for phase in (Phase.NOUNS, Phase.VERBS, Phase.GRAMMAR):
@@ -242,6 +237,5 @@ async def compile_assets(
 
             compiled_item = item.model_copy()
             compiled_item.phase = phase
-            compiled.append(compiled_item)
 
-    return compiled
+    return items_by_phase

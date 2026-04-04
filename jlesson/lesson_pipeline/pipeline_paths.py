@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from jlesson.pipeline_steps.pipeline_core import LessonConfig
+
 _DEFAULT_OUTPUT_BASE = Path(__file__).parent.parent / "output"
 
 
@@ -18,11 +20,11 @@ def resolve_lang_dir(config) -> Path:
     return _output_base(config) / config.language
 
 
-def resolve_lesson_dir(config, lesson_id: int) -> Path:
+def resolve_lesson_dir(config: LessonConfig) -> Path:
     """Return the self-contained lesson bundle dir:
     ``{base}/{language}/{theme}/lesson_{id:03d}/``
     """
-    return resolve_lang_dir(config) / config.theme / f"lesson_{lesson_id:03d}"
+    return resolve_lang_dir(config) / config.theme / f"lesson_{config.lesson_number:03d}"
 
 
 def resolve_output_dir(config) -> Path:
