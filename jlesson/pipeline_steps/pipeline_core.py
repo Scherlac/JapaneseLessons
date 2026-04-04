@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Generic, TypeVar
@@ -89,6 +90,7 @@ class LessonContext:
     compiled_items: list[CompiledItem] = field(default_factory=list)
     touches: list[Touch] = field(default_factory=list)
     lesson_id: int = 0
+    artifact_lesson_id: int = 0
     created_at: str = ""
     content_path: Path | None = None
     video_path: Path | None = None
@@ -547,7 +549,7 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
 
         rt = ContextRuntime(ctx)
         chunks = self.build_chunks(ctx)
-        self._last_chunks = chunks
+        self._last_chunks = deepcopy(chunks)
         outputs: list[_O] = []
         for loop_index, chunk in enumerate(chunks):
             block_index = getattr(chunk, "block_index", loop_index)
@@ -560,5 +562,5 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
             )
             outputs.append(self.action.run(cfg, chunk))
 
-        self._last_outputs = outputs
+        self._last_outputs = deepcopy(outputs)
         return self.merge_outputs(ctx, outputs)

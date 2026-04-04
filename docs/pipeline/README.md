@@ -190,6 +190,10 @@ rather than ad hoc reads/writes to context fields.
 
 Default execution order from `lesson_pipeline.__init__`.
 
+The current production pipeline has 16 steps. `GrammarSelectStep` still exists
+as a compatibility path in code, but the default production flow now uses
+`canonical_vocab_select` followed by `lesson_planner`.
+
 The pipeline currently has two concrete enrichment steps, `noun_practice` and
 `verb_practice`, but architecturally they are better understood as one
 conceptual `vocab_enrichment` stage with two item-specific implementations.
@@ -199,18 +203,19 @@ conceptual `vocab_enrichment` stage with two item-specific implementations.
 | 1 | `retrieve_material` | Reuse prior material when retrieval coverage is high enough | theme, retrieval settings, target language, vocab quotas | writes nouns, verbs, noun_items, verb_items, sentences, grammar ids directly to context | `LessonRequest -> RetrievedLessonMaterial` |
 | 2 | `narrative_generator` | Generate or normalise block-by-block story progression | theme, lesson number, block count, seed narrative | `NarrativeFrame` -> `narrative_blocks` | Keep as `NarrativeGenChunk -> NarrativeFrame` |
 | 3 | `extract_narrative_vocab` | Extract per-block noun/verb hints from the narrative | `NarrativeFrame` | `NarrativeVocabPlan` -> `narrative_vocab_terms` | Keep as `NarrativeFrame -> NarrativeVocabPlan` |
-| 4 | `generate_narrative_vocab` | Expand narrative terms into full vocab entries | `NarrativeVocabPlan` | `VocabFile` -> `vocab` | Keep as `NarrativeVocabPlan -> VocabFile` |
-| 5 | `select_vocab` | Choose lesson nouns/verbs from vocab with curriculum freshness and narrative fit | `VocabFile`, `NarrativeVocabPlan`, curriculum coverage, optional LLM gap fill | `nouns`, `verbs` as `list[GeneralItem]` | `VocabFile + NarrativeVocabPlan + CurriculumState -> VocabSelection` |
-| 6 | `grammar_select` | Choose grammar points and block-level grammar windows | grammar progression, covered grammar ids, nouns, verbs, lesson number | `GrammarSelectResult` -> `selected_grammar`, `selected_grammar_blocks` | `VocabSelection + CurriculumState -> GrammarPlan` |
-| 7 | `narrative_grammar` | Generate block-aware practice sentences | `BlockChunk` built from narrative, selected vocab, and grammar slices | `list[Sentence]` -> `sentences` | `PerBlockContentPlan -> SentenceSequence` |
-| 8 | `review_sentences` | Review sentence naturalness and rewrite weak outputs | `SentenceReviewBatch(ItemBatch[Sentence])` plus vocab/grammar context | `SentenceReviewResult` -> revised `sentences` | `SentenceSequence + review context -> ReviewedSentenceSequence + SemanticTextRecord[sentences]` |
-| 9 | `vocab_enrichment` | Enrich selected vocab with examples, conjugation/memory support, and semantic records | selected noun/verb items, lesson number, per-block narrative/grammar context when needed | enriched vocab (`noun_items`, `verb_items`) | `PerBlockContentPlan -> EnrichedVocab + SemanticTextRecord[words]` |
-| 10 | `register_lesson` | Persist curriculum progression and assign lesson id | nouns, verbs, selected grammar, enriched noun items, sentences | updated curriculum, `lesson_id`, `created_at` | `LessonRegistration` derived from reviewed sentences + enriched vocab + grammar plan |
-| 11 | `persist_content` | Canonise finalized lesson items, attach language branches as needed, and persist the lesson manifest | narrative blocks, grammar ids, enriched vocab, reviewed sentences, lesson id | reference-oriented `LessonContent`, `content_path`, canonisation handoff | `Reviewed content + semantic records -> CanonicalSemanticRecord batch -> CanonicalLessonNode/LanguageBranch + LessonContentRefs` |
-| 12 | `compile_assets` | Resolve lesson-content references, render cards/audio, persist compiled asset records, and attach them to branch/canonical entities | `LessonContent`, `Profile` | `compiled_items`, compiled asset refs | `LessonContentRefs + TouchProfile -> CompiledItemSequence + CompiledAssetRecord batch + BranchAssetLinks` |
-| 13 | `compile_touches` | Build the learner-facing repetition sequence | compiled asset refs and/or `compiled_items`, `Profile` | `touches` as `list[Touch]` | `CompiledAssetRecord batch + TouchProfile -> TouchSequence` |
-| 14 | `render_video` | Assemble final MP4 from the touch sequence | `touches` | `video_path` | `TouchSequence -> RenderedVideo` |
-| 15 | `save_report` | Finalise and persist the run report | accumulated `ReportBuilder` state and artifacts | `report_path` | Keep as report sink; not part of the main learning-content artifact chain |
+| 4 | `canonical_vocab_select` | Deterministically choose canonical English lesson vocab for planning | `NarrativeVocabPlan`, curriculum coverage, narrative blocks | `CanonicalVocabSelection` -> `canonical_vocab` | Keep as `NarrativeVocabPlan + CurriculumState -> CanonicalVocabSelection` |
+| 5 | `generate_narrative_vocab` | Expand canonical narrative terms into language-pair vocab rows | `NarrativeVocabPlan` | `VocabFile` -> `vocab` | In the target design this should move after planning/content finalisation or become a branch-materialisation step |
+| 6 | `select_vocab` | Resolve selected canonical terms to language-pair vocab items | `VocabFile`, `CanonicalVocabSelection`, curriculum coverage, optional LLM gap fill | `SelectedVocabSet` -> `nouns`, `verbs` as `list[GeneralItem]` | `CanonicalVocabSelection + BranchVocab -> SelectedVocabSet`; current step materialises source/target too early |
+| 7 | `lesson_planner` | Plan grammar selection and per-block pacing in canonical language | `CanonicalVocabSelection`, grammar progression, narrative blocks, curriculum state | `LessonOutline`, `CanonicalLessonPlan`, `selected_grammar`, `selected_grammar_blocks` | `CanonicalVocabSelection + CurriculumState -> CanonicalLessonPlan` |
+| 8 | `narrative_grammar` | Generate block-aware practice sentences | `BlockChunk` built from narrative, selected vocab, and grammar slices | `list[Sentence]` -> `sentences` | `PerBlockContentPlan -> SentenceSequence`; this is the first step that should need source/target language sentence content |
+| 9 | `review_sentences` | Review sentence naturalness and rewrite weak outputs | `SentenceReviewBatch(ItemBatch[Sentence])` plus vocab/grammar context | `SentenceReviewResult` -> revised `sentences` | `SentenceSequence + review context -> ReviewedSentenceSequence + SemanticTextRecord[sentences]` |
+| 10 | `vocab_enrichment` | Enrich selected vocab with examples, conjugation/memory support, and semantic records | selected noun/verb items, lesson number, per-block narrative/grammar context when needed | enriched vocab (`noun_items`, `verb_items`) | `PerBlockContentPlan -> EnrichedVocab + SemanticTextRecord[words]`; this is the second step that should need source/target language content |
+| 11 | `register_lesson` | Persist curriculum progression and assign lesson id | nouns, verbs, selected grammar, enriched noun items, sentences | updated curriculum, `lesson_id`, `created_at` | `LessonRegistration` derived from reviewed sentences + enriched vocab + grammar plan |
+| 12 | `persist_content` | Canonise finalized lesson items, attach language branches as needed, and persist the lesson manifest | narrative blocks, grammar ids, enriched vocab, reviewed sentences, lesson id | reference-oriented `LessonContent`, `content_path`, canonisation handoff | `Reviewed content + semantic records -> CanonicalSemanticRecord batch -> CanonicalLessonNode/LanguageBranch + LessonContentRefs` |
+| 13 | `compile_assets` | Resolve lesson-content references, render cards/audio, persist compiled asset records, and attach them to branch/canonical entities | `LessonContent`, `Profile` | `compiled_items`, compiled asset refs | `LessonContentRefs + TouchProfile -> CompiledItemSequence + CompiledAssetRecord batch + BranchAssetLinks` |
+| 14 | `compile_touches` | Build the learner-facing repetition sequence | compiled asset refs and/or `compiled_items`, `Profile` | `touches` as `list[Touch]` | `CompiledAssetRecord batch + TouchProfile -> TouchSequence` |
+| 15 | `render_video` | Assemble final MP4 from the touch sequence | `touches` | `video_path` | `TouchSequence -> RenderedVideo` |
+| 16 | `save_report` | Finalise and persist the run report | accumulated `ReportBuilder` state and artifacts | `report_path` | Keep as report sink; not part of the main learning-content artifact chain |
 
 Current implementation note for step 9:
 
@@ -224,14 +229,18 @@ Current implementation note for step 9:
 
 Current state by artifact class:
 
-- `Narrative content` is the cleanest aligned chain today: `NarrativeGenChunk -> NarrativeFrame -> NarrativeVocabPlan -> VocabFile`.
+- `Narrative content` and canonical term extraction now have a clean early chain: `NarrativeGenChunk -> NarrativeFrame -> NarrativeVocabPlan -> CanonicalVocabSelection`.
+- The canonical planning boundary is only partially achieved. `LessonPlannerStep` plans against `CanonicalVocabSelection`, but `generate_narrative_vocab` and `select_vocab` still materialise language-pair vocab before `narrative_grammar`, `review_sentences`, and `vocab_enrichment`.
 - `Sentences` now have a real successor alignment: `NarrativeGrammarStep` produces `Sentence`, and `ReviewSentencesStep` consumes `Sentence` via `SentenceReviewBatch`.
-- `Vocab` is still the most fragmented area. Raw vocab, selected vocab, and enriched vocab are all real stages, but they are not yet named as separate artifacts cleanly enough. Treating `noun_practice` and `verb_practice` as one conceptual `vocab_enrichment` stage is a better model.
+- `Vocab` is still the most fragmented area. Raw vocab, canonical selection, selected branch vocab, and enriched vocab are all real stages, but they are not yet named or connected cleanly enough. Treating `noun_practice` and `verb_practice` as one conceptual `vocab_enrichment` stage is a better model.
+- `SelectedVocabSet` loses the per-block assignment encoded in `CanonicalVocabSelection`. `NarrativeGrammarStep` rebuilds block groupings by chunking flat noun/verb lists rather than consuming one explicit predecessor artifact that already carries the block plan.
 - Meaning-aware refinement is not yet explicit. The code has a place to carry semantic payload (`metadata` on lesson items), but there is not yet a first-class semantic text record or canonical semantic record.
 - `LessonContent` is still best thought of as a future reference manifest, not as a durable duplicate of the full generated payload. The target boundary is: finalize items, canonise them, then persist only stable references plus lesson structure.
 - `Per-block content plan` is the biggest missing first-class type. It currently exists only as assembly logic inside `BlockChunk` construction and adjacent block-slicing logic.
 - Render-side sequencing is semantically split between `Profile`, `CompiledItem`, and `Touch`. That is workable, but rendering should start from `LessonContent` references rather than directly from live enriched items.
 - Compiled assets should become durable records linked back into the semantic graph. Default attachment should be at `LanguageBranch`; direct canonical-node attachment should be reserved for language-neutral assets.
+- Step artifact persistence still begins only after `register_lesson`, because `steps/<step_name>/` is derived from `lesson_id`. That means the most important planning steps are not currently inspectable in the emitted lesson bundle.
+- Step `input.json` snapshots are currently captured after the step action has run. For mutable payloads such as `compile_assets`, this means the recorded input may already contain output-era mutations like asset paths, so those snapshots are not yet trustworthy as true pre-action inputs.
 
 Most useful next alignment target:
 
@@ -252,6 +261,79 @@ Third useful target:
 Fourth useful target:
 
 - make `persist_content` the real handoff into canonisation and branch attachment, and reduce `LessonContent` to a reference-only lesson manifest
+
+---
+
+## Observed Totoro Run
+
+Representative review run executed on 2026-04-04:
+
+- theme: `totoro`
+- blocks: `5`
+- grammar points per lesson: `3`
+- grammar points per block: `2`
+- nouns per block: `1`
+- verbs per block: `1`
+- retrieval: disabled
+- output root: `output/review_totoro/`
+
+Observed planning results:
+
+- canonical nouns selected: `old house`, `soot sprite`, `dusty house`, `garden`, `camphor tree`
+- canonical verbs selected: `move`, `discover`, `clean`, `follow`, `sleep`
+- grammar selected: `identity_present_affirmative`, `action_present_affirmative`, `action_present_negative`
+- block grammar plan:
+    - block 1: `identity_present_affirmative`, `action_present_affirmative`
+    - block 2: `identity_present_affirmative`, `action_present_affirmative`
+    - block 3: `action_present_affirmative`, `action_present_negative`
+    - block 4: `action_present_negative`, `identity_present_affirmative`
+    - block 5: `action_present_affirmative`, `action_present_negative`
+
+Observed content-generation results:
+
+- `narrative_grammar` produced `10` sentences
+- `review_sentences` revised `1` sentence
+- `vocab_enrichment` produced `5` noun items and `5` verb items
+
+Observed artifact persistence results:
+
+- lesson bundle created at `output/review_totoro/eng-jap/totoro/lesson_001/`
+- all pipeline steps now persist under the same lesson bundle from the start of the run
+- saved `steps/` subfolders now include the planning/content-generation half: `retrieve_material`, `narrative_generator`, `extract_narrative_vocab`, `canonical_vocab_select`, `generate_narrative_vocab`, `select_vocab`, `lesson_planner`, `narrative_grammar`, `review_sentences`, `vocab_enhancement`, plus the later persistence/render steps
+- `compile_assets/input.json` is now a true pre-action snapshot and no longer contains rendered asset paths
+
+Observed problems relevant to the canonical-language goal:
+
+- the pipeline already plans grammar in canonical English, but branch language vocab is still generated in step 5 and materialised in step 6 before the final content steps
+- persisted enriched items in `content.json` currently have empty `canonical` payloads, so canonical meaning does not survive through enrichment and persistence yet
+- `narrative_grammar/input.json` and `review_sentences/input.json` make the remaining gap visible: they still consume language-specific `GeneralItem` / `Sentence` payloads rather than one canonical first-class `PerBlockContentPlan`
+- the representative rerun now completes end-to-end, including `lesson.mp4` and `report.md`, so the lesson bundle is a stable review artifact
+
+---
+
+## Refinement Session Prep
+
+Recommended session goal:
+
+- make the planning half fully canonical-language only, and make each step consume one typed predecessor artifact directly
+
+Concrete decisions to make in the session:
+
+1. Should `generate_narrative_vocab` stay in the planning half at all, or should branch-vocab materialisation move to the post-plan content phase?
+2. What should the first-class `PerBlockContentPlan` contain so that both `narrative_grammar` and `vocab_enrichment` can consume the same artifact directly?
+3. Should `select_vocab` disappear into a later branch-materialisation step built from `CanonicalLessonPlan`, or should it emit a new artifact that preserves per-block mapping instead of flattening it?
+4. Where should canonical semantic data be made durable first: `GeneralItem.canonical`, `metadata`, or a new explicit semantic record model?
+5. Now that all steps persist into the single lesson folder from the beginning of the run, what additional step-level data is still worth writing for refinement review?
+6. Should output snapshots stay at the action-artifact level, or should some steps also persist a second post-merge context view when merge logic adds meaningful fields?
+
+Suggested implementation order:
+
+1. Introduce a first-class `PerBlockContentPlan` built from `CanonicalLessonPlan`.
+2. Make `narrative_grammar` consume `PerBlockContentPlan` directly.
+3. Make `vocab_enrichment` consume the same `PerBlockContentPlan` directly.
+4. Move branch-language vocab resolution so it happens only where source/target language payload is actually needed.
+5. Preserve canonical semantic payload through enrichment and `persist_content`.
+6. Preserve canonical semantic payload through enrichment and `persist_content` before widening the persisted artifact schema further.
 
 ---
 
@@ -296,12 +378,14 @@ flowchart TD
     NarrativeFrame["Narrative content<br/>NarrativeFrame"]
     ExtractVocab[extract_narrative_vocab]
     NarrativePlan["Narrative vocab plan<br/>NarrativeVocabPlan"]
+    CanonicalSelect[canonical_vocab_select]
+    CanonicalVocab["Canonical vocab<br/>CanonicalVocabSelection"]
     GenVocab[generate_narrative_vocab]
     VocabFile["Vocab<br/>VocabFile"]
     SelectVocab[select_vocab]
     VocabSelection["Vocab selection<br/>candidate"]
-    GrammarSelect[grammar_select]
-    GrammarPlan["Grammar plan<br/>GrammarSelectResult"]
+    LessonPlanner[lesson_planner]
+    CanonicalPlan["Canonical lesson plan<br/>CanonicalLessonPlan"]
     BlockPlan["Per-block content plan<br/>candidate"]
     SentenceGen[narrative_grammar]
     Sentences["Sentences<br/>list of Sentence"]
@@ -350,21 +434,23 @@ flowchart TD
     NarrativeGen --> NarrativeFrame
     NarrativeFrame --> ExtractVocab
     ExtractVocab --> NarrativePlan
+    NarrativePlan --> CanonicalSelect
+    CanonicalSelect --> CanonicalVocab
     NarrativePlan --> GenVocab
     GenVocab --> VocabFile
 
     VocabFile --> SelectVocab
-    NarrativePlan --> SelectVocab
+    CanonicalVocab --> SelectVocab
     Request --> SelectVocab
     SelectVocab --> VocabSelection
 
-    VocabSelection --> GrammarSelect
-    Request --> GrammarSelect
-    GrammarSelect --> GrammarPlan
+    CanonicalVocab --> LessonPlanner
+    Request --> LessonPlanner
+    LessonPlanner --> CanonicalPlan
 
     NarrativeFrame --> BlockPlan
     VocabSelection --> BlockPlan
-    GrammarPlan --> BlockPlan
+    CanonicalPlan --> BlockPlan
     BlockPlan --> SentenceGen
     SentenceGen --> Sentences
     Sentences --> Review
@@ -375,12 +461,12 @@ flowchart TD
 
     ReviewedSentences --> Register
     EnrichedVocab --> Register
-    GrammarPlan --> Register
+    CanonicalPlan --> Register
 
     ReviewedSentences --> Persist
     EnrichedVocab --> Persist
     NarrativeFrame --> Persist
-    GrammarPlan --> Persist
+    CanonicalPlan --> Persist
     Persist --> SemanticText
     SemanticText --> CanonicalNode
     CanonicalNode --> VectorStorePut
@@ -415,9 +501,9 @@ flowchart TD
     classDef runtime fill:#fbccd5,stroke:#760f0c,stroke-width:2px,color:#2f0407
 
     class Request,Profile request
-    class Retrieval,NarrativeGen,ExtractVocab,GenVocab,SelectVocab,GrammarSelect,SentenceGen,Review,VocabEnrichment,Register,Persist,CompileAssets,CompileTouches,RenderVideo,SaveReport step
-    class NarrativeFrame,NarrativePlan,VocabFile,Sentences,ReviewedSentences,LessonContent,CompiledItems,Touches,Video,CanonicalNode,LanguageBranches artifact
-    class Retrieved,VocabSelection,GrammarPlan,BlockPlan,EnrichedVocab,SemanticText,CanonicalSemantic,CompiledAssetRecord candidate
+    class Retrieval,NarrativeGen,ExtractVocab,CanonicalSelect,GenVocab,SelectVocab,LessonPlanner,SentenceGen,Review,VocabEnrichment,Register,Persist,CompileAssets,CompileTouches,RenderVideo,SaveReport step
+    class NarrativeFrame,NarrativePlan,CanonicalVocab,VocabFile,CanonicalPlan,Sentences,ReviewedSentences,LessonContent,CompiledItems,Touches,Video,CanonicalNode,LanguageBranches artifact
+    class Retrieved,VocabSelection,BlockPlan,EnrichedVocab,SemanticText,CanonicalSemantic,CompiledAssetRecord candidate
     class CompiledItems,Touches,Video render
     class VectorStorePut,DatabaseStorePut,BlobStorePut runtime
     class LessonContent,Video,SaveReport sink
@@ -460,5 +546,6 @@ cohesive and makes inter-step artifact alignment easier to see.
 | `compile_assets` still starts from live enriched items in current implementation | Target should start from persisted lesson content references |
 | Compiled assets are not yet first-class persisted records linked to `LanguageBranch` / `CanonicalLessonNode` | Needed so rendering artifacts participate in the same durable semantic graph |
 | Retrieval writes directly to multiple context fields | Useful, but architecturally broad |
+| Canonical payload is not surviving through enrichment into persisted lesson content | Blocks the intended canonical-trunk plus language-branch model |
 | Remaining `PipelineStep` classes not yet migrated to `ActionStep` | Migration in progress |
 | Runtime-services coverage beyond `call_llm` | Still incomplete |

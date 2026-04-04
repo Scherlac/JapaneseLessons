@@ -1,5 +1,6 @@
 ﻿"""Unit tests for jlesson.lesson_pipeline — pipeline steps and runner."""
 
+from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -27,6 +28,7 @@ from jlesson.lesson_pipeline import (
 )
 from jlesson.models import CompiledItem, ItemAssets, NounItem, Phase, Touch, TouchIntent, TouchType, VerbItem, Sentence, GeneralItem, PartialItem, VocabFile, VocabItem
 from jlesson.pipeline_steps.pipeline_core import CanonicalItem, CanonicalVocabSelection
+from jlesson.pipeline_steps.pipeline_core import ActionStep, StepAction
 from jlesson.item_generator.eng_jap import EngJapItemGenerator
 from jlesson.retrieval import CanonicalLessonNode, FileBackedRetrievalService, LanguageBranch
 
@@ -119,6 +121,46 @@ _VOCAB_FILE = VocabFile.model_validate(_VOCAB)
 def test_step_info_label():
     info = StepInfo(index=3, total=9, name="generate_sentences", description="LLM")
     assert info.label == "[3/9]"
+
+
+@dataclass
+class _SnapshotChunk:
+    block_index: int
+    payload: dict
+
+
+class _SnapshotAction(StepAction[_SnapshotChunk, dict]):
+    def run(self, config, chunk: _SnapshotChunk) -> dict:
+        chunk.payload["values"].append("mutated")
+        return {"count": len(chunk.payload["values"])}
+
+
+class _SnapshotStep(ActionStep[_SnapshotChunk, dict]):
+    name = "snapshot_test"
+    description = "snapshot test"
+    _action = _SnapshotAction()
+
+    @property
+    def action(self) -> _SnapshotAction:
+        return self._action
+
+    def should_skip(self, ctx) -> bool:
+        return False
+
+    def build_chunks(self, ctx) -> list[_SnapshotChunk]:
+        return [_SnapshotChunk(block_index=0, payload={"values": ["original"]})]
+
+    def merge_outputs(self, ctx, outputs: list[dict]):
+        return ctx
+
+
+def test_action_step_captures_pre_action_chunk_snapshot(ctx):
+    step = _SnapshotStep()
+
+    step.execute(ctx)
+
+    assert step._last_chunks == [_SnapshotChunk(block_index=0, payload={"values": ["original"]})]
+    assert step._last_outputs == [{"count": 2}]
 
 
 # ---------------------------------------------------------------------------
@@ -744,6 +786,26 @@ def test_persist_content_is_loadable(ctx, tmp_path):
     loaded = load_lesson_content(7, resolve_lesson_dir(ctx.config, 7))
     assert loaded.lesson_id == 7
     assert loaded.theme == "food"
+
+
+def test_step_artifact_dir_uses_reserved_lesson_id_before_registration(config):
+    from jlesson.lesson_pipeline.pipeline_orchestrator import _step_artifact_dir
+    from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
+
+    c = LessonContext(config=config)
+    c.artifact_lesson_id = 3
+
+    assert _step_artifact_dir(c, "lesson_planner") == resolve_lesson_dir(config, 3) / "steps" / "lesson_planner"
+
+
+def test_resolve_checkpoint_path_uses_single_reserved_lesson_folder(config):
+    from jlesson.lesson_pipeline.pipeline_orchestrator import _resolve_checkpoint_path
+    from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
+
+    c = LessonContext(config=config)
+    c.artifact_lesson_id = 4
+
+    assert _resolve_checkpoint_path(c) == resolve_lesson_dir(config, 4) / "content.json"
 
 
 # ---------------------------------------------------------------------------

@@ -42,12 +42,21 @@ def _to_json_safe(obj):
 # Step artifact helpers
 # ---------------------------------------------------------------------------
 
+def _artifact_lesson_id(ctx: LessonContext) -> int:
+    """Return the reserved lesson id for artifact/checkpoint paths."""
+    if ctx.lesson_id > 0:
+        return ctx.lesson_id
+    if ctx.artifact_lesson_id > 0:
+        return ctx.artifact_lesson_id
+    return 0
+
 def _step_artifact_dir(ctx: LessonContext, step_name: str) -> Path | None:
-    """Return ``lesson_dir/steps/<step_name>`` or None when lesson_id unknown."""
-    if ctx.lesson_id <= 0:
+    """Return ``lesson_dir/steps/<step_name>`` or None when lesson id is unknown."""
+    lesson_id = _artifact_lesson_id(ctx)
+    if lesson_id <= 0:
         return None
     from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
-    return resolve_lesson_dir(ctx.config, ctx.lesson_id) / "steps" / step_name
+    return resolve_lesson_dir(ctx.config, lesson_id) / "steps" / step_name
 
 
 def _save_step_artifacts(ctx: LessonContext, step_name: str, chunks, outputs) -> None:
@@ -79,9 +88,14 @@ def _resolve_checkpoint_path(ctx: LessonContext) -> Path:
     """Return the path to write the checkpoint to."""
     if ctx.content_path is not None:
         return ctx.content_path
-    from jlesson.lesson_pipeline.pipeline_paths import resolve_lang_dir
-    pending_dir = resolve_lang_dir(ctx.config) / ctx.config.theme / "lesson_pending"
-    return pending_dir / "content.json"
+    lesson_id = _artifact_lesson_id(ctx)
+    if lesson_id <= 0:
+        from jlesson.lesson_pipeline.pipeline_paths import resolve_lang_dir
+
+        return resolve_lang_dir(ctx.config) / ctx.config.theme / "content.json"
+    from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
+
+    return resolve_lesson_dir(ctx.config, lesson_id) / "content.json"
 
 
 def _save_context_checkpoint(ctx: LessonContext) -> None:
@@ -90,8 +104,9 @@ def _save_context_checkpoint(ctx: LessonContext) -> None:
     from jlesson.models import LessonContent
 
     checkpoint_path = _resolve_checkpoint_path(ctx)
+    lesson_id = _artifact_lesson_id(ctx)
     content = LessonContent(
-        lesson_id=ctx.lesson_id,
+        lesson_id=lesson_id,
         theme=ctx.config.theme,
         language=ctx.config.language,
         narrative_blocks=ctx.narrative_blocks,
@@ -204,6 +219,7 @@ def restore_context_from_checkpoint(
 
     # --- Restore content fields ---
     ctx.lesson_id = content.lesson_id
+    ctx.artifact_lesson_id = content.lesson_id
     ctx.created_at = content.created_at
     ctx.pipeline_started_at = content.pipeline_started_at
     ctx.narrative_blocks = list(content.narrative_blocks)
@@ -265,6 +281,10 @@ def run_pipeline(
         ctx = LessonContext(config=config)
         ctx.language_config = get_language_config(config.language)
         ctx.curriculum = load_curriculum_fn(config.curriculum_path)
+        if config.regenerate_lesson_id is not None:
+            ctx.artifact_lesson_id = config.regenerate_lesson_id
+        else:
+            ctx.artifact_lesson_id = len(ctx.curriculum.lessons) + 1
 
         if config.regenerate_lesson_id is not None:
             ctx.lesson_id = config.regenerate_lesson_id
