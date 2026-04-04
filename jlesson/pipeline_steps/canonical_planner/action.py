@@ -122,7 +122,6 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
         outline = self._parse_outline(
             result_2,
             config.lesson.lesson_blocks,
-            config.lesson.sentences_per_grammar,
             narrative_frame=input,
             theme=config.lesson.theme,
             lesson_number=input.lesson_number,
@@ -158,14 +157,17 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
                 items_raw = block_raw.get(PHASE_PARSE_DETAILS[phase]["field"], [])
                 # vocab items has vocab and gloss 
                 if PHASE_PARSE_DETAILS[phase]["is_vocab"]:
-                    content_sequences[phase] = [
-                        CanonicalItem(
-                            text=vocab,
-                            gloss=gloss
-                        )
-                        for vocab, gloss in items_raw.items()
-
-                    ]
+                    if isinstance(items_raw, dict):
+                        content_sequences[phase] = [
+                            CanonicalItem(text=vocab, gloss=gloss)
+                            for vocab, gloss in items_raw.items()
+                        ]
+                    else:
+                        content_sequences[phase] = [
+                            CanonicalItem(text=item if isinstance(item, str) else item.get("text", str(item)),
+                                          gloss=item.get("gloss", "") if isinstance(item, dict) else "")
+                            for item in items_raw
+                        ]
                 else:
                     content_sequences[phase] = [
                         CanonicalItem(

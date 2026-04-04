@@ -29,7 +29,7 @@ class LessonPlannerAction(StepAction[CanonicalLessonBlock, LessonBlock]):
             target_language=config.language.target.display_name,
             canonical_language=config.language.canonical_language,
             block_index=input.block_index,
-            narrative_content=input.narrative_content,
+            narrative_content=input.narrative.narrative,
             grammar_ids=input.grammar_ids,
             content_sequences=input.content_sequences,
         )
