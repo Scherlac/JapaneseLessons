@@ -101,6 +101,7 @@ def restore_context_from_checkpoint(
         CanonicalLessonPlan,
         LessonBlock,
         LessonPlan,
+        NarrativeBlock,
         NarrativeFrame,
     )
 
@@ -122,7 +123,7 @@ def restore_context_from_checkpoint(
             lesson_number=config.lesson_number,
             lesson_blocks=config.lesson_blocks,
             seed_blocks=[],
-            blocks=list(content.narrative_blocks),
+            blocks=content.narrative_blocks,
         )
 
     # --- Restore canonical_plan (minimal stub so planning steps skip) ---

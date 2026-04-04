@@ -7,7 +7,7 @@ testable with a mock runtime.
 """
 from __future__ import annotations
 
-from ..pipeline_core import ActionConfig, NarrativeFrame, NarrativeConfig, StepAction
+from ..pipeline_core import ActionConfig, NarrativeBlock, NarrativeFrame, NarrativeConfig, StepAction
 from .config import build_narrative_generator_language_config
 from .prompt import build_narrative_generator_prompt
 
@@ -35,12 +35,13 @@ class NarrativeGeneratorAction(StepAction[NarrativeConfig, NarrativeFrame]):
     def run(self, config: ActionConfig, chunk: NarrativeConfig) -> NarrativeFrame:
         provided = chunk.seed_blocks
         if len(provided) >= chunk.lesson_blocks:
+            seed_narrative_blocks = [NarrativeBlock(narrative=s) for s in provided[:chunk.lesson_blocks]]
             return NarrativeFrame(
                 theme=chunk.theme,
                 lesson_number=chunk.lesson_number,
                 lesson_blocks=chunk.lesson_blocks,
                 seed_blocks=provided,
-                blocks=provided[:chunk.lesson_blocks],
+                blocks=seed_narrative_blocks,
             )
 
         language_config = config.language
@@ -54,22 +55,26 @@ class NarrativeGeneratorAction(StepAction[NarrativeConfig, NarrativeFrame]):
             seed_blocks=provided,
         )
         result = config.runtime.call_llm(prompt)
-        generated = [
-            (block.get("narrative") or "").strip()
+        generated: list[NarrativeBlock] = [
+            NarrativeBlock(
+                narrative=(block.get("narrative") or "").strip(),
+                alignment_notes=(block.get("alignment_notes") or "").strip(),
+                sentiment=(block.get("sentiment") or "").strip(),
+            )
             for block in result.get("blocks", [])
-            if isinstance(block, dict)
+            if isinstance(block, dict) and (block.get("narrative") or "").strip()
         ]
         defaults = step_config.default_block_builder(
             chunk.theme,
             curriculum.level_details,
             chunk.lesson_blocks,
         )
-        blocks = list(provided)
-        for text in generated:
-            if text and len(blocks) < chunk.lesson_blocks:
-                blocks.append(text)
+        blocks: list[NarrativeBlock] = [NarrativeBlock(narrative=s) for s in provided]
+        for nb in generated:
+            if len(blocks) < chunk.lesson_blocks:
+                blocks.append(nb)
         while len(blocks) < chunk.lesson_blocks:
-            blocks.append(defaults[len(blocks)])
+            blocks.append(NarrativeBlock(narrative=defaults[len(blocks)]))
         return NarrativeFrame(
             theme=chunk.theme,
             lesson_number=chunk.lesson_number,

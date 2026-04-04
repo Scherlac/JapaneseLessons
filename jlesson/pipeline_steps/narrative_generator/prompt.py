@@ -39,7 +39,12 @@ The progression should stay concrete and {level_details}.
 Return ONLY a raw JSON object:
 {{
     "blocks": [
-        {{"index": 1, "narrative": "..."}}
+        {{
+            "index": 1,
+            "narrative": "...",
+            "alignment_notes": "A backstory for the same scene (different angle, simpler vocabulary, or avoiding spoilers for later events).",
+            "sentiment": "One-word tone label, e.g. heartwarming, tense, playful, melancholic."
+        }}
     ]
 }}
 """.strip()

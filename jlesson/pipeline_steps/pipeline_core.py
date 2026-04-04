@@ -159,6 +159,20 @@ class ItemBatch(Generic[_T]):
 # ---------------------------------------------------------------------------
 
 @dataclass
+class NarrativeBlock:
+    """A single narrative block with all three content variants.
+
+    Produced by ``NarrativeGeneratorStep`` and consumed by
+    ``CanonicalPlannerStep`` to populate ``CanonicalLessonBlock`` fields.
+    """
+
+    narrative: str
+    alignment_notes: str = "" # alignment_notes
+    sentiment: str = ""
+
+EmptyNarrativeBlock = NarrativeBlock(narrative="", alignment_notes="", sentiment="")
+
+@dataclass
 class NarrativeConfig:
     """Input chunk for ``NarrativeGeneratorStep``.
 
@@ -182,10 +196,10 @@ class NarrativeFrame(NarrativeConfig):
     that ``NarrativeGeneratorStep`` emits is the chunk type the next step
     directly consumes.
 
-    Context field: ``LessonContext.narrative_blocks``
+    Context field: ``LessonContext.narrative_frame``
     """
 
-    blocks: list[str]
+    blocks: list[NarrativeBlock]
 
 
 
@@ -208,16 +222,7 @@ class CanonicalLessonBlock(BaseModel):
     theme: str
     lesson_number: int
     block_index: int = Field(default=0, description="The 0-based index of this block within the lesson.")
-    narrative_content: str = Field(default="", 
-        description="The narrative content for this block, e.g. 'The cat climbs the tree.'")
-    alternative_content: str = Field(default="", 
-        description = ( 
-        """An alternative version of the narrative content, e.g. 'The cat is black and likes milk.' 
-        This can be used to provide variety in practice sentences or to offer a fallback if the main narrative
-        content is too complex for certain grammar points or to avoid spoilers for later narrative blocks.""" ))
-    sentiment: str = Field(default="", 
-        description= (
-        """Optional sentiment or tone label for the block, e.g. 'misetorse', 'heartwarming', 'tense', etc."""))
+    narrative: NarrativeBlock = Field(default_factory=EmptyNarrativeBlock, description="The narrative content for this block.")
     grammar_ids: list[str]
     content_sequences: dict[Phase, list[CanonicalItem]]
 

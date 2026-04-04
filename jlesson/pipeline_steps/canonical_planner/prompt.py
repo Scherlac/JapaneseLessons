@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from jlesson.models import CanonicalItem, GrammarItem, Phase
+from jlesson.pipeline_steps.pipeline_core import NarrativeBlock
 
 
 # ── Fibonacci learning-cycle stages ──────────────────────────────────────────
@@ -69,7 +70,7 @@ IMPLICATION FOR PLANNING:
 PHASE_PARSE_DETAILS = {
     Phase.NOUNS: {
         "name": "noun",
-        "description": "nouns"
+        "description": "nouns",
         "field": "noun_items",
         "is_vocab": True,
         "is_grammar": False,
@@ -114,7 +115,7 @@ def build_lesson_plan_prompt(
     *,
     lesson_number: int,
     lesson_blocks: int,
-    narrative_blocks: list[str],
+    narrative_blocks: list[NarrativeBlock],
     unlocked_grammar: list[GrammarItem],
     covered_grammar: list[GrammarCoverageInfo],
     grammar_points_per_lesson: int,
@@ -146,7 +147,10 @@ def build_lesson_plan_prompt(
 
 
     narrative_section = "\n\n".join(
-        f"--- Block {i + 1} ---\n{block}"
+        f"--- Block {i + 1} ---\n"
+        f"    Narrative: {block.narrative}\n" if block.narrative else ""
+        f"    Alignment Notes: {block.alignment_notes}\n" if block.alignment_notes else ""
+        f"    Sentiment: {block.sentiment}" if block.sentiment else ""
         for i, block in enumerate(narrative_blocks)
     )
 

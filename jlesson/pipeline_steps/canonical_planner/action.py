@@ -16,6 +16,8 @@ from ...language_config import LanguageConfig
 
 from ..pipeline_core import (
     ActionConfig,
+    EmptyNarrativeBlock,
+    NarrativeBlock,
     StepAction,
     NarrativeFrame,
     CanonicalLessonPlan, 
@@ -153,10 +155,12 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
         for block_raw in raw.get("blocks", []):
 
             block_index = block_raw.get("block_index", 0)
-            narrative_item = narrative_frame.blocks[block_index - 1] if block_index - 1 < len(narrative_frame.blocks) else ""
-            narrative_content = block_raw.get("narrative_content", narrative_item)
-            alignment_notes = block_raw.get("alignment_notes", "")
-            sentiment = block_raw.get("sentiment", "")    
+            nb = narrative_frame.blocks[block_index - 1] if block_index - 1 < len(narrative_frame.blocks) else EmptyNarrativeBlock
+            narrative = NarrativeBlock(
+                narrative=block_raw.get("narrative_content", nb.narrative),
+                alignment_notes=block_raw.get("alignment_notes_content", nb.alignment_notes),
+                sentiment=block_raw.get("sentiment", nb.sentiment),
+            )
             content_sequences = {}
             # using PHASE_PARSE_DETAILS
             for phase in Phase:
@@ -185,9 +189,7 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
                 lesson_number=lesson_number,
                 block_index=block_raw.get("block_index", len(blocks) + 1),
                 grammar_ids=block_raw.get("grammar_ids", []),
-                narrative_content=narrative_content,
-                alignment_notes=alignment_notes,
-                sentiment=sentiment,
+                narrative=narrative,
                 content_sequences=content_sequences,
             ))
         # Pad missing blocks
@@ -205,7 +207,7 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
                     Phase.GRAMMAR: [],
                     Phase.NARRATIVE: [],
                 },
-                narrative_content="",
+                narrative=EmptyNarrativeBlock,
             ))
         return CanonicalLessonPlan(theme=theme, lesson_number=lesson_number, blocks=blocks)
 
