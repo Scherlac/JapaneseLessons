@@ -1,16 +1,17 @@
 """Lesson generation pipeline.
 
-Orchestrates the currently active lesson workflow through nine sequential steps:
+Orchestrates the currently active lesson workflow through ten sequential steps:
 
-    step 1  narrative_generator  — create block-by-block story progression
-    step 2  lesson_planner       — LLM: two-pass lesson outline (grammar + pacing)
-    step 3  review_sentences     — LLM: rate naturalness, rewrite awkward sentences
-    step 4  register_lesson      — add+complete the lesson in curriculum.json
-    step 5  persist_content      — save LessonContent to output/<id>/content.json
-    step 6  compile_assets       — render card images + TTS audio per item (Stage 2)
-    step 7  compile_touches      — profile-driven touch sequencing (Stage 3)
-    step 8  render_video         — assemble MP4 from touch sequence
-    step 9  save_report          — finalize and save Markdown lesson report
+    step 1   narrative_generator  — create block-by-block story progression
+    step 2   canonical_planner    — LLM: two-pass lesson outline (grammar + pacing)
+    step 3   lesson_planner       — LLM: resolve canonical items into target language
+    step 4   review_sentences     — LLM: rate naturalness, rewrite awkward sentences
+    step 5   register_lesson      — add+complete the lesson in curriculum.json
+    step 6   persist_content      — save LessonContent to output/<id>/content.json
+    step 7   compile_assets       — render card images + TTS audio per item (Stage 2)
+    step 8   compile_touches      — profile-driven touch sequencing (Stage 3)
+    step 9   render_video         — assemble MP4 from touch sequence
+    step 10  save_report          — finalize and save Markdown lesson report
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from jlesson.pipeline_steps import (
     CompileTouchesStep,
     LessonConfig,
     LessonContext,
+    LessonPlannerStep,
     NarrativeGeneratorStep,
     PersistContentStep,
     PipelineStep,
@@ -38,6 +40,7 @@ def _build_pipeline() -> list[PipelineStep]:
     return [
         NarrativeGeneratorStep(),
         CanonicalPlannerStep(),
+        LessonPlannerStep(),
         ReviewSentencesStep(),
         RegisterLessonStep(),
         PersistContentStep(),
@@ -90,6 +93,7 @@ __all__ = [
     "CompileTouchesStep",
     "LessonConfig",
     "LessonContext",
+    "LessonPlannerStep",
     "NarrativeGeneratorStep",
     "PersistContentStep",
     "PIPELINE",

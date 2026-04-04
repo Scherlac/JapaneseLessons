@@ -106,7 +106,7 @@ def add_lesson(
         id=next_id,
         title=title,
         theme=theme,
-        nouns=nouns
+        nouns=nouns,
         verbs=verbs,
         adjectives=adjectives,
         grammar_ids=grammar_ids,
