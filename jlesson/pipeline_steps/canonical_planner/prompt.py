@@ -78,6 +78,7 @@ def build_lesson_plan_prompt(
     sentences_per_grammar: int,
     noun_names: list[str],
     verb_names: list[str],
+    canonical_language: str = "english",
     previous_outline_json: str | None = None,
 ) -> str:
     """Build the language-agnostic lesson plan prompt.
@@ -155,6 +156,10 @@ CONSTRAINTS:
   gradually increasing gaps.
 - Assign nouns and verbs to blocks so they align with the narrative content
   and the grammar being practised.
+- IMPORTANT: All noun_suggestions and verb_suggestions MUST be in {canonical_language}.
+  This is a canonical (language-neutral) plan. Use plain {canonical_language} words
+  (e.g. "house", "father", "tree", "to move", "to find"). Do NOT use any
+  target-language words in the suggestions.
 {revision_section}
 Return ONLY a raw JSON object — no markdown fences, no commentary:
 {{

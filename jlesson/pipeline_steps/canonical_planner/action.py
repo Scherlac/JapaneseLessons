@@ -6,7 +6,7 @@ from typing import Any, Tuple, List, Dict
 from collections import Counter
 from .prompt import GrammarCoverageInfo, fibonacci_stage_label
 
-from jlesson.models import GrammarItem
+from jlesson.models import GrammarItem, CanonicalItem
 
 from ...models import (
     Phase   
@@ -23,6 +23,9 @@ from ..pipeline_core import (
 )
 from .prompt import GrammarCoverageInfo, build_lesson_plan_prompt
 
+
+# test run:
+#  conda activate base; jlesson lesson add --theme totoro --nouns 1 --verbs 1 --sentences 1 --grammar-points 3 --grammar-points-per-block 2 --blocks 5 --curriculum output/review_totoro/curriculum.json --output-dir output/review_totoro --no-retrieval --narrative-file .\narrative_totoro.txt
 
 @dataclass
 class LessonBlockConfig:
@@ -85,9 +88,13 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
             )
             for gid in covered
         ]
+        canonical = None
         if canonical is None:
             canonical = CanonicalLessonBlock(
                 theme=config.lesson.theme,
+                lesson_number=config.lesson.lesson_number,
+                grammar_ids=[],
+                content_sequences={},
             )
 
 
@@ -96,13 +103,14 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
             lesson_number=input.lesson_number,
             lesson_blocks=input.lesson_blocks,
             narrative_blocks=input.blocks,
-            unlocked_grammar=[g.id for g in unlocked],
+            unlocked_grammar=unlocked,
             covered_grammar=covered_grammar,
             grammar_points_per_lesson=config.lesson.grammar_points_per_lesson,
             grammar_points_per_block=config.lesson.grammar_points_per_block,
             sentences_per_grammar=config.lesson.sentences_per_grammar,
-            noun_names=[n.text for n in canonical.content_sequences.get(Phase.NOUN, [])],
-            verb_names=[v.text for v in canonical.content_sequences.get(Phase.VERB, [])],
+            noun_names=[n.text for n in canonical.content_sequences.get(Phase.NOUNS, [])],
+            verb_names=[v.text for v in canonical.content_sequences.get(Phase.VERBS, [])],
+            canonical_language=config.language.canonical_language,
         )
 
         # ── Pass 1: draft outline ────────────────────────────────────────
@@ -115,7 +123,13 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
         result_2 = config.runtime.call_llm(prompt_2)
 
         # ── Parse the final result ───────────────────────────────────────
-        outline = self._parse_outline(result_2, config.lesson.lesson_blocks, config.lesson.sentences_per_grammar)
+        outline = self._parse_outline(
+            result_2,
+            config.lesson.lesson_blocks,
+            config.lesson.sentences_per_grammar,
+            theme=config.lesson.theme,
+            lesson_number=input.lesson_number,
+        )
         return outline
 
     @staticmethod
@@ -123,6 +137,9 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
         raw: dict,
         expected_blocks: int,
         default_sentence_count: int,
+        *,
+        theme: str = "",
+        lesson_number: int = 0,
     ) -> CanonicalLessonPlan:
         
         grammar_ids = raw.get("grammar_ids", [])
@@ -132,16 +149,17 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
 
             content_sequences = {}
             if "noun_suggestions" in block_raw:
-                content_sequences[Phase.NOUN] = [GrammarItem(id=nid, text=nid) for nid in block_raw.get("noun_suggestions", [])]
+                content_sequences[Phase.NOUNS] = [CanonicalItem(id=nid, text=nid) for nid in block_raw.get("noun_suggestions", [])]
             if "verb_suggestions" in block_raw:
-                content_sequences[Phase.VERB] = [GrammarItem(id=vid, text=vid) for vid in block_raw.get("verb_suggestions", [])]
+                content_sequences[Phase.VERBS] = [CanonicalItem(id=vid, text=vid) for vid in block_raw.get("verb_suggestions", [])]
             if "adjective_suggestions" in block_raw:
-                content_sequences[Phase.ADJECTIVE] = [GrammarItem(id=aid, text=aid) for aid in block_raw.get("adjective_suggestions", [])]
+                content_sequences[Phase.ADJECTIVES] = [CanonicalItem(id=aid, text=aid) for aid in block_raw.get("adjective_suggestions", [])]
 
             blocks.append(CanonicalLessonBlock(
+                theme=theme,
+                lesson_number=lesson_number,
                 block_index=block_raw.get("block_index", len(blocks) + 1),
                 grammar_ids=block_raw.get("grammar_ids", []),
-                sentence_count=block_raw.get("sentence_count", default_sentence_count),
                 narrative_content=block_raw.get("narrative_summary", ""),
                 content_sequences=content_sequences,
             ))
@@ -149,16 +167,17 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
         while len(blocks) < expected_blocks:
             idx = len(blocks) + 1
             blocks.append(CanonicalLessonBlock(
+                theme=theme,
+                lesson_number=lesson_number,
                 block_index=idx,
                 grammar_ids=grammar_ids[:1] if grammar_ids else [],
                 content_sequences={
-                    Phase.NOUN: [],
-                    Phase.VERB: [],
+                    Phase.NOUNS: [],
+                    Phase.VERBS: [],
                 },
-                sentence_count=default_sentence_count,
                 narrative_content="",
             ))
-        return CanonicalLessonPlan(blocks=blocks, grammar_ids=grammar_ids, rationale=rationale)
+        return CanonicalLessonPlan(theme=theme, lesson_number=lesson_number, blocks=blocks)
 
 
     @staticmethod

@@ -51,8 +51,13 @@ class ReviewSentencesStep(ActionStep[SentenceReviewBatch, SentenceReviewResult])
         return ReviewSentencesAction()
 
     def should_skip(self, ctx: LessonContext) -> bool:
-        if not ctx.sentences:
-            self._log(ctx, "       (no sentences to review)")
+        # The review step operates on ctx.sentences which is populated by
+        # the old generate_sentences pipeline path.  In the new canonical
+        # pipeline (narrative → canonical_planner → lesson_planner) there
+        # are no standalone sentences yet, so skip gracefully.
+        sentences = getattr(ctx, "sentences", None)
+        if not sentences:
+            self._log(ctx, "       (no sentences to review — skipping)")
             return True
         return False
 

@@ -455,25 +455,32 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
         """Return ``True`` when this step's output is already populated."""
         ...
 
-    @abstractmethod
     def build_input(self, ctx: LessonContext) -> _I:
-        """Decompose *ctx* into the ordered list of input chunks."""
-        ...
+        """Decompose *ctx* into a single input chunk.
 
-    @abstractmethod
+        Override this (together with ``merge_output``) for steps that process
+        one chunk.  The default raises ``NotImplementedError``; it is only
+        called when ``build_input_list`` returns an empty list.
+        """
+        raise NotImplementedError(f"{type(self).__name__}.build_input not implemented")
+
     def merge_output(self, ctx: LessonContext, outputs: _O) -> LessonContext:
-        """Apply the collected *outputs* back to *ctx* and return it."""
-        ...
+        """Apply a single action output back to *ctx* and return it."""
+        raise NotImplementedError(f"{type(self).__name__}.merge_output not implemented")
 
-    @abstractmethod
     def build_input_list(self, ctx: LessonContext) -> list[_I]:
-        """Decompose *ctx* into the ordered list of input chunks."""
+        """Decompose *ctx* into the ordered list of input chunks.
+
+        Override this (together with ``merge_output_list``) for steps that
+        iterate over multiple chunks.  The default returns an empty list,
+        which causes ``execute`` to fall back to the single-input path
+        (``build_input`` / ``merge_output``).
+        """
         return []
 
-    @abstractmethod
     def merge_output_list(self, ctx: LessonContext, outputs: list[_O]) -> LessonContext:
         """Apply the collected *outputs* back to *ctx* and return it."""
-        ...
+        return ctx
 
     def process_list(self, ctx: LessonContext, chunks: list[_I]) -> list[_O]:
 

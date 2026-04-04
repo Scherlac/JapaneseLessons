@@ -35,7 +35,13 @@ class NarrativeGeneratorAction(StepAction[NarrativeConfig, NarrativeFrame]):
     def run(self, config: ActionConfig, chunk: NarrativeConfig) -> NarrativeFrame:
         provided = chunk.seed_blocks
         if len(provided) >= chunk.lesson_blocks:
-            return NarrativeFrame(blocks=provided[:chunk.lesson_blocks])
+            return NarrativeFrame(
+                theme=chunk.theme,
+                lesson_number=chunk.lesson_number,
+                lesson_blocks=chunk.lesson_blocks,
+                seed_blocks=provided,
+                blocks=provided[:chunk.lesson_blocks],
+            )
 
         language_config = config.language
         curriculum = config.curriculum
@@ -64,4 +70,10 @@ class NarrativeGeneratorAction(StepAction[NarrativeConfig, NarrativeFrame]):
                 blocks.append(text)
         while len(blocks) < chunk.lesson_blocks:
             blocks.append(defaults[len(blocks)])
-        return NarrativeFrame(blocks=blocks[:chunk.lesson_blocks])
+        return NarrativeFrame(
+            theme=chunk.theme,
+            lesson_number=chunk.lesson_number,
+            lesson_blocks=chunk.lesson_blocks,
+            seed_blocks=provided,
+            blocks=blocks[:chunk.lesson_blocks],
+        )

@@ -8,10 +8,10 @@ from ..pipeline_core import (
 )
 
 class CanonicalPlannerStep(ActionStep[NarrativeFrame, CanonicalLessonPlan]):
-    """Two-pass cononical planner: draft outline then revise with Fibonacci pacing."""
+    """Canonical planner: draft outline then revise with Fibonacci pacing."""
 
-    name = "lesson_planner"
-    description = "LLM: plan lesson outline (two-pass)"
+    name = "canonical_planner"
+    description = "LLM: plan canonical lesson"
     _action = CanonicalPlannerAction()
 
     @property
@@ -20,7 +20,7 @@ class CanonicalPlannerStep(ActionStep[NarrativeFrame, CanonicalLessonPlan]):
 
     def should_skip(self, ctx: LessonContext) -> bool:
         if ctx.narrative_frame is None:
-            self._log(ctx, "       no narrative frame — cannot plan lesson")
+            self._log(ctx, "       no narrative frame — cannot plan canonical lesson")
             return True
         return False
 
@@ -35,7 +35,7 @@ class CanonicalPlannerStep(ActionStep[NarrativeFrame, CanonicalLessonPlan]):
     ) -> LessonContext:
         
         ctx.canonical_plan = output
-        self._log(ctx, f"       planned {len(ctx.canonical_plan.blocks)} lesson blocks")
+        self._log(ctx, f"       planned {len(ctx.canonical_plan.blocks)} canonical lesson blocks")
         for block in ctx.canonical_plan.blocks:
             self._log(ctx, f"         block {block.block_index}: "
                 f"{len(block.grammar_ids)} grammar items")
