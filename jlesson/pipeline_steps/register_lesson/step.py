@@ -18,12 +18,11 @@ class RegisterLessonStep(ActionStep[RegisterLessonRequest, LessonRegistrationArt
     def should_skip(self, ctx: LessonContext) -> bool:
         return ctx.lesson_id > 0
 
-    def build_input(self, ctx: LessonContext) -> list[RegisterLessonRequest]:
-        return [
-            RegisterLessonRequest(
-                vocab=ctx.vocab,
-                nouns=list(ctx.nouns),
-                verbs=list(ctx.verbs),
+    def build_input(self, ctx: LessonContext) -> RegisterLessonRequest:
+        return RegisterLessonRequest(
+            vocab=ctx.vocab,
+            nouns=list(ctx.nouns),
+            verbs=list(ctx.verbs),
                 noun_items=list(ctx.noun_items),
                 verb_items=list(ctx.verb_items),
                 theme=ctx.config.theme,
@@ -31,10 +30,9 @@ class RegisterLessonStep(ActionStep[RegisterLessonRequest, LessonRegistrationArt
                 block_grammar_ids=[[g.id for g in block] for block in ctx.selected_grammar_blocks],
                 items_count=len(ctx.noun_items) + len(ctx.sentences),
             )
-        ]
 
-    def merge_output(self, ctx: LessonContext, outputs: list[LessonRegistrationArtifact]) -> LessonContext:
-        result = outputs[-1]
+    def merge_output(self, ctx: LessonContext, outputs: LessonRegistrationArtifact) -> LessonContext:
+        result = outputs
         ctx.lesson_registration = result
         ctx.lesson_id = result.lesson_id
         ctx.created_at = result.created_at

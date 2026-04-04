@@ -29,7 +29,7 @@ class CompileAssetsStep(ActionStep[AssetCompileRequest, GeneralItemSequence]):
     def should_skip(self, ctx: LessonContext) -> bool:
         return bool(ctx.compiled_items)
 
-    def build_input(self, ctx: LessonContext) -> list[AssetCompileRequest]:
+    def build_input(self, ctx: LessonContext) -> AssetCompileRequest:
         items_by_phase = self.build_items_by_phase(ctx)
         total_items = sum(len(items) for items in items_by_phase.values())
         lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
@@ -39,16 +39,14 @@ class CompileAssetsStep(ActionStep[AssetCompileRequest, GeneralItemSequence]):
         else:
             self._log(ctx, f"       {total_items} items -> cards + TTS")
 
-        return [
-            AssetCompileRequest(
-                items_by_phase=items_by_phase,
-                lesson_dir=lesson_dir,
-                dry_run=ctx.config.dry_run,
-            )
-        ]
+        return AssetCompileRequest(
+            items_by_phase=items_by_phase,
+            lesson_dir=lesson_dir,
+            dry_run=ctx.config.dry_run,
+        )
 
-    def merge_output(self, ctx: LessonContext, outputs: list[GeneralItemSequence]) -> LessonContext:
-        result = outputs[-1] if outputs else GeneralItemSequence(items=[])
+    def merge_output(self, ctx: LessonContext, outputs: GeneralItemSequence) -> LessonContext:
+        result = outputs if outputs else GeneralItemSequence(items=[])
         ctx.compiled_sequence = result
         self._log(ctx, f"       {len(ctx.compiled_items)} compiled items")
         return ctx

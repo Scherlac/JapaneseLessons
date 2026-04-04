@@ -83,7 +83,7 @@ class LessonContext:
 
     narrative_frame: NarrativeFrame | None = None
     canonical_plan: CanonicalLessonPlan | None = None
-    lesson_plan: list[LessonBlock] | None = None
+    lesson_plan: LessonPlan | None = None
 
 class PipelineStep(ABC):
     """Abstract base class for pipeline steps."""
@@ -451,25 +451,30 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
         ...
 
     @abstractmethod
-    def build_input(self, ctx: LessonContext) -> list[_I]:
+    def build_input(self, ctx: LessonContext) -> _I:
         """Decompose *ctx* into the ordered list of input chunks."""
         ...
 
     @abstractmethod
-    def merge_output(self, ctx: LessonContext, outputs: list[_O]) -> LessonContext:
+    def merge_output(self, ctx: LessonContext, outputs: _O) -> LessonContext:
         """Apply the collected *outputs* back to *ctx* and return it."""
         ...
 
-    def execute(self, ctx: LessonContext) -> LessonContext:
-        if self.should_skip(ctx):
-            self._last_chunks: list = []
-            self._last_outputs: list = []
-            return ctx
+    @abstractmethod
+    def build_input_list(self, ctx: LessonContext) -> list[_I]:
+        """Decompose *ctx* into the ordered list of input chunks."""
+        return []
+
+    @abstractmethod
+    def merge_output_list(self, ctx: LessonContext, outputs: list[_O]) -> LessonContext:
+        """Apply the collected *outputs* back to *ctx* and return it."""
+        ...
+
+    def process_list(self, ctx: LessonContext, chunks: list[_I]) -> list[_O]:
 
         from jlesson.runtime._base import ContextRuntime  # local import avoids circularity
-
         rt = ContextRuntime(ctx)
-        chunks = self.build_input(ctx)
+
         self._last_chunks = deepcopy(chunks)
         outputs: list[_O] = []
         for loop_index, chunk in enumerate(chunks):
@@ -484,4 +489,40 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
             outputs.append(self.action.run(cfg, chunk))
 
         self._last_outputs = deepcopy(outputs)
-        return self.merge_output(ctx, outputs)
+        return self.merge_output_list(ctx, outputs)
+    
+    def process_single(self, ctx: LessonContext) -> LessonContext:
+
+        from jlesson.runtime._base import ContextRuntime  # local import avoids circularity
+        rt = ContextRuntime(ctx)
+        
+        inputs = self.build_input(ctx)
+        cfg = ActionConfig(
+            curriculum=ctx.curriculum,
+            lesson=ctx.config,
+            block_index=0,
+            language=ctx.language_config,
+            runtime=rt,
+        )
+        output = self.action.run(cfg, inputs)
+
+        self._last_chunks = [inputs]
+        self._last_outputs = [output]
+
+        return self.merge_output(ctx, output)
+
+
+
+    def execute(self, ctx: LessonContext) -> LessonContext:
+        if self.should_skip(ctx):
+            self._last_chunks: list = []
+            self._last_outputs: list = []
+            return ctx
+
+        chunks = self.build_input_list(ctx)
+
+        if len(chunks) > 0:
+            return self.process_list(ctx, chunks)
+        else:
+            return self.process_single(ctx)
+

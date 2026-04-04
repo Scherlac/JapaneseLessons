@@ -18,11 +18,11 @@ class CompileTouchesStep(ActionStep[GeneralItemSequence, TouchSequence]):
     def should_skip(self, ctx: LessonContext) -> bool:
         return bool(ctx.touches)
 
-    def build_input(self, ctx: LessonContext) -> list[GeneralItemSequence]:
-        return [GeneralItemSequence(items=ctx.compiled_items)]
+    def build_input(self, ctx: LessonContext) -> GeneralItemSequence:
+        return GeneralItemSequence(items=ctx.compiled_items)
 
-    def merge_output(self, ctx: LessonContext, outputs: list[TouchSequence]) -> LessonContext:
-        result = outputs[-1] if outputs else TouchSequence(items=[])
+    def merge_output(self, ctx: LessonContext, outputs: TouchSequence) -> LessonContext:
+        result = outputs if outputs else TouchSequence(items=[])
         ctx.touch_sequence = result
         self._log(
             ctx,

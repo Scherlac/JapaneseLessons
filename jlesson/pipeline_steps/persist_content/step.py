@@ -25,7 +25,7 @@ class PersistContentStep(ActionStep[PersistContentRequest, PersistedContentArtif
     def should_skip(self, ctx: LessonContext) -> bool:
         return ctx.content_path is not None
 
-    def build_input(self, ctx: LessonContext) -> list[PersistContentRequest]:
+    def build_input(self, ctx: LessonContext) -> PersistContentRequest:
         created_at = ctx.created_at or (
             datetime.now(timezone.utc)
             .isoformat(timespec="seconds")
@@ -37,12 +37,11 @@ class PersistContentStep(ActionStep[PersistContentRequest, PersistedContentArtif
             curriculum=ctx.curriculum,
             header_markdown="",
         )
-        return [
-            PersistContentRequest(
-                registration=registration,
-                theme=ctx.config.theme,
-                language=ctx.config.language,
-                narrative_blocks=ctx.narrative_blocks,
+        return PersistContentRequest(
+            registration=registration,
+            theme=ctx.config.theme,
+            language=ctx.config.language,
+            narrative_blocks=ctx.narrative_blocks,
                 grammar_ids=[grammar.id for grammar in ctx.selected_grammar],
                 noun_items=list(ctx.noun_items),
                 verb_items=list(ctx.verb_items),
@@ -52,10 +51,9 @@ class PersistContentStep(ActionStep[PersistContentRequest, PersistedContentArtif
                 step_details=dict(ctx.step_details),
                 pipeline_started_at=ctx.pipeline_started_at,
             )
-        ]
 
-    def merge_output(self, ctx: LessonContext, outputs: list[PersistedContentArtifact]) -> LessonContext:
-        result = outputs[-1]
+    def merge_output(self, ctx: LessonContext, outputs: PersistedContentArtifact) -> LessonContext:
+        result = outputs
         ctx.persisted_content = result
         ctx.created_at = result.created_at
         ctx.content_path = result.content_path
