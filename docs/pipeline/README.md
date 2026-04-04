@@ -199,7 +199,7 @@ conceptual `vocab_enrichment` stage with two item-specific implementations.
 
 | # | Step | Purpose | Current expected inputs | Current outputs | Possible aligned input/output |
 |---|---|---|---|---|---|
-| 1 | `narrative_generator` | Generate or normalise block-by-block story progression | theme, lesson number, block count, seed narrative | `NarrativeFrame` -> `narrative_blocks` | Keep as `NarrativeGenChunk -> NarrativeFrame` |
+| 1 | `narrative_generator` | Generate or normalise block-by-block story progression | theme, lesson number, block count, seed narrative | `NarrativeFrame` -> `narrative_blocks` | Keep as `NarrativeConfig -> NarrativeFrame` |
 | 2 | `extract_narrative_vocab` | Extract per-block noun/verb hints from the narrative | `NarrativeFrame` | `NarrativeVocabPlan` -> `narrative_vocab_terms` | Keep as `NarrativeFrame -> NarrativeVocabPlan` |
 | 3 | `canonical_vocab_select` | Deterministically choose canonical English lesson vocab for planning | `NarrativeVocabPlan`, curriculum coverage, narrative blocks | `CanonicalVocabSet` -> `canonical_vocab` | Keep as `NarrativeVocabPlan + CurriculumState -> CanonicalVocabSet` |
 | 4 | `select_vocab` | Resolve lesson vocab from the theme vocab file and canonical selection | `VocabFile`, `CanonicalVocabSet`, curriculum coverage, optional fallback selection logic | `VocabSet` -> `nouns`, `verbs` as `list[GeneralItem]` | `CanonicalVocabSet + BranchVocab -> VocabSet`; current step materialises source/target too early and may diverge from narrative-specific canonical picks |
@@ -226,8 +226,8 @@ Current implementation note for `vocab_enrichment`:
 
 Current state by artifact class:
 
-- `Narrative content` and canonical term extraction now have a clean early chain: `NarrativeGenChunk -> NarrativeFrame -> NarrativeVocabPlan -> CanonicalVocabSet`.
-- The canonical planning boundary is only partially achieved. `LessonPlannerStep` plans against `CanonicalVocabSet`, but `select_vocab` already materialises language-pair vocab before `narrative_grammar`, `review_sentences`, and `vocab_enrichment`.
+- `Narrative content` and canonical term extraction now have a clean early chain: `NarrativeConfig -> NarrativeFrame -> NarrativeVocabPlan -> CanonicalVocabSet`.
+- The canonical planning boundary is only partially achieved. `CanonicalPlannerStep` plans against `CanonicalVocabSet`, but `select_vocab` already materialises language-pair vocab before `narrative_grammar`, `review_sentences`, and `vocab_enrichment`.
 - `Sentences` now have a real successor alignment: `NarrativeGrammarStep` produces `Sentence`, and `ReviewSentencesStep` consumes `Sentence` via `SentenceReviewBatch`.
 - `Vocab` is still the most fragmented area. Raw vocab, canonical selection, selected branch vocab, and enriched vocab are all real stages, but they are not yet named or connected cleanly enough. Treating `noun_practice` and `verb_practice` as one conceptual `vocab_enrichment` stage is a better model.
 - `VocabSet` loses the per-block assignment encoded in `CanonicalVocabSet`. `NarrativeGrammarStep` rebuilds block groupings by chunking flat noun/verb lists rather than consuming one explicit predecessor artifact that already carries the block plan.
@@ -431,7 +431,7 @@ flowchart TD
     VocabFile["Vocab<br/>VocabFile"]
     SelectVocab[select_vocab]
     VocabSelection["Vocab selection<br/>candidate"]
-    LessonPlanner[lesson_planner]
+    CanonicalPlanner[lesson_planner]
     CanonicalPlan["Canonical lesson plan<br/>CanonicalLessonPlan"]
     BlockPlan["Per-block content plan<br/>candidate"]
     SentenceGen[narrative_grammar]
@@ -486,9 +486,9 @@ flowchart TD
     Request --> SelectVocab
     SelectVocab --> VocabSelection
 
-    CanonicalVocab --> LessonPlanner
-    Request --> LessonPlanner
-    LessonPlanner --> CanonicalPlan
+    CanonicalVocab --> CanonicalPlanner
+    Request --> CanonicalPlanner
+    CanonicalPlanner --> CanonicalPlan
 
     NarrativeFrame --> BlockPlan
     VocabSelection --> BlockPlan
@@ -543,7 +543,7 @@ flowchart TD
     classDef runtime fill:#fbccd5,stroke:#760f0c,stroke-width:2px,color:#2f0407
 
     class Request,Profile request
-    class NarrativeGen,ExtractVocab,CanonicalSelect,SelectVocab,LessonPlanner,SentenceGen,Review,VocabEnrichment,Register,Persist,CompileAssets,CompileTouches,RenderVideo,SaveReport step
+    class NarrativeGen,ExtractVocab,CanonicalSelect,SelectVocab,CanonicalPlanner,SentenceGen,Review,VocabEnrichment,Register,Persist,CompileAssets,CompileTouches,RenderVideo,SaveReport step
     class NarrativeFrame,NarrativePlan,CanonicalVocab,VocabFile,CanonicalPlan,Sentences,ReviewedSentences,LessonContent,GeneralItems,Touches,Video,CanonicalNode,LanguageBranches artifact
     class VocabSelection,BlockPlan,EnrichedVocab,SemanticText,CanonicalSemantic,CompiledAssetRecord candidate
     class GeneralItems,Touches,Video render

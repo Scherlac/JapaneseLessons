@@ -18,7 +18,7 @@ class RegisterLessonStep(ActionStep[RegisterLessonRequest, LessonRegistrationArt
     def should_skip(self, ctx: LessonContext) -> bool:
         return ctx.lesson_id > 0
 
-    def build_chunks(self, ctx: LessonContext) -> list[RegisterLessonRequest]:
+    def build_input(self, ctx: LessonContext) -> list[RegisterLessonRequest]:
         return [
             RegisterLessonRequest(
                 vocab=ctx.vocab,
@@ -33,7 +33,7 @@ class RegisterLessonStep(ActionStep[RegisterLessonRequest, LessonRegistrationArt
             )
         ]
 
-    def merge_outputs(self, ctx: LessonContext, outputs: list[LessonRegistrationArtifact]) -> LessonContext:
+    def merge_output(self, ctx: LessonContext, outputs: list[LessonRegistrationArtifact]) -> LessonContext:
         result = outputs[-1]
         ctx.lesson_registration = result
         ctx.lesson_id = result.lesson_id

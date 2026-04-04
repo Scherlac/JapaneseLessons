@@ -25,7 +25,7 @@ class PersistContentStep(ActionStep[PersistContentRequest, PersistedContentArtif
     def should_skip(self, ctx: LessonContext) -> bool:
         return ctx.content_path is not None
 
-    def build_chunks(self, ctx: LessonContext) -> list[PersistContentRequest]:
+    def build_input(self, ctx: LessonContext) -> list[PersistContentRequest]:
         created_at = ctx.created_at or (
             datetime.now(timezone.utc)
             .isoformat(timespec="seconds")
@@ -54,7 +54,7 @@ class PersistContentStep(ActionStep[PersistContentRequest, PersistedContentArtif
             )
         ]
 
-    def merge_outputs(self, ctx: LessonContext, outputs: list[PersistedContentArtifact]) -> LessonContext:
+    def merge_output(self, ctx: LessonContext, outputs: list[PersistedContentArtifact]) -> LessonContext:
         result = outputs[-1]
         ctx.persisted_content = result
         ctx.created_at = result.created_at

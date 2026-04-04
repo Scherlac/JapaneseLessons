@@ -45,7 +45,7 @@ from jlesson.pipeline_steps import (
     GrammarSelectStep,  # kept for backward-compatible re-export
     LessonConfig,
     LessonContext,
-    LessonPlannerStep,
+    CanonicalPlannerStep,
     NarrativeGeneratorStep,
     NounPracticeStep,
     PersistContentStep,
@@ -69,7 +69,7 @@ def _build_pipeline() -> list[PipelineStep]:
         ExtractNarrativeVocabStep(),
         CanonicalVocabSelectStep(),
         SelectVocabStep(),
-        LessonPlannerStep(),  # two-pass lesson outline (replaces GrammarSelectStep)
+        CanonicalPlannerStep(),  # two-pass lesson outline (replaces GrammarSelectStep)
         # GrammarSelectStep(),
         NarrativeGrammarStep(),
         ReviewSentencesStep(),

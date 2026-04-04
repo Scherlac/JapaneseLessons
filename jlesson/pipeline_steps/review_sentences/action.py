@@ -10,7 +10,7 @@ inter-step dependency explicit at the type level:
     NarrativeGrammarStep → list[Sentence] → ReviewSentencesStep
 
 The action works entirely in local (intra-batch) index space.  The enclosing
-``ReviewSentencesStep.merge_outputs`` is responsible for mapping local indices
+``ReviewSentencesStep.merge_output`` is responsible for mapping local indices
 back to global sentence positions for logging and the report section.
 """
 from __future__ import annotations
@@ -62,9 +62,9 @@ class SentenceReviewBatch(ItemBatch[Sentence]):
 
 @dataclass
 class SentenceRevisionRecord:
-    """One revision applied during review, for logging in ``merge_outputs``.
+    """One revision applied during review, for logging in ``merge_output``.
 
-    Carries the local (intra-batch) index so ``merge_outputs`` can compute
+    Carries the local (intra-batch) index so ``merge_output`` can compute
     the global sentence position as ``batch_offset + local_index``.
     """
 
@@ -80,17 +80,17 @@ class SentenceReviewResult:
     One result per ``SentenceReviewBatch``.
 
     sentences   list[Sentence]
-        Possibly-revised sentences for this batch.  ``merge_outputs``
+        Possibly-revised sentences for this batch.  ``merge_output``
         concatenates these across all batches to rebuild ``ctx.sentences``.
     reviews     list[dict]
         Raw LLM review records for report generation.  Indices are
-        local (intra-batch); ``merge_outputs`` adjusts them to global
+        local (intra-batch); ``merge_output`` adjusts them to global
         positions before building the report section.
     revisions   list[SentenceRevisionRecord]
         Per-revision records capturing the local index, score, and original
-        text for step-level logging in ``merge_outputs``.
+        text for step-level logging in ``merge_output``.
 
-    Context field: ``LessonContext.sentences``  (reassembled by ``merge_outputs``)
+    Context field: ``LessonContext.sentences``  (reassembled by ``merge_output``)
     """
 
     sentences: list[Sentence]
@@ -117,11 +117,11 @@ class ReviewSentencesAction(StepAction[SentenceReviewBatch, SentenceReviewResult
     ------
     SentenceReviewResult
         Possibly-revised sentences for the batch, the raw LLM review records,
-        and per-revision records for logging in ``merge_outputs``.
+        and per-revision records for logging in ``merge_output``.
 
     The action normalises any dict sentences (retrieval may return untyped
     data) before building the prompt.  All revision decisions use local
-    (intra-batch) indices; the step's ``merge_outputs`` handles the global
+    (intra-batch) indices; the step's ``merge_output`` handles the global
     offset.
     """
 

@@ -23,7 +23,7 @@ class SaveReportStep(ActionStep[SaveReportRequest, ReportArtifact]):
     def should_skip(self, ctx: LessonContext) -> bool:
         return bool(ctx.report_path)
 
-    def build_chunks(self, ctx: LessonContext) -> list[SaveReportRequest]:
+    def build_input(self, ctx: LessonContext) -> list[SaveReportRequest]:
         lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
         rendered = RenderedVideoArtifact(
             video_path=ctx.video_path,
@@ -43,7 +43,7 @@ class SaveReportStep(ActionStep[SaveReportRequest, ReportArtifact]):
             )
         ]
 
-    def merge_outputs(self, ctx: LessonContext, outputs: list[ReportArtifact]) -> LessonContext:
+    def merge_output(self, ctx: LessonContext, outputs: list[ReportArtifact]) -> LessonContext:
         result = outputs[-1] if outputs else ReportArtifact(report_path=None)
         ctx.saved_report = result
         ctx.report_path = result.report_path

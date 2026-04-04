@@ -20,7 +20,7 @@ class RenderVideoStep(ActionStep[RenderVideoRequest, RenderedVideoArtifact]):
     def should_skip(self, ctx: LessonContext) -> bool:
         return bool(ctx.video_path)
 
-    def build_chunks(self, ctx: LessonContext) -> list[RenderVideoRequest]:
+    def build_input(self, ctx: LessonContext) -> list[RenderVideoRequest]:
         if not ctx.config.render_video or ctx.config.dry_run:
             reason = "dry-run" if ctx.config.dry_run else "skipped"
             self._log(ctx, f"       ({reason})")
@@ -29,7 +29,7 @@ class RenderVideoStep(ActionStep[RenderVideoRequest, RenderedVideoArtifact]):
         lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
         return [RenderVideoRequest(items=ctx.touches, lesson_dir=lesson_dir)]
 
-    def merge_outputs(self, ctx: LessonContext, outputs: list[RenderedVideoArtifact]) -> LessonContext:
+    def merge_output(self, ctx: LessonContext, outputs: list[RenderedVideoArtifact]) -> LessonContext:
         if not outputs:
             return ctx
 

@@ -29,7 +29,7 @@ class ReviewSentencesStep(ActionStep[SentenceReviewBatch, SentenceReviewResult])
     -------------------------
     ``SentenceReviewBatch`` extends ``ItemBatch[Sentence]``, where ``Sentence``
     is the direct output item type of ``NarrativeGrammarStep``.
-    ``build_chunks`` wraps ``ctx.sentences`` — the list ``NarrativeGrammarStep``
+    ``build_input`` wraps ``ctx.sentences`` — the list ``NarrativeGrammarStep``
     produced — into batches of at most ``BATCH_SIZE``, attaching the
     noun/verb/grammar context needed by the review prompt.
 
@@ -40,7 +40,7 @@ class ReviewSentencesStep(ActionStep[SentenceReviewBatch, SentenceReviewResult])
     Outputs
     -------
     One ``SentenceReviewResult`` per batch → reassembled into ``ctx.sentences``
-    by ``merge_outputs``.
+    by ``merge_output``.
     """
 
     name = "review_sentences"
@@ -56,7 +56,7 @@ class ReviewSentencesStep(ActionStep[SentenceReviewBatch, SentenceReviewResult])
             return True
         return False
 
-    def build_chunks(self, ctx: LessonContext) -> list[SentenceReviewBatch]:
+    def build_input(self, ctx: LessonContext) -> list[SentenceReviewBatch]:
         return [
             SentenceReviewBatch(
                 batch_index=i,
@@ -69,7 +69,7 @@ class ReviewSentencesStep(ActionStep[SentenceReviewBatch, SentenceReviewResult])
             for i, start in enumerate(range(0, len(ctx.sentences), BATCH_SIZE))
         ]
 
-    def merge_outputs(
+    def merge_output(
         self, ctx: LessonContext, outputs: list[SentenceReviewResult]
     ) -> LessonContext:
         ctx.review_results = outputs

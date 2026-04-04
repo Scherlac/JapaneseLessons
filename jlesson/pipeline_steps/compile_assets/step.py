@@ -29,7 +29,7 @@ class CompileAssetsStep(ActionStep[AssetCompileRequest, GeneralItemSequence]):
     def should_skip(self, ctx: LessonContext) -> bool:
         return bool(ctx.compiled_items)
 
-    def build_chunks(self, ctx: LessonContext) -> list[AssetCompileRequest]:
+    def build_input(self, ctx: LessonContext) -> list[AssetCompileRequest]:
         items_by_phase = self.build_items_by_phase(ctx)
         total_items = sum(len(items) for items in items_by_phase.values())
         lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
@@ -47,7 +47,7 @@ class CompileAssetsStep(ActionStep[AssetCompileRequest, GeneralItemSequence]):
             )
         ]
 
-    def merge_outputs(self, ctx: LessonContext, outputs: list[GeneralItemSequence]) -> LessonContext:
+    def merge_output(self, ctx: LessonContext, outputs: list[GeneralItemSequence]) -> LessonContext:
         result = outputs[-1] if outputs else GeneralItemSequence(items=[])
         ctx.compiled_sequence = result
         self._log(ctx, f"       {len(ctx.compiled_items)} compiled items")

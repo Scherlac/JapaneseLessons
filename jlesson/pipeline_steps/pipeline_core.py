@@ -32,6 +32,7 @@ class LessonConfig:
     sentences_per_grammar: int = 3
     grammar_points_per_lesson: int = 2
     grammar_points_per_block: int = 1
+    lesson_number: int = 1
     lesson_blocks: int = 1
     seed: int | None = None
     use_cache: bool = True
@@ -75,6 +76,7 @@ class LessonContext:
     """Mutable state accumulated across pipeline steps."""
 
     config: LessonConfig
+    language_config: LanguageConfig | None = None
     report: ReportBuilder = field(default_factory=ReportBuilder)
     step_info: StepInfo | None = None
     curriculum: CurriculumData = field(default_factory=CurriculumData)
@@ -112,7 +114,7 @@ class BlockChunk:
     e.g. sentence generation, narrative generation, coherence review.
 
     Fields map directly to the per-block slices assembled from ``LessonContext``
-    by the enclosing ``ActionStep.build_chunks`` implementation.
+    by the enclosing ``ActionStep.build_input`` implementation.
     """
 
     block_index: int
@@ -146,12 +148,12 @@ class ItemBatch(Generic[_T]):
 # ---------------------------------------------------------------------------
 
 @dataclass
-class NarrativeGenChunk:
+class NarrativeConfig:
     """Input chunk for ``NarrativeGeneratorStep``.
 
     Carries everything needed for one narrative generation call.
     ``lesson_number`` is resolved from curriculum state inside
-    ``build_chunks`` so the action remains free of ``LessonContext``.
+    ``build_input`` so the action remains free of ``LessonContext``.
     """
 
     theme: str
@@ -161,7 +163,7 @@ class NarrativeGenChunk:
 
 
 @dataclass
-class NarrativeFrame:
+class NarrativeFrame(NarrativeConfig):
     """Typed output of ``NarrativeGeneratorStep``.
 
     Also serves as the input chunk for ``ExtractNarrativeVocabStep``,
@@ -184,7 +186,7 @@ class NarrativeFrame:
 class CanonicalLessonBlock(BaseModel):
     """Fully-resolved lesson plan expressed in canonical (English) terms only.
 
-    Assembled by ``LessonPlannerStep.merge_outputs`` after the two-pass
+    Assembled by ``CanonicalPlannerStep.merge_output`` after the two-pass
     planning LLM calls complete.  Persisting this artifact to disk is the
     Phase-1 / Phase-2 boundary: the same plan can later be loaded to drive
     a different language pair without repeating planning-phase LLM calls.
@@ -213,7 +215,7 @@ class CanonicalLessonBlock(BaseModel):
 class CanonicalLessonPlan:
     """Full lesson plan expressed in canonical (English) terms only.
 
-    Assembled by ``LessonPlannerStep.merge_outputs`` after the two-pass
+    Assembled by ``CanonicalPlannerStep.merge_output`` after the two-pass
     planning LLM calls complete.  Persisting this artifact to disk is the
     Phase-1 / Phase-2 boundary: the same plan can later be loaded to drive
     a different language pair without repeating planning-phase LLM calls.
@@ -257,8 +259,6 @@ class LessonPlan:
     ``LessonContext.lesson_plan``.
     """
 
-    theme: str
-    lesson_number: int
     blocks: list[LessonBlock]
 
 
@@ -421,17 +421,17 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
     ``should_skip(ctx)``
         Return ``True`` when this step's output is already present in *ctx*
         (idempotency guard, e.g. when retrieval pre-populated the field).
-    ``build_chunks(ctx)``
+    ``build_input(ctx)``
         Decompose *ctx* into the ordered list of typed input chunks.
-    ``merge_outputs(ctx, outputs)``
+    ``merge_output(ctx, outputs)``
         Write the collected action outputs back to *ctx* and return it.
 
     The iteration contract
     ----------------------
-    ``execute`` calls ``build_chunks``, then for each chunk it constructs an
+    ``execute`` calls ``build_input``, then for each chunk it constructs an
     ``ActionConfig`` (binding the current ``LessonContext`` into a
     ``ContextRuntime``) and invokes ``action.run(config, chunk)``.  After all
-    chunks are processed, ``merge_outputs`` is called once with the full list
+    chunks are processed, ``merge_output`` is called once with the full list
     of outputs.
 
     ``block_index`` is read from ``chunk.block_index`` when the attribute
@@ -451,12 +451,12 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
         ...
 
     @abstractmethod
-    def build_chunks(self, ctx: LessonContext) -> list[_I]:
+    def build_input(self, ctx: LessonContext) -> list[_I]:
         """Decompose *ctx* into the ordered list of input chunks."""
         ...
 
     @abstractmethod
-    def merge_outputs(self, ctx: LessonContext, outputs: list[_O]) -> LessonContext:
+    def merge_output(self, ctx: LessonContext, outputs: list[_O]) -> LessonContext:
         """Apply the collected *outputs* back to *ctx* and return it."""
         ...
 
@@ -469,7 +469,7 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
         from jlesson.runtime._base import ContextRuntime  # local import avoids circularity
 
         rt = ContextRuntime(ctx)
-        chunks = self.build_chunks(ctx)
+        chunks = self.build_input(ctx)
         self._last_chunks = deepcopy(chunks)
         outputs: list[_O] = []
         for loop_index, chunk in enumerate(chunks):
@@ -484,4 +484,4 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
             outputs.append(self.action.run(cfg, chunk))
 
         self._last_outputs = deepcopy(outputs)
-        return self.merge_outputs(ctx, outputs)
+        return self.merge_output(ctx, outputs)

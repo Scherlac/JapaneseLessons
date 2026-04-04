@@ -145,10 +145,10 @@ class _SnapshotStep(ActionStep[_SnapshotChunk, dict]):
     def should_skip(self, ctx) -> bool:
         return False
 
-    def build_chunks(self, ctx) -> list[_SnapshotChunk]:
+    def build_input(self, ctx) -> list[_SnapshotChunk]:
         return [_SnapshotChunk(block_index=0, payload={"values": ["original"]})]
 
-    def merge_outputs(self, ctx, outputs: list[dict]):
+    def merge_output(self, ctx, outputs: list[dict]):
         return ctx
 
 

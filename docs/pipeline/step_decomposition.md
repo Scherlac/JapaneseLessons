@@ -192,21 +192,21 @@ class ActionStep(PipelineStep, Generic[I, O]):
     def should_skip(self, ctx: LessonContext) -> bool: ...
 
     @abstractmethod
-    def build_chunks(self, ctx: LessonContext) -> list[I]: ...
+    def build_input(self, ctx: LessonContext) -> list[I]: ...
 
     @abstractmethod
-    def merge_outputs(self, ctx: LessonContext, outputs: list[O]) -> LessonContext: ...
+    def merge_output(self, ctx: LessonContext, outputs: list[O]) -> LessonContext: ...
 
     def execute(self, ctx: LessonContext) -> LessonContext:
         if self.should_skip(ctx):
             return ctx
         rt = ContextRuntime(ctx)
-        for loop_index, chunk in enumerate(self.build_chunks(ctx)):
+        for loop_index, chunk in enumerate(self.build_input(ctx)):
             block_index = getattr(chunk, "block_index", loop_index)
             cfg = ActionConfig(lesson=ctx.config, block_index=block_index,
                                language=ctx.language_config, runtime=rt)
             outputs.append(self.action.run(cfg, chunk))
-        return self.merge_outputs(ctx, outputs)
+        return self.merge_output(ctx, outputs)
 ```
 
 The `block_index` for `ActionConfig` is read from `chunk.block_index` when the
@@ -220,12 +220,12 @@ for custom chunk types.
 | Concern | Owner |
 |---------|-------|
 | Idempotency guard | `ActionStep.should_skip` |
-| Chunk decomposition | `ActionStep.build_chunks` |
+| Chunk decomposition | `ActionStep.build_input` |
 | Iteration | `ActionStep.execute` (inherited) |
 | Per-invocation config | `ActionConfig` (constructed by `ActionStep.execute`) |
 | I/O (LLM, retrieval, cache) | `RuntimeServices` / `ContextRuntime` |
 | Transformation logic | `StepAction.run` |
-| Result assembly + ctx mutation | `ActionStep.merge_outputs` |
+| Result assembly + ctx mutation | `ActionStep.merge_output` |
 
 ---
 
@@ -276,7 +276,7 @@ Action:  one call_llm + deterministic extension + block slicing
 ```
 
 `_project_grammar` and `_build_block_progression` are module-level pure functions
-accessible to both the action (for post-processing) and the step (for `build_chunks`,
+accessible to both the action (for post-processing) and the step (for `build_input`,
 which needs `_project_grammar` to compute the unlocked set before the LLM call).
 
 ### `vocab_enhancement` — merged noun/verb enrichment after `select_vocab`
@@ -469,7 +469,7 @@ for `ExtractNarrativeVocabStep`.
 
 ```
 NarrativeGeneratorStep
-  Input chunk:  NarrativeGenChunk  (theme, lesson_number, lesson_blocks, seed_blocks)
+  Input chunk:  NarrativeConfig  (theme, lesson_number, lesson_blocks, seed_blocks)
   Output:       NarrativeFrame     (blocks: list[str])
   Action:       zero or one call_llm (skipped when seed_blocks covers all blocks)
 
@@ -479,18 +479,18 @@ ExtractNarrativeVocabStep
   Action:       one call_llm
 ```
 
-The `build_chunks` of `ExtractNarrativeVocabStep` wraps `ctx.narrative_blocks`
+The `build_input` of `ExtractNarrativeVocabStep` wraps `ctx.narrative_blocks`
 in a `NarrativeFrame`:
 
 ```python
-def build_chunks(self, ctx: LessonContext) -> list[NarrativeFrame]:
+def build_input(self, ctx: LessonContext) -> list[NarrativeFrame]:
     if not ctx.narrative_blocks:
         return []
     return [NarrativeFrame(blocks=ctx.narrative_blocks)]
 ```
 
 This makes the dependency visible in the type signature rather than buried in
-prose documentation: any step whose `build_chunks` returns `list[NarrativeFrame]`
+prose documentation: any step whose `build_input` returns `list[NarrativeFrame]`
 declares, at the type level, that it follows `NarrativeGeneratorStep`.
 
 ---
@@ -589,7 +589,7 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `generate_sentences` | `BlockChunk` | 1 per block | **done** |
 | `vocab_enhancement` | `VocabEnhancementRequest` ← from `select_vocab` | merged batched noun/verb enrichment | **done** — successor step; emits `VocabEnhancementArtifact` for `register_lesson` |
 | `grammar_select` | `GrammarSelectChunk` | 1 | **done** |
-| `narrative_generator` | `NarrativeGenChunk` | 0–1 | **done** — emits `NarrativeFrame` |
+| `narrative_generator` | `NarrativeConfig` | 0–1 | **done** — emits `NarrativeFrame` |
 | `extract_narrative_vocab` | `NarrativeFrame` ← from `narrative_generator` | 1 | **done** — emits `NarrativeVocabPlan` |
 | `review_sentences` | `SentenceReviewBatch(ItemBatch[Sentence])` ← from `generate_sentences` | batched ×30 | **done** — successor step; chunk item type = `Sentence` (output of `NarrativeGrammarStep`) |
 | `register_lesson` | `RegisterLessonRequest` | 1 storage write | **done** — predecessor step; emits `LessonRegistrationArtifact` for later `persist_content` alignment |

@@ -7,17 +7,17 @@ testable with a mock runtime.
 """
 from __future__ import annotations
 
-from ..pipeline_core import ActionConfig, NarrativeFrame, NarrativeGenChunk, StepAction
+from ..pipeline_core import ActionConfig, NarrativeFrame, NarrativeConfig, StepAction
 from .config import build_narrative_generator_language_config
 from .prompt import build_narrative_generator_prompt
 
 
-class NarrativeGeneratorAction(StepAction[NarrativeGenChunk, NarrativeFrame]):
+class NarrativeGeneratorAction(StepAction[NarrativeConfig, NarrativeFrame]):
     """Generate or pass through a narrative progression across lesson blocks.
 
     Input
     -----
-    chunk : NarrativeGenChunk
+    chunk : NarrativeConfig
         Theme, lesson number, desired block count, and any user-provided seed
         passages.  If ``chunk.seed_blocks`` already covers all blocks, the
         action returns them directly without an LLM call.
@@ -32,7 +32,7 @@ class NarrativeGeneratorAction(StepAction[NarrativeGenChunk, NarrativeFrame]):
     language-specific default builder fills the remainder.
     """
 
-    def run(self, config: ActionConfig, chunk: NarrativeGenChunk) -> NarrativeFrame:
+    def run(self, config: ActionConfig, chunk: NarrativeConfig) -> NarrativeFrame:
         provided = chunk.seed_blocks
         if len(provided) >= chunk.lesson_blocks:
             return NarrativeFrame(blocks=provided[:chunk.lesson_blocks])
