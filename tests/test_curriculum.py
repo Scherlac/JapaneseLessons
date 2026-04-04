@@ -32,7 +32,6 @@ from jlesson.curriculum import (
 )
 from jlesson.item_generator.eng_jap import EngJapItemGenerator
 from jlesson.pipeline_steps.select_vocab import SelectVocabStep
-from jlesson.models import VocabItem
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -56,16 +55,6 @@ def food_nouns():
 @pytest.fixture
 def food_verbs():
     return [_VERB(w) for w in ["to eat", "to drink", "to cook"]]
-
-
-@pytest.fixture
-def food_noun_items():
-    return [VocabItem.model_validate(_NOUN(w)) for w in ["water", "rice", "fish", "meat", "egg"]]
-
-
-@pytest.fixture
-def food_verb_items():
-    return [VocabItem.model_validate(_VERB(w)) for w in ["to eat", "to drink", "to cook"]]
 
 
 @pytest.fixture

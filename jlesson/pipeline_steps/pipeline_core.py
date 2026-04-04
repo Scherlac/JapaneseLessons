@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, TypeVar
 
@@ -12,6 +12,7 @@ from jlesson.models import GeneralItem, GeneralItem, GrammarItem, Sentence, Touc
 from jlesson.curriculum import CurriculumData
 from jlesson.runtime.interfaces import RuntimeServices
 from jlesson.curriculum import create_curriculum
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from jlesson.pipeline_steps.review_sentences.action import SentenceReviewResult
@@ -41,7 +42,7 @@ class LessonConfig:
     verbose: bool = True
     profile: str = "passive_video"
     language: str = "eng-jap"
-    narrative: list[str] = field(default_factory=list)
+    narrative: list[str] = dataclass_field(default_factory=list)
     retrieval_enabled: bool = True
     retrieval_store_path: Path | None = None
     retrieval_backend: str = "file"
@@ -77,15 +78,14 @@ class LessonContext:
 
     config: LessonConfig
     language_config: LanguageConfig | None = None
-    report: ReportBuilder = field(default_factory=ReportBuilder)
+    report: ReportBuilder = dataclass_field(default_factory=ReportBuilder)
     step_info: StepInfo | None = None
-    curriculum: CurriculumData = field(default_factory=CurriculumData)
+    curriculum: CurriculumData = dataclass_field(default_factory=CurriculumData)
 
     narrative_frame: NarrativeFrame | None = None
     canonical_plan: CanonicalLessonPlan | None = None
     lesson_plan: LessonPlan | None = None
 
-    compiled_sequence: CompiledSequence | None = None
     touch_sequence: TouchSequence | None = None
 
     rendered_video: RenderedVideoArtifact | None = None
@@ -202,16 +202,15 @@ class CanonicalLessonBlock(BaseModel):
 
     theme: str
     lesson_number: int
-    block_index: int = field(default=0, 
-        metadata={"description": "The 0-based index of this block within the lesson."})
-    narrative_content: str = field(default="", 
+    block_index: int = Field(default=0, description="The 0-based index of this block within the lesson.")
+    narrative_content: str = Field(default="", 
         description="The narrative content for this block, e.g. 'The cat climbs the tree.'")
-    alternative_content: str = field(default="", 
+    alternative_content: str = Field(default="", 
         description = ( 
         """An alternative version of the narrative content, e.g. 'The cat is black and likes milk.' 
         This can be used to provide variety in practice sentences or to offer a fallback if the main narrative
         content is too complex for certain grammar points or to avoid spoilers for later narrative blocks.""" ))
-    sentiment: str = field(default="", 
+    sentiment: str = Field(default="", 
         description= (
         """Optional sentiment or tone label for the block, e.g. 'mishievous', 'heartwarming', 'tense', etc."""))
     grammar_ids: list[str]
@@ -244,10 +243,9 @@ class LessonBlock(BaseModel):
     ``LessonContext.canonical_plan``.
     """
 
-    block_index: int = field(default=0, 
-        metadata={"description": "The 0-based index of this block within the lesson."})
+    block_index: int = Field(default=0, description="The 0-based index of this block within the lesson.")
     
-    content_sequences: dict[Phase, list[GeneralItem]] = field(default_factory=dict, 
+    content_sequences: dict[Phase, list[GeneralItem]] = Field(default_factory=dict, 
         description=(
         """The core content items for this block, organized by lesson phase (nouns, verbs
         grammar points, etc.).  Each item is expressed in the target language and enriched with

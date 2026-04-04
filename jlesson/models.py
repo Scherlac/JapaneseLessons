@@ -14,9 +14,19 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Union
 
-from attrs import field
-from matplotlib import text
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class Phase(str, Enum):
+    """Lesson phase — determines which repetition cycle applies."""
+
+    UNKNOWN = "unknown"
+    NOUNS = "nouns"
+    VERBS = "verbs"
+    ADJECTIVES = "adjectives"
+    VOCAB = "vocab"  # general catch-all for words that don't fit neatly into noun/verb/adjective categories
+    GRAMMAR = "grammar" # grammar points and practice sentences
+    NARRATIVE = "narrative" # narrative story blocks making lesson cohesive and memorable
 
 
 class _NullStrCoerce(BaseModel):
@@ -65,9 +75,9 @@ class CanonicalItem(BaseModel):
             """LLM-generated vector embeddings for this item, used for retrieval and inter-step 
             reference resolution.  Populated in the item generation step and consumed in later 
             steps like lesson planning and touch compilation."""))
-    text: str = field(default="", description="The canonical English word or phrase representing the core meaning of this item.")
-    type: Phase = field(default=Phase.UNKNOWN, description="The lesson phase this item belongs to (e.g. noun, verb, grammar, etc.)")
-    gloss: str = field(default="", 
+    text: str = Field(default="", description="The canonical English word or phrase representing the core meaning of this item.")
+    type: Phase = Field(default=Phase.UNKNOWN, description="The lesson phase this item belongs to (e.g. noun, verb, grammar, etc.)")
+    gloss: str = Field(default="", 
         description=(
             """A brief gloss to disambiguate the meaning when the same surface form has multiple 
             senses, e.g. 'bank (river)' vs. 'bank (finance)'."""))
@@ -188,18 +198,6 @@ class LessonContent(BaseModel):
 # ---------------------------------------------------------------------------
 # Compilation pipeline models (Stages 2–3)
 # ---------------------------------------------------------------------------
-
-
-class Phase(str, Enum):
-    """Lesson phase — determines which repetition cycle applies."""
-
-    UNKNOWN = "unknown"
-    NOUNS = "nouns"
-    VERBS = "verbs"
-    ADJECTIVES = "adjectives"
-    VOCAB = "vocab"  # general catch-all for words that don't fit neatly into noun/verb/adjective categories
-    GRAMMAR = "grammar" # grammar points and practice sentences 
-    NARRATIVE = "narrative" # narrative story blocks making lesson cohesive and memorable
 
 
 class TouchType(str, Enum):

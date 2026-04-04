@@ -25,8 +25,8 @@ from jlesson.lesson_pipeline import (
     VerbPracticeStep,
     run_pipeline,
 )
-from jlesson.models import GeneralItem, GeneralItem, GeneralItem, Phase, Touch, TouchIntent, TouchType, GeneralItem, Sentence, GeneralItem, PartialItem, VocabFile, VocabItem
-from jlesson.pipeline_steps.pipeline_core import CanonicalItem, CanonicalVocabSet
+from jlesson.models import GeneralItem, GeneralItem, GeneralItem, Phase, Touch, TouchIntent, TouchType, GeneralItem, Sentence, GeneralItem, PartialItem
+from jlesson.pipeline_steps.pipeline_core import CanonicalItem
 from jlesson.pipeline_steps.pipeline_core import ActionStep, StepAction
 from jlesson.item_generator.eng_jap import EngJapItemGenerator
 
