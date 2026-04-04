@@ -18,9 +18,9 @@ class ExtractNarrativeVocabStep(ActionStep[NarrativeFrame, NarrativeVocabPlan]):
     Output
     ------
     narrative_vocab_terms   list[NarrativeVocabBlock]  (via ``NarrativeVocabPlan``)
-        Per-block noun/verb vocabulary hints.  The action emits a
-        ``NarrativeVocabPlan`` which is also the direct input chunk for the
-        successor step ``GenerateNarrativeVocabStep``.
+        Per-block noun/verb vocabulary hints. The action emits a
+        ``NarrativeVocabPlan`` which is then consumed by canonical vocab
+        planning and later language-pair selection.
     """
 
     name = "extract_narrative_vocab"

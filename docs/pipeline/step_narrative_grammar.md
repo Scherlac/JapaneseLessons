@@ -26,8 +26,8 @@ All inputs come from `LessonContext`:
 
 | Field | Type | Set by |
 |---|---|---|
-| `ctx.nouns` | `list[GeneralItem]` | `SelectVocabStep` or `RetrieveLessonMaterialStep` |
-| `ctx.verbs` | `list[GeneralItem]` | same as above |
+| `ctx.nouns` | `list[GeneralItem]` | `SelectVocabStep` |
+| `ctx.verbs` | `list[GeneralItem]` | `SelectVocabStep` |
 | `ctx.narrative_blocks` | `list[str]` | `NarrativeGeneratorStep` |
 | `ctx.selected_grammar_blocks` | `list[list[GrammarItem]]` | `GrammarSelectStep` |
 | `ctx.selected_grammar` | `list[GrammarItem]` | `GrammarSelectStep` (flat fallback) |
@@ -38,7 +38,7 @@ All inputs come from `LessonContext`:
 
 ### Idempotency
 
-If `ctx.sentences` is already populated (e.g. from retrieval), the step returns
+If `ctx.sentences` is already populated, the step returns
 immediately without any LLM call.
 
 ---

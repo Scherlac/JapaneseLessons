@@ -61,6 +61,4 @@ class PersistContentStep(ActionStep[PersistContentRequest, PersistedContentArtif
         if result.content_path is not None:
             ctx.report.add_artifact("Content JSON", result.content_path)
             self._log(ctx, f"       {result.content_path}")
-        if result.vocab_path is not None:
-            self._log(ctx, f"       vocab  {result.vocab_path}")
         return ctx

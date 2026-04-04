@@ -27,9 +27,7 @@ class ExtractNarrativeVocabAction(StepAction[NarrativeFrame, NarrativeVocabPlan]
     ------
     NarrativeVocabPlan
         Per-block noun/verb vocabulary targets wrapped in the typed inter-step
-        artifact.  The same type is the direct input chunk for the successor
-        step ``GenerateNarrativeVocabStep``, continuing the typed chain.
-        One LLM call is made via ``config.runtime.call_llm``.
+        artifact. One LLM call is made via ``config.runtime.call_llm``.
     """
 
     def run(self, config: ActionConfig, chunk: NarrativeFrame) -> NarrativeVocabPlan:

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from jlesson.lesson_store import load_lesson_content, save_lesson_content, save_shared_vocab
+from jlesson.lesson_store import load_lesson_content, save_lesson_content
 
 
 def _ldir(base, lesson_id: int):

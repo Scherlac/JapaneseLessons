@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from jlesson.lesson_pipeline.pipeline_paths import resolve_vocab_dir
-from jlesson.lesson_store import save_shared_vocab
 from jlesson.models import GeneralItem, LessonContent, Sentence
 
 from ..pipeline_core import (
@@ -13,18 +11,6 @@ from ..pipeline_core import (
     PersistedContentArtifact,
     StepAction,
 )
-
-
-def _item_to_vocab_dict(item: GeneralItem | dict) -> dict:
-    if isinstance(item, dict):
-        return item
-    source_text = item.source.display_text or ""
-    payload = {**item.source.extra, **item.target.extra}
-    payload["id"] = source_text.strip().lower()
-    payload["source"] = source_text
-    payload["target"] = item.target.display_text or ""
-    payload["phonetic"] = item.target.pronunciation or ""
-    return payload
 
 
 @dataclass
@@ -54,7 +40,7 @@ class PersistContentRequest:
 
 
 class PersistContentAction(StepAction[PersistContentRequest, PersistedContentArtifact]):
-    """Persist lesson content and shared vocab using the typed registration artifact."""
+    """Persist lesson content using the typed registration artifact."""
 
     def run(
         self,
@@ -85,15 +71,8 @@ class PersistContentAction(StepAction[PersistContentRequest, PersistedContentArt
             chunk.registration.lesson_id,
             content.model_dump(mode="python", exclude_none=True),
         )
-        vocab_path = save_shared_vocab(
-            resolve_vocab_dir(config.lesson),
-            chunk.theme,
-            [_item_to_vocab_dict(item) for item in chunk.noun_items],
-            [_item_to_vocab_dict(item) for item in chunk.verb_items],
-        )
         return PersistedContentArtifact(
             lesson_id=chunk.registration.lesson_id,
             created_at=created_at,
             content_path=content_path,
-            vocab_path=vocab_path,
         )

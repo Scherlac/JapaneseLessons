@@ -2,7 +2,7 @@
 
 **Status:** Implemented  
 **Date:** 2026-03-29  
-**Migrated steps:** `retrieve_material`, `generate_sentences`, `grammar_select`, `vocab_enhancement`, `narrative_generator`, `extract_narrative_vocab`, `generate_narrative_vocab`, `select_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`, `register_lesson`, `persist_content`
+**Migrated steps:** `generate_sentences`, `grammar_select`, `vocab_enhancement`, `narrative_generator`, `extract_narrative_vocab`, `select_vocab`, `review_sentences`, `compile_assets`, `compile_touches`, `render_video`, `save_report`, `register_lesson`, `persist_content`
 
 ---
 
@@ -234,7 +234,6 @@ for custom chunk types.
 | Step | Chunk type | Pattern |
 |------|-----------|--------|
 | `generate_sentences` | `BlockChunk` | one LLM call per lesson block |
-| `retrieve_material` | `RetrieveMaterialRequest` | single retrieval query producing a typed retrieval seed artifact |
 | `grammar_select` | `GrammarSelectChunk` | single LLM call + pure post-processing |
 | `vocab_enhancement` | `VocabEnhancementRequest(SelectedVocabSet)` | merged noun/verb enrichment with typed successor artifact |
 | `select_vocab` | `SelectVocabRequest` | single vocab selection pass producing a typed successor artifact |
@@ -320,33 +319,13 @@ extends that artifact so the successor step advertises the dependency in its
 type signature.
 
 ```
-GenerateNarrativeVocabStep
-    Output:        VocabFile
-
 SelectVocabStep
-    Input chunk:   SelectVocabRequest    (VocabFile + narrative plan + curriculum coverage)
+    Input chunk:   SelectVocabRequest    (VocabFile + canonical selection + curriculum coverage)
     Output:        SelectedVocabSet      (vocab + nouns + verbs)
-    Action:        load-or-reuse vocab + select narrative-aware fresh items
+    Action:        load-or-reuse vocab + select fresh items
 
 GrammarSelectStep
     Input chunk:   GrammarSelectChunk    (SelectedVocabSet + grammar progression state)
-```
-
-### `retrieve_material` — alternate early producer of `SelectedVocabSet`
-
-This migrates the retrieval branch into the same action-step pattern and gives
-it a typed output artifact rather than a large opaque context mutation.
-
-`RetrievedMaterialArtifact` extends `VocabEnhancementArtifact`, so the retrieval
-path converges on the same enriched-vocabulary layer used after
-`vocab_enhancement` while also carrying retrieved sentences, grammar, and the
-retrieval trace envelope.
-
-```
-RetrieveLessonMaterialStep
-    Input chunk:   RetrieveMaterialRequest   (theme + query filters + requested language)
-    Output:        RetrievedMaterialArtifact (VocabEnhancementArtifact + retrieved sentences + grammar + trace)
-    Action:        one retrieval query + deterministic coverage gate + item conversion
 ```
 
 ### `compile_touches` — render-side successor artifact (`CompiledItemSequence`)
@@ -474,7 +453,7 @@ RegisterLessonStep
 
 PersistContentStep
     Input chunk:   PersistContentRequest       (LessonRegistrationArtifact + finalized content)
-    Output:        PersistedContentArtifact    (created_at + content_path + vocab_path)
+    Output:        PersistedContentArtifact    (created_at + content_path)
     Action:        one lesson-content write + shared vocab update
 ```
 
@@ -525,9 +504,7 @@ current typed connections.
 | Producing step | Artifact type | Consuming step |
 |----------------|---------------|----------------|
 | `NarrativeGeneratorStep` | `NarrativeFrame` | `ExtractNarrativeVocabStep` |
-| `RetrieveLessonMaterialStep` | `RetrievedMaterialArtifact` (extends `VocabEnhancementArtifact`) | Later generation steps via seeded vocab/sentence/grammar state |
-| `ExtractNarrativeVocabStep` | `NarrativeVocabPlan` | `GenerateNarrativeVocabStep` |
-| `GenerateNarrativeVocabStep` | `VocabFile` (via `SelectVocabRequest`) | `SelectVocabStep` |
+| `ExtractNarrativeVocabStep` | `NarrativeVocabPlan` | `CanonicalVocabSelectStep` |
 | `SelectVocabStep` | `SelectedVocabSet` | `GrammarSelectStep` |
 | `SelectVocabStep` | `SelectedVocabSet` | `VocabEnhancementStep` |
 | `VocabEnhancementStep` | `VocabEnhancementArtifact` | `RegisterLessonStep` |
@@ -614,14 +591,11 @@ Steps ordered by iteration pattern clarity and migration effort.
 | `grammar_select` | `GrammarSelectChunk` | 1 | **done** |
 | `narrative_generator` | `NarrativeGenChunk` | 0–1 | **done** — emits `NarrativeFrame` |
 | `extract_narrative_vocab` | `NarrativeFrame` ← from `narrative_generator` | 1 | **done** — emits `NarrativeVocabPlan` |
-| `generate_narrative_vocab` | `NarrativeVocabPlan` ← from `extract_narrative_vocab` | 1 per batch | **done** — emits `VocabFile` |
 | `review_sentences` | `SentenceReviewBatch(ItemBatch[Sentence])` ← from `generate_sentences` | batched ×30 | **done** — successor step; chunk item type = `Sentence` (output of `NarrativeGrammarStep`) |
 | `register_lesson` | `RegisterLessonRequest` | 1 storage write | **done** — predecessor step; emits `LessonRegistrationArtifact` for later `persist_content` alignment |
 | `compile_assets` | `AssetCompileRequest` | 1 sync/async render call | **done** — predecessor step; emits `CompiledItemSequence` for `compile_touches` |
 | `compile_touches` | `CompiledItemSequence` ← from `compile_assets` | 1 pure transform | **done** — successor step; chunk type wraps predecessor render artifact |
 | `render_video` | `RenderVideoRequest(TouchSequence)` ← from `compile_touches` | 1 sink render call | **done** — successor step; chunk type preserves `TouchSequence` as the predecessor artifact |
 | `save_report` | `SaveReportRequest(RenderedVideoArtifact)` ← from `render_video` | 1 sink write | **done** — successor step; chunk type preserves `RenderedVideoArtifact` as the predecessor artifact |
-| `generate_narrative_vocab` | `ItemBatch[str]` | batched ×60 | not started |
-| `select_vocab` | `SelectVocabRequest` ← from `generate_narrative_vocab` | conditional vocab load + gap-fill | **done** — bridge step; emits `SelectedVocabSet` for `grammar_select` and `vocab_enhancement` |
-| `retrieve_material` | `RetrieveMaterialRequest` | single query | **done** — predecessor step; emits `RetrievedMaterialArtifact` as an alternate early producer of `VocabEnhancementArtifact`-compatible data |
+| `select_vocab` | `SelectVocabRequest` | conditional vocab load + gap-fill | **done** — bridge step; emits `SelectedVocabSet` for `grammar_select` and `vocab_enhancement` |
 | `persist_content` | `PersistContentRequest` ← from `register_lesson` | storage only | **done** — successor step; request preserves `LessonRegistrationArtifact` as the predecessor artifact |

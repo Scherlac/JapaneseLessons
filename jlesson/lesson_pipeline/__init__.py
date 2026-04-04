@@ -1,11 +1,11 @@
 """
 Lesson generation pipeline.
 
-Orchestrates the full lesson workflow through fifteen sequential steps:
+Orchestrates the full lesson workflow through fourteen sequential steps:
 
-    step 1   retrieve_material  — optional retrieval with safe fallback
-    step 2   narrative_generator     — create block-by-block story progression
-    step 3   extract_narrative_vocab — extract block-level vocab targets
+    step 1   narrative_generator     — create block-by-block story progression
+    step 2   extract_narrative_vocab — extract block-level vocab targets
+    step 3   canonical_vocab_select  — choose canonical planning vocab
     step 4   select_vocab            — pick fresh nouns/verbs from the vocab file
     step 5   lesson_planner          — LLM: two-pass lesson outline (grammar + pacing)
     step 6   narrative_grammar       — LLM: produce block-aware practice sentences
@@ -52,7 +52,6 @@ from jlesson.pipeline_steps import (
     PipelineStep,
     RegisterLessonStep,
     RenderVideoStep,
-    RetrieveLessonMaterialStep,
     ReviewSentencesStep,
     SaveReportStep,
     SelectVocabStep,
@@ -66,7 +65,6 @@ from jlesson.runtime import PipelineRuntime
 
 def _build_pipeline() -> list[PipelineStep]:
     return [
-        RetrieveLessonMaterialStep(),
         NarrativeGeneratorStep(),
         ExtractNarrativeVocabStep(),
         CanonicalVocabSelectStep(),
@@ -139,7 +137,6 @@ __all__ = [
     "PipelineStep",
     "RegisterLessonStep",
     "RenderVideoStep",
-    "RetrieveLessonMaterialStep",
     "ReviewSentencesStep",
     "SaveReportStep",
     "SelectVocabStep",

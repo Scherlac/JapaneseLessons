@@ -25,13 +25,6 @@ def resolve_lesson_dir(config, lesson_id: int) -> Path:
     return resolve_lang_dir(config) / config.theme / f"lesson_{lesson_id:03d}"
 
 
-def resolve_vocab_dir(config) -> Path:
-    """Return the shared vocab dir for the language:
-    ``{base}/{language}/vocab/``
-    """
-    return resolve_lang_dir(config) / "vocab"
-
-
 def resolve_output_dir(config) -> Path:
     """Return the language-level output dir ``{base}/{language}/``.
 

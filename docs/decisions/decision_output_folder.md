@@ -75,37 +75,10 @@ No other module constructs output paths independently.
 ```python
 resolve_lang_dir(config)              # output/{language}/
 resolve_lesson_dir(config, lesson_id) # output/{language}/{theme}/lesson_{id:03d}/
-resolve_vocab_dir(config)             # output/{language}/vocab/
 ```
 
 `resolve_output_dir` is retained as a backward-compatibility shim that delegates to
 `resolve_lang_dir`.
-
----
-
-## Shared Vocab File
-
-`output/{language}/vocab/{theme}.json` accumulates all vocabulary seen across every
-lesson run for a given language+theme combination. It is written by
-`lesson_store.save_shared_vocab()` as a side-effect of `PersistContentStep`.
-
-Deduplication key: `"english"` field. New entries are appended; existing entries are
-never modified. This makes the file suitable for Anki deck building and curriculum
-review across all lessons in a theme.
-
-```json
-{
-  "theme": "totoro",
-  "nouns": [
-    { "english": "forest", "japanese": "もり", "kanji": "森", "romaji": "mori" },
-    ...
-  ],
-  "verbs": [
-    { "english": "to walk", "japanese": "あるく", "kanji": "歩く", "masu_form": "歩きます" },
-    ...
-  ]
-}
-```
 
 ---
 

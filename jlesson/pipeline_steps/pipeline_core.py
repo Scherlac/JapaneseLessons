@@ -11,7 +11,6 @@ from jlesson.lesson_report import ReportBuilder
 from jlesson.models import CompiledItem, GeneralItem, GrammarItem, NarrativeVocabBlock, Sentence, Touch, VocabFile
 from jlesson.models import CanonicalItem
 from jlesson.curriculum import CurriculumData
-from jlesson.retrieval import RetrievalResult
 from jlesson.runtime.interfaces import RuntimeServices
 from jlesson.curriculum import create_curriculum
 
@@ -96,7 +95,6 @@ class LessonContext:
     video_path: Path | None = None
     report_path: Path | None = None
     language_config: LanguageConfig | None = None
-    retrieval_result: RetrievalResult | None = None
     pipeline_started_at: str = ""
     completed_steps: list[str] = field(default_factory=list)
     step_timings: dict[str, float] = field(default_factory=dict)
@@ -316,27 +314,6 @@ class VocabEnhancementArtifact(SelectedVocabSet):
     verb_items: list[GeneralItem]
 
 
-@dataclass
-class RetrievedMaterialArtifact(VocabEnhancementArtifact):
-    """Typed output of ``RetrieveLessonMaterialStep``.
-
-    Retrieval is an alternate early producer of lesson vocab and other seed
-    material. This artifact intentionally extends
-    ``VocabEnhancementArtifact`` so the retrieval path converges on the same
-    successor-side enriched vocabulary layer that later generation steps use.
-
-    Context fields: ``LessonContext.retrieval_result``, ``LessonContext.nouns``,
-    ``LessonContext.verbs``, ``LessonContext.noun_items``,
-    ``LessonContext.verb_items``, ``LessonContext.sentences``,
-    ``LessonContext.selected_grammar``
-    """
-
-    sentences: list[Sentence]
-    selected_grammar: list[GrammarItem]
-    retrieval_result: RetrievalResult
-    selected_grammar_blocks: list[list[GrammarItem]] = field(default_factory=list)
-
-
 # ---------------------------------------------------------------------------
 # Render inter-step typed artifacts
 # ---------------------------------------------------------------------------
@@ -432,7 +409,6 @@ class PersistedContentArtifact:
     lesson_id: int
     created_at: str
     content_path: Path | None
-    vocab_path: Path | None = None
 
 
 # ---------------------------------------------------------------------------
