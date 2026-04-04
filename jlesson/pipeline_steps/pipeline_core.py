@@ -262,7 +262,8 @@ class LessonPlan:
     refactors a concrete artifact to work with instead of relying only on
     ``LessonContext.lesson_plan``.
     """
-
+    theme: str
+    lesson_number: int
     blocks: list[LessonBlock]
 
 

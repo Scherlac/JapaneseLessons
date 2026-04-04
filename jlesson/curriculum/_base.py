@@ -31,8 +31,9 @@ class LessonRecord(BaseModel):
     id: int
     title: str
     theme: str
-    nouns: list[str]
-    verbs: list[str]
+    nouns: dict[str, str]
+    verbs: dict[str, str]
+    adjectives: dict[str, str]
     grammar_ids: list[str]
     items_count: int = 0
     status: str = "draft"
@@ -89,8 +90,9 @@ def add_lesson(
     *,
     title: str,
     theme: str,
-    nouns: list[str],
-    verbs: list[str],
+    nouns: dict[str, str],
+    verbs: dict[str, str],
+    adjectives: dict[str, str],
     grammar_ids: list[str],
     items_count: int = 0,
     status: str = "draft",
@@ -104,9 +106,10 @@ def add_lesson(
         id=next_id,
         title=title,
         theme=theme,
-        nouns=list(nouns),
-        verbs=list(verbs),
-        grammar_ids=list(grammar_ids),
+        nouns=nouns
+        verbs=verbs,
+        adjectives=adjectives,
+        grammar_ids=grammar_ids,
         items_count=items_count,
         status=status,
         created_at=_now(),
@@ -121,8 +124,9 @@ def replace_lesson(
     lesson_id: int,
     title: str,
     theme: str,
-    nouns: list[str],
-    verbs: list[str],
+    nouns: dict[str, str],
+    verbs: dict[str, str],
+    adjectives: dict[str, str],
     grammar_ids: list[str],
     items_count: int = 0,
     status: str = "draft",
@@ -131,9 +135,10 @@ def replace_lesson(
     lesson = _get_lesson(curriculum, lesson_id)
     lesson.title = title
     lesson.theme = theme
-    lesson.nouns = list(nouns)
-    lesson.verbs = list(verbs)
-    lesson.grammar_ids = list(grammar_ids)
+    lesson.nouns = nouns
+    lesson.verbs = verbs
+    lesson.adjectives = adjectives
+    lesson.grammar_ids = grammar_ids
     lesson.items_count = items_count
     lesson.status = status
     lesson.created_at = _now()
@@ -145,6 +150,7 @@ def recompute_coverage(curriculum: CurriculumData) -> None:
     """Rebuild covered vocab/grammar trackers from completed lessons."""
     covered_nouns: set[str] = set()
     covered_verbs: set[str] = set()
+    covered_adjectives: set[str] = set()
     covered_grammar: set[str] = set()
 
     for lesson in curriculum.lessons:
@@ -152,10 +158,12 @@ def recompute_coverage(curriculum: CurriculumData) -> None:
             continue
         covered_nouns.update(lesson.nouns)
         covered_verbs.update(lesson.verbs)
+        covered_adjectives.update(lesson.adjectives)
         covered_grammar.update(lesson.grammar_ids)
 
     curriculum.covered_nouns = sorted(covered_nouns)
     curriculum.covered_verbs = sorted(covered_verbs)
+    curriculum.covered_adjectives = sorted(covered_adjectives)
     curriculum.covered_grammar_ids = sorted(covered_grammar)
 
 

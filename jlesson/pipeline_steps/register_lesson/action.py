@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pydantic import BaseModel
 
 from jlesson.curriculum import add_lesson, complete_lesson, replace_lesson
-from jlesson.models import GeneralItem, LessonPlan
+from jlesson.models import GeneralItem, GeneralItem, Phase, Sentence
 
-from ..pipeline_core import ActionConfig, LessonRegistrationArtifact, StepAction
+from ..pipeline_core import ActionConfig, LessonRegistrationArtifact, StepAction, LessonPlan
 
 
 @dataclass
@@ -32,9 +33,10 @@ class RegisterLessonAction(StepAction[LessonPlan, BaseModel]):
         regenerate_lesson_id = config.lesson.regenerate_lesson_id
         vocab_kwargs = dict(
             theme=input.theme,
-            nouns=[item.source.display_text for item in input.nouns],
-            verbs=[item.source.display_text for item in input.verbs],
-            grammar_ids=input.grammar_ids,
+            nouns={item.canonical.id: item.canonical.text for blocks in input.blocks for item in blocks.content_sequences[Phase.NOUNS]},
+            verbs={item.canonical.id: item.canonical.text for blocks in input.blocks for item in blocks.content_sequences[Phase.VERBS]},
+            adjectives={item.canonical.id: item.canonical.text for blocks in input.blocks for item in blocks.content_sequences[Phase.ADJECTIVES]},
+            grammar_ids=[grammar_id for blocks in input.blocks for grammar_id in blocks.grammar_ids],
             items_count=input.items_count,
         )
         if regenerate_lesson_id is None:
