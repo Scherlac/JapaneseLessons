@@ -13,6 +13,7 @@ from __future__ import annotations
 from enum import Enum
 import hashlib
 from random import random, sample
+from typing import ClassVar
 import re
 
 from pathlib import Path
@@ -86,8 +87,8 @@ class CanonicalItem(BaseModel):
             """A brief gloss to disambiguate the meaning when the same surface form has multiple 
             senses, e.g. 'bank (river)' vs. 'bank (finance)'."""))
     
-    SLUG_FILTER_REGEX: str = r'[^\w]+'
-    COMPILED_SLUG_FILTER_REGEX = re.compile(SLUG_FILTER_REGEX)
+    COMPILED_SLUG_FILTER_REGEX: ClassVar[re.Pattern] = re.compile(r'[^\w\s]+')
+    COMPILED_SLUG_WHITESPACE_REGEX: ClassVar[re.Pattern] = re.compile(r'[\s]+')
 
     @staticmethod
     def update_item(item: CanonicalItem, phase: Phase) -> None:
@@ -95,8 +96,11 @@ class CanonicalItem(BaseModel):
         # Generate a stable ID based on the text, gloss, and phase
         item.type = phase
         
-        slug_text = CanonicalItem.COMPILED_SLUG_FILTER_REGEX.sub("_", item.text.lower().strip())
-        slug_gloss = CanonicalItem.COMPILED_SLUG_FILTER_REGEX.sub("_", item.gloss.lower().strip())
+        slug_text = CanonicalItem.COMPILED_SLUG_FILTER_REGEX.sub("", item.text.lower().strip())
+        slug_text = CanonicalItem.COMPILED_SLUG_WHITESPACE_REGEX.sub("_", slug_text)
+        slug_gloss = CanonicalItem.COMPILED_SLUG_FILTER_REGEX.sub("", item.gloss.lower().strip())
+        slug_gloss = CanonicalItem.COMPILED_SLUG_WHITESPACE_REGEX.sub("_", slug_gloss)
+        
         hash_input = f"{phase.value}_{slug_text}_{slug_gloss}"
 
         gloss_hash = hashlib.sha1(hash_input.encode()).hexdigest()

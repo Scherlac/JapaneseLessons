@@ -34,34 +34,56 @@ from .profiles import Profile
 # ---------------------------------------------------------------------------
 
 
+def _asset_stem(item: GeneralItem, lang_cfg: LanguageConfig | None) -> str:
+    """Return a stable filename stem for *item* based on canonical id."""
+    canonical_id = (item.canonical.id if item.canonical else "") or ""
+    if canonical_id:
+        return canonical_id
+    # Fallback: derive from display text if id not yet populated
+    text = (item.canonical.text if item.canonical else "") or ""
+    return text.lower().replace(" ", "_")[:40] or "item"
+
+
+def _lang_codes(lang_cfg: LanguageConfig | None) -> tuple[str, str]:
+    """Return (source_code, target_code) from *lang_cfg*, defaulting to 'src'/'tar'."""
+    if lang_cfg is None:
+        return "src", "tar"
+    return lang_cfg.source.code, lang_cfg.target.code
+
+
 def _render_item_cards(
     item: GeneralItem,
     required: set[str],
     cards_dir: Path,
-    item_index: int,
-    renderer : CardRenderer,
-    lang_cfg: LanguageConfig | None =None,
+    renderer: CardRenderer,
+    lang_cfg: LanguageConfig | None = None,
 ) -> None:
     """Render the card images needed for *item* and update item's assets.
 
-    When *lang_cfg* is provided its :class:`~jlesson.language_config.FieldMap`
-    is used for language-agnostic text extraction and the correct card renderer
-    method is selected for the language.  Falls back to the Japanese-specific
-    renderer methods when *lang_cfg* is ``None``.
+    Filenames use the canonical item id + language codes so that each item
+    across all blocks gets a unique, stable path, e.g.:
+      nouns_house_08c6b0_card_en_ja.png
     """
+    stem = _asset_stem(item, lang_cfg)
+    src_code, tar_code = _lang_codes(lang_cfg)
+
+    _CARD_FILENAME: dict[str, str] = {
+        "card_src": f"{stem}_card_{src_code}.png",
+        "card_tar": f"{stem}_card_{tar_code}.png",
+        "card_src_tar": f"{stem}_card_{src_code}_{tar_code}.png",
+    }
 
     for asset_key in required:
-        if not asset_key.startswith("card_"):
+        if asset_key not in _CARD_FILENAME:
             continue
-        suffix = asset_key.split('_', 1)[1]  # src, tar, src_tar
-        path = cards_dir / f"{item_index:03d}_{suffix}.png"
+        path = cards_dir / _CARD_FILENAME[asset_key]
         card = renderer.render_card(
             item=item,
-            touch=None,  # Touch-specific details are not needed for static card rendering
+            touch=None,
             lang_cfg=lang_cfg,
         )
         renderer.save_card(card, path)
-        if "src" in asset_key and asset_key != "card_src_tar":
+        if asset_key == "card_src":
             item.source.assets[asset_key] = path
         else:
             item.target.assets[asset_key] = path
@@ -76,9 +98,8 @@ async def _render_item_audio(
     item: GeneralItem,
     required: set[str],
     audio_dir: Path,
-    item_index: int,
     create_engine_fn,
-    lang_cfg: LanguageConfig | None =None,
+    lang_cfg: LanguageConfig | None = None,
 ) -> None:
     """Generate TTS audio files needed for *item* and update item's assets.
 
@@ -103,11 +124,19 @@ async def _render_item_audio(
         "audio_tar_m": (lang_cfg.target_voice_male, target_text),
     }
 
+    stem = _asset_stem(item, lang_cfg)
+    src_code, tar_code = _lang_codes(lang_cfg)
+    _AUDIO_FILENAME: dict[str, str] = {
+        "audio_src": f"{stem}_audio_{src_code}.mp3",
+        "audio_tar_f": f"{stem}_audio_{tar_code}_f.mp3",
+        "audio_tar_m": f"{stem}_audio_{tar_code}_m.mp3",
+    }
+
     for asset_key, (voice_key, text) in voice_map.items():
         if asset_key not in required or not text or not voice_key:
             continue
         engine = create_engine_fn(lang_cfg.voices.get(voice_key, voice_key), rate="-20%")
-        path = audio_dir / f"{item_index:03d}_{asset_key}.mp3"
+        path = audio_dir / _AUDIO_FILENAME.get(asset_key, f"{stem}_{asset_key}.mp3")
         for attempt in range(3):
             try:
                 await engine.generate_audio(text, path)
@@ -165,16 +194,13 @@ def compile_assets_sync(
     cards_dir = output_dir / "cards"
     cards_dir.mkdir(parents=True, exist_ok=True)
 
-    item_index = 0
-
     for phase in (Phase.NOUNS, Phase.VERBS, Phase.GRAMMAR):
         items = items_by_phase.get(phase, [])
         required = profile.required_assets(phase)
 
         for item in items:
-            item_index += 1
             _render_item_cards(
-                item, required, cards_dir, item_index, renderer, lang_cfg=lang_cfg,
+                item, required, cards_dir, renderer, lang_cfg=lang_cfg,
             )
             compiled_item = item.model_copy()
             compiled_item.phase = phase
@@ -188,7 +214,7 @@ async def compile_assets(
     output_dir: Path | None = None,
     renderer=None,
     create_engine_fn=None,
-    lang_cfg: LanguageConfig | None =None,
+    lang_cfg: LanguageConfig | None = None,
 ) -> dict[Phase, list[GeneralItem]]:
     """Full asset compilation: card images + TTS audio.
 
@@ -217,21 +243,17 @@ async def compile_assets(
     cards_dir.mkdir(parents=True, exist_ok=True)
     audio_dir.mkdir(parents=True, exist_ok=True)
 
-    item_index = 0
-
     for phase in (Phase.NOUNS, Phase.VERBS, Phase.GRAMMAR):
         items = items_by_phase.get(phase, [])
         required = profile.required_assets(phase)
 
         for item in items:
-            item_index += 1
-
             _render_item_cards(
-                item, required, cards_dir, item_index, renderer, lang_cfg=lang_cfg,
+                item, required, cards_dir, renderer, lang_cfg=lang_cfg,
             )
 
             await _render_item_audio(
-                item, required, audio_dir, item_index, create_engine_fn,
+                item, required, audio_dir, create_engine_fn,
                 lang_cfg=lang_cfg,
             )
 
