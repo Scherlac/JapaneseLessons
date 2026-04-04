@@ -157,7 +157,8 @@ def build_lesson_plan_prompt(
     dynamic_item_counts_str = ", ".join(
         f"{PHASE_PARSE_DETAILS[phase]['name'].capitalize()}s: {content_counts.get(phase, 0)}"
         for phase in Phase
-        if PHASE_PARSE_DETAILS[phase]["is_vocab"]
+        if ( content_counts.get(phase, 0) > 0 
+            and PHASE_PARSE_DETAILS[phase]["is_vocab"] )
     )
     dynamic_vocab_str = "\n".join(
         f"  - {PHASE_PARSE_DETAILS[phase]['name'].capitalize()}s:\n"
@@ -166,12 +167,14 @@ def build_lesson_plan_prompt(
             for item in content_sequences.get(phase, [])
         )
         for phase in Phase
-        if PHASE_PARSE_DETAILS[phase]["is_vocab"]
+        if (content_counts.get(phase, 0) > 0 
+            and PHASE_PARSE_DETAILS[phase]["is_vocab"] )
     )
 
     dynamic_json_template_example = ",\n      ".join(
         PHASE_PARSE_DETAILS[phase]["json_template_example"]
         for phase in Phase
+        if content_counts.get(phase, 0) > 0
     )
 
     dynamic_json_item_list = ", ".join(

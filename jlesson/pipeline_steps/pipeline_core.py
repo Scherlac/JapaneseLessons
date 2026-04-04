@@ -222,7 +222,7 @@ class CanonicalLessonBlock(BaseModel):
     theme: str
     lesson_number: int
     block_index: int = Field(default=0, description="The 0-based index of this block within the lesson.")
-    narrative: NarrativeBlock = Field(default_factory=EmptyNarrativeBlock, description="The narrative content for this block.")
+    narrative: NarrativeBlock = Field(default_factory=lambda: NarrativeBlock(narrative="", alignment_notes="", sentiment=""), description="The narrative content for this block.")
     grammar_ids: list[str]
     content_sequences: dict[Phase, list[CanonicalItem]]
 

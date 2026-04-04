@@ -27,18 +27,7 @@ from .prompt import GrammarCoverageInfo, build_lesson_plan_prompt
 
 
 # test run:
-#  conda activate base; jlesson lesson add --theme totoro --nouns 1 --verbs 1 --sentences 1 --grammar-points 3 --grammar-points-per-block 2 --blocks 5 --curriculum output/review_totoro/curriculum.json --output-dir output/review_totoro --no-retrieval --narrative-file .\narrative_totoro.txt
-
-@dataclass
-class LessonBlockConfig:
-    """All data the cononical planner needs for one planning call."""
-
-    block_index: int
-    lesson_number: int
-    lesson_blocks: int
-    narrative_blocks: List[str]
-    covered_grammar_ids: List[str]
-    covered_grammar: List[GrammarCoverageInfo]
+#  conda activate base; jlesson lesson add --theme totoro --nouns 1 --verbs 1 --sentences 1 --grammar-points 3 --grammar-points-per-block 2 --blocks 5 --curriculum output/review_totoro/curriculum.json --output-dir output/review_totoro --narrative-file .\narrative_totoro.txt
 
 
 CanonicalPlannerOutput = List[CanonicalLessonBlock | None]
@@ -164,6 +153,8 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
             content_sequences = {}
             # using PHASE_PARSE_DETAILS
             for phase in Phase:
+                if phase not in PHASE_PARSE_DETAILS:
+                    continue
                 items_raw = block_raw.get(PHASE_PARSE_DETAILS[phase]["field"], [])
                 # vocab items has vocab and gloss 
                 if PHASE_PARSE_DETAILS[phase]["is_vocab"]:
