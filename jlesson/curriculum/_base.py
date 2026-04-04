@@ -50,6 +50,7 @@ class CurriculumData(BaseModel):
     lessons: list[LessonRecord] = Field(default_factory=list)
     covered_nouns: list[str] = Field(default_factory=list)
     covered_verbs: list[str] = Field(default_factory=list)
+    covered_adjectives: list[str] = Field(default_factory=list)
     covered_grammar_ids: list[str] = Field(default_factory=list)
 
 

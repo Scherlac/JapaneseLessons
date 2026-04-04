@@ -21,9 +21,9 @@ class CompileAssetsStep(ActionStep[LessonBlock, LessonBlock]):
 
     def should_skip(self, ctx: LessonContext) -> bool:
         if ctx.lesson_plan is None:
-            self._log(ctx, "       no lesson plan — cannot compile assets")
-            return False
-        return True
+            self._log(ctx, "       no lesson plan — skipping compile_assets")
+            return True
+        return False
 
     def build_input_list(self, ctx: LessonContext) -> list[LessonBlock]:
         items_by_phase = ctx.lesson_plan.blocks
@@ -37,8 +37,15 @@ class CompileAssetsStep(ActionStep[LessonBlock, LessonBlock]):
         return items_by_phase
 
     def merge_output_list(self, ctx: LessonContext, outputs: list[LessonBlock]) -> LessonContext:
-        items_by_phase = ctx.lesson_plan.blocks
-        total_items = sum(len(seq_list) for items in items_by_phase for seq_list in items.content_sequences.values())
-
+        ctx.lesson_plan = LessonPlan(
+            theme=ctx.lesson_plan.theme,
+            lesson_number=ctx.lesson_plan.lesson_number,
+            blocks=outputs,
+        )
+        total_items = sum(
+            len(seq_list)
+            for block in outputs
+            for seq_list in block.content_sequences.values()
+        )
         self._log(ctx, f"       {total_items} compiled items")
         return ctx
