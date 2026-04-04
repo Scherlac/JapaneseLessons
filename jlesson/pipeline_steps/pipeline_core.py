@@ -91,6 +91,10 @@ class LessonContext:
     rendered_video: RenderedVideoArtifact | None = None
     saved_report: ReportArtifact | None = None
 
+    # Registration artifacts — populated by RegisterLessonStep
+    lesson_id: int | None = None
+    created_at: str | None = None
+
 class PipelineStep(ABC):
     """Abstract base class for pipeline steps."""
 
@@ -244,7 +248,7 @@ class LessonBlock(BaseModel):
     """
 
     block_index: int = Field(default=0, description="The 0-based index of this block within the lesson.")
-    
+    grammar_ids: list[str] = Field(default_factory=list, description="Grammar point IDs for this block, copied from the canonical plan.")
     content_sequences: dict[Phase, list[GeneralItem]] = Field(default_factory=dict, 
         description=(
         """The core content items for this block, organized by lesson phase (nouns, verbs
@@ -265,6 +269,33 @@ class LessonPlan:
     theme: str
     lesson_number: int
     blocks: list[LessonBlock]
+
+    @property
+    def grammar_ids(self) -> list[str]:
+        """Deduplicated grammar IDs across all blocks, preserving order."""
+        seen: set[str] = set()
+        result: list[str] = []
+        for block in self.blocks:
+            for gid in block.grammar_ids:
+                if gid not in seen:
+                    seen.add(gid)
+                    result.append(gid)
+        return result
+
+    @property
+    def block_grammar_ids(self) -> list[list[str]]:
+        """Per-block grammar ID lists."""
+        return [block.grammar_ids for block in self.blocks]
+
+    @property
+    def items_count(self) -> int:
+        """Total noun + verb item count across all blocks."""
+        count = 0
+        for block in self.blocks:
+            for phase, items in block.content_sequences.items():
+                if phase in (Phase.NOUNS, Phase.VERBS):
+                    count += len(items)
+        return count
 
 
 # ---------------------------------------------------------------------------
@@ -334,9 +365,7 @@ class LessonRegistrationArtifact:
     """Typed output of ``RegisterLessonStep``.
 
     This is the storage-side handoff artifact produced before lesson-content
-    persistence. A later ``PersistContentStep`` migration can consume this
-    artifact instead of relying only on ``lesson_id`` and ``created_at`` on the
-    shared context.
+    persistence. 
 
     Context fields: ``LessonContext.lesson_id``, ``LessonContext.created_at``
     """
@@ -346,22 +375,6 @@ class LessonRegistrationArtifact:
     curriculum: CurriculumData
     header_markdown: str
 
-
-@dataclass
-class PersistedContentArtifact:
-    """Typed output of ``PersistContentStep``.
-
-    This is the storage-side persistence result produced after lesson
-    registration. It keeps the content-write boundary explicit and gives later
-    successor-oriented refactors a concrete artifact instead of relying only on
-    ``LessonContext.content_path``.
-
-    Context field: ``LessonContext.content_path``
-    """
-
-    lesson_id: int
-    created_at: str
-    content_path: Path | None
 
 
 # ---------------------------------------------------------------------------

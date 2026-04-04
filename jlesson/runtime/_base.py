@@ -5,10 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from jlesson.curriculum import load_curriculum, save_curriculum
-from jlesson.lesson_store import load_lesson_content, save_lesson_content
 from jlesson.llm_cache import ask_llm_cached
 from jlesson.llm_client import ask_llm_json_free
-from jlesson.models import LessonContent
 from jlesson.retrieval import get_retrieval_service
 from jlesson.vocab_generator import generate_vocab, VOCAB_DIR
 
@@ -91,22 +89,6 @@ class ContextRuntime:
 
     def update_retrieval(self, theme: str, items: list[Any]) -> None:
         raise NotImplementedError("update_retrieval not yet migrated to ContextRuntime")
-
-    # ── Lesson content storage ────────────────────────────────────────────────
-
-    def read_content(self, lesson_id: int) -> dict[str, Any]:
-        from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
-
-        lesson_dir = resolve_lesson_dir(self._ctx.config, lesson_id)
-        content = load_lesson_content(lesson_id, lesson_dir)
-        return content.model_dump(mode="json", exclude_none=True)
-
-    def write_content(self, lesson_id: int, data: dict[str, Any]) -> Path:
-        from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
-
-        lesson_dir = resolve_lesson_dir(self._ctx.config, lesson_id)
-        content = LessonContent.model_validate(data)
-        return save_lesson_content(content, lesson_dir)
 
     # ── Curriculum storage ────────────────────────────────────────────────────
 

@@ -33,9 +33,9 @@ class RegisterLessonAction(StepAction[LessonPlan, BaseModel]):
         regenerate_lesson_id = config.lesson.regenerate_lesson_id
         vocab_kwargs = dict(
             theme=input.theme,
-            nouns={item.canonical.id: item.canonical.text for blocks in input.blocks for item in blocks.content_sequences[Phase.NOUNS]},
-            verbs={item.canonical.id: item.canonical.text for blocks in input.blocks for item in blocks.content_sequences[Phase.VERBS]},
-            adjectives={item.canonical.id: item.canonical.text for blocks in input.blocks for item in blocks.content_sequences[Phase.ADJECTIVES]},
+            nouns={item.canonical.id: item.canonical.text for blocks in input.blocks for item in blocks.content_sequences.get(Phase.NOUNS, [])},
+            verbs={item.canonical.id: item.canonical.text for blocks in input.blocks for item in blocks.content_sequences.get(Phase.VERBS, [])},
+            adjectives={item.canonical.id: item.canonical.text for blocks in input.blocks for item in blocks.content_sequences.get(Phase.ADJECTIVES, [])},
             grammar_ids=[grammar_id for blocks in input.blocks for grammar_id in blocks.grammar_ids],
             items_count=input.items_count,
         )

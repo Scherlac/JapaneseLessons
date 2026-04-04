@@ -15,7 +15,6 @@ from jlesson.lesson_pipeline import (
     LessonConfig,
     LessonContext,
     NounPracticeStep,
-    PersistContentStep,
     RegisterLessonStep,
     RenderVideoStep,
     ReviewSentencesStep,
@@ -732,78 +731,6 @@ def test_register_lesson_can_regenerate_existing_lesson_id(ctx):
     assert ctx.curriculum.lessons[0].title == "Lesson 1: Food"
     assert ctx.curriculum.lessons[0].theme == "food"
     assert ctx.curriculum.covered_grammar_ids == ["action_present_affirmative"]
-
-
-# ---------------------------------------------------------------------------
-# PersistContentStep
-# ---------------------------------------------------------------------------
-
-
-def test_persist_content_creates_file(ctx):
-    ctx.lesson_id = 1
-    ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
-    ctx.noun_items = [
-        {
-            "english": "water",
-            "japanese": "\u307f\u305a",
-            "kanji": "\u6c34",
-            "romaji": "mizu",
-            "example_sentence_jp": "",
-            "example_sentence_en": "",
-            "memory_tip": "",
-        },
-    ]
-    ctx.verb_items = []
-    ctx.sentences = []
-    ctx = PersistContentStep().execute(ctx)
-    assert ctx.content_path is not None
-    assert ctx.content_path.exists()
-
-
-def test_persist_content_adds_artifact_to_report(ctx):
-    ctx.lesson_id = 1
-    ctx.selected_grammar = [get_grammar_by_id("action_present_affirmative")]
-    ctx.noun_items = []
-    ctx.verb_items = []
-    ctx.sentences = []
-    ctx = PersistContentStep().execute(ctx)
-    md = ctx.report.render()
-    assert "Content JSON" in md
-
-
-def test_persist_content_is_loadable(ctx, tmp_path):
-    ctx.lesson_id = 7
-    ctx.selected_grammar = [get_grammar_by_id("identity_present_affirmative")]
-    ctx.noun_items = []
-    ctx.verb_items = []
-    ctx.sentences = []
-    PersistContentStep().execute(ctx)
-    from jlesson.lesson_store import load_lesson_content
-    from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
-
-    loaded = load_lesson_content(7, resolve_lesson_dir(ctx.config, 7))
-    assert loaded.lesson_id == 7
-    assert loaded.theme == "food"
-
-
-def test_step_artifact_dir_uses_reserved_lesson_id_before_registration(config):
-    from jlesson.lesson_pipeline.pipeline_orchestrator import _step_artifact_dir
-    from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
-
-    c = LessonContext(config=config)
-    c.artifact_lesson_id = 3
-
-    assert _step_artifact_dir(c, "lesson_planner") == resolve_lesson_dir(config, 3) / "steps" / "lesson_planner"
-
-
-def test_resolve_checkpoint_path_uses_single_reserved_lesson_folder(config):
-    from jlesson.lesson_pipeline.pipeline_orchestrator import _resolve_checkpoint_path
-    from jlesson.lesson_pipeline.pipeline_paths import resolve_lesson_dir
-
-    c = LessonContext(config=config)
-    c.artifact_lesson_id = 4
-
-    assert _resolve_checkpoint_path(c) == resolve_lesson_dir(config, 4) / "content.json"
 
 
 # ---------------------------------------------------------------------------

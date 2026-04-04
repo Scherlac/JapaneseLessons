@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from pydantic.v1 import BaseModel
-
 from .action import RegisterLessonAction, RegisterLessonRequest
 from ..pipeline_core import ActionStep, LessonContext, LessonPlan, LessonRegistrationArtifact
 
 
-class RegisterLessonStep(ActionStep[LessonPlan, BaseModel]):
+class RegisterLessonStep(ActionStep[LessonPlan, LessonRegistrationArtifact]):
     """Step 7 — Register and complete the lesson in curriculum.json."""
 
     name = "register_lesson"
@@ -18,12 +16,14 @@ class RegisterLessonStep(ActionStep[LessonPlan, BaseModel]):
         return self._action
 
     def should_skip(self, ctx: LessonContext) -> bool:
-        if ctx.lesson_plan is None:
-            return False
-        return True
+        return ctx.lesson_id is not None
 
     def build_input(self, ctx: LessonContext) -> LessonPlan:
         return ctx.lesson_plan
     
-    def merge_output(self, ctx: LessonContext, outputs: BaseModel) -> LessonContext:
+    def merge_output(self, ctx: LessonContext, outputs: LessonRegistrationArtifact) -> LessonContext:
+        ctx.lesson_id = outputs.lesson_id
+        ctx.created_at = outputs.created_at
+        ctx.curriculum = outputs.curriculum
+        self._log(ctx, f"       lesson_id={outputs.lesson_id}, created_at={outputs.created_at}")
         return ctx

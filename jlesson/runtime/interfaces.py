@@ -58,16 +58,6 @@ class RuntimeServices(Protocol):
         ...
 
 
-    # ── Lesson content storage ────────────────────────────────────────────────
-
-    def read_content(self, lesson_id: int) -> dict[str, Any]:
-        """Load a persisted lesson content JSON by *lesson_id*."""
-        ...
-
-    def write_content(self, lesson_id: int, data: dict[str, Any]) -> Path:
-        """Persist lesson content *data* for *lesson_id* and return the file path."""
-        ...
-
     # ── Curriculum storage ────────────────────────────────────────────────────
 
     def read_curriculum(self) -> CurriculumData:

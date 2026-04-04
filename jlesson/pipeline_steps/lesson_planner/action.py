@@ -85,5 +85,6 @@ class LessonPlannerAction(StepAction[CanonicalLessonBlock, LessonBlock]):
 
         return LessonBlock(
             block_index=canonical_block.block_index,
+            grammar_ids=list(canonical_block.grammar_ids),
             content_sequences=content_sequences,
         )
