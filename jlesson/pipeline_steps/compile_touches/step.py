@@ -23,7 +23,7 @@ class CompileTouchesStep(ActionStep[CompiledItemSequence, TouchSequence]):
 
     def merge_outputs(self, ctx: LessonContext, outputs: list[TouchSequence]) -> LessonContext:
         result = outputs[-1] if outputs else TouchSequence(items=[])
-        ctx.touches = result.items
+        ctx.touch_sequence = result
         self._log(
             ctx,
             f"       {len(ctx.touches)} touches "

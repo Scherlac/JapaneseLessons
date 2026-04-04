@@ -56,6 +56,7 @@ class PersistContentStep(ActionStep[PersistContentRequest, PersistedContentArtif
 
     def merge_outputs(self, ctx: LessonContext, outputs: list[PersistedContentArtifact]) -> LessonContext:
         result = outputs[-1]
+        ctx.persisted_content = result
         ctx.created_at = result.created_at
         ctx.content_path = result.content_path
         if result.content_path is not None:

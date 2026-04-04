@@ -48,31 +48,41 @@ class VocabEnhancementStep(ActionStep[VocabEnhancementRequest, VocabEnhancementA
         tgt_lbl = ctx.language_config.target_label
         ph_lbl = ctx.language_config.phonetic_label
         has_phonetic = bool(ph_lbl)
+        noun_items = list(ctx.noun_items)
+        verb_items = list(ctx.verb_items)
 
         if "nouns" in pending_parts:
-            ctx.noun_items = list(result.noun_items)
-            for index, item in enumerate(ctx.noun_items):
+            noun_items = list(result.noun_items)
+            for index, item in enumerate(noun_items):
                 item.phase = Phase.NOUNS
                 item.block_index = index // max(1, ctx.config.num_nouns) + 1
-            self._log(ctx, f"       {len(ctx.noun_items)} noun items")
-            ctx.report.add("vocabulary", self._noun_vocab_table(ctx.noun_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic))
-            ctx.report.add("noun_practice", self._noun_practice_section(ctx.noun_items, tgt_lbl, ph_lbl))
+            self._log(ctx, f"       {len(noun_items)} noun items")
+            ctx.report.add("vocabulary", self._noun_vocab_table(noun_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic))
+            ctx.report.add("noun_practice", self._noun_practice_section(noun_items, tgt_lbl, ph_lbl))
 
         if "verbs" in pending_parts:
-            ctx.verb_items = list(result.verb_items)
-            for index, item in enumerate(ctx.verb_items):
+            verb_items = list(result.verb_items)
+            for index, item in enumerate(verb_items):
                 item.phase = Phase.VERBS
                 item.block_index = index // max(1, ctx.config.num_verbs) + 1
-            self._log(ctx, f"       {len(ctx.verb_items)} verb items")
+            self._log(ctx, f"       {len(verb_items)} verb items")
             special_labels = ctx.language_config.target_special_labels
             ctx.report.add(
                 "vocabulary",
-                self._verb_vocab_table(ctx.verb_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic, special_labels),
+                self._verb_vocab_table(verb_items, src_lbl, tgt_lbl, ph_lbl, has_phonetic, special_labels),
             )
             ctx.report.add(
                 "verb_practice",
-                self._verb_practice_section(ctx.verb_items, tgt_lbl, ph_lbl, special_labels),
+                self._verb_practice_section(verb_items, tgt_lbl, ph_lbl, special_labels),
             )
+
+        ctx.vocab_enhancement = VocabEnhancementArtifact(
+            vocab=result.vocab,
+            nouns=list(result.nouns),
+            verbs=list(result.verbs),
+            noun_items=noun_items,
+            verb_items=verb_items,
+        )
 
         return ctx
 

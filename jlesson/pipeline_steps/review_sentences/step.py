@@ -72,7 +72,7 @@ class ReviewSentencesStep(ActionStep[SentenceReviewBatch, SentenceReviewResult])
     def merge_outputs(
         self, ctx: LessonContext, outputs: list[SentenceReviewResult]
     ) -> LessonContext:
-        ctx.sentences = [sentence for result in outputs for sentence in result.sentences]
+        ctx.review_results = outputs
 
         all_reviews: list[dict] = []
         total_revised = 0

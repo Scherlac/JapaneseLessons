@@ -68,6 +68,7 @@ class RenderVideoStep(ActionStep[RenderVideoRequest, RenderedVideoArtifact]):
             return ctx
 
         result = outputs[-1]
+        ctx.rendered_video = result
         lesson_dir = resolve_lesson_dir(ctx.config, ctx.lesson_id)
         video_path = lesson_dir / "lesson.mp4"
 

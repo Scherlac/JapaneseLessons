@@ -4,7 +4,7 @@ from collections import Counter
 
 from .action import LessonPlannerAction, LessonPlannerChunk, LessonPlannerResult, _project_grammar
 from .prompt import GrammarCoverageInfo, fibonacci_stage_label
-from ..pipeline_core import ActionStep, LessonContext
+from ..pipeline_core import ActionStep, GrammarSelectionArtifact, LessonContext
 
 
 class LessonPlannerStep(ActionStep[LessonPlannerChunk, LessonPlannerResult]):
@@ -74,10 +74,12 @@ class LessonPlannerStep(ActionStep[LessonPlannerChunk, LessonPlannerResult]):
         outputs: list[LessonPlannerResult],
     ) -> LessonContext:
         result = outputs[0]
-        ctx.lesson_outline = result.outline
-        ctx.selected_grammar = result.selected_grammar
-        ctx.selected_grammar_blocks = result.selected_grammar_blocks
-        ctx.canonical_plan = result.canonical_plan
+        ctx.grammar_selection = GrammarSelectionArtifact(
+            selected_grammar=list(result.selected_grammar),
+            selected_grammar_blocks=[list(block) for block in result.selected_grammar_blocks],
+            lesson_outline=result.outline,
+            canonical_plan=result.canonical_plan,
+        )
         self._log(ctx, f"       selected : {[g.id for g in ctx.selected_grammar]}")
         self._log(ctx, f"       rationale: {result.outline.rationale}")
         if ctx.selected_grammar_blocks:

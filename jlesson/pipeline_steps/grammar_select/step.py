@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .action import GrammarSelectAction, GrammarSelectChunk, GrammarSelectResult, _project_grammar
-from ..pipeline_core import ActionStep, LessonContext
+from ..pipeline_core import ActionStep, GrammarSelectionArtifact, LessonContext
 
 
 class GrammarSelectStep(ActionStep[GrammarSelectChunk, GrammarSelectResult]):
@@ -51,8 +51,10 @@ class GrammarSelectStep(ActionStep[GrammarSelectChunk, GrammarSelectResult]):
         outputs: list[GrammarSelectResult],
     ) -> LessonContext:
         result = outputs[0]
-        ctx.selected_grammar = result.selected_grammar
-        ctx.selected_grammar_blocks = result.selected_grammar_blocks
+        ctx.grammar_selection = GrammarSelectionArtifact(
+            selected_grammar=list(result.selected_grammar),
+            selected_grammar_blocks=[list(block) for block in result.selected_grammar_blocks],
+        )
         self._log(ctx, f"       selected : {[grammar.id for grammar in ctx.selected_grammar]}")
         if ctx.selected_grammar_blocks:
             block_lines = "\n".join(

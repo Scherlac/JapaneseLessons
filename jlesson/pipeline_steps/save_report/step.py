@@ -45,6 +45,7 @@ class SaveReportStep(ActionStep[SaveReportRequest, ReportArtifact]):
 
     def merge_outputs(self, ctx: LessonContext, outputs: list[ReportArtifact]) -> LessonContext:
         result = outputs[-1] if outputs else ReportArtifact(report_path=None)
+        ctx.saved_report = result
         ctx.report_path = result.report_path
         self._log(ctx, f"       {ctx.report_path}")
         return ctx

@@ -49,7 +49,7 @@ class NarrativeGeneratorStep(ActionStep[NarrativeGenChunk, NarrativeFrame]):
 
     def merge_outputs(self, ctx: LessonContext, outputs: list[NarrativeFrame]) -> LessonContext:
         frame = outputs[0]
-        ctx.narrative_blocks = frame.blocks
+        ctx.narrative_frame = frame
         self._log(ctx, f"       {len(ctx.narrative_blocks)} narrative blocks")
         ctx.report.add("narrative", self._render_narrative(ctx.narrative_blocks))
         return ctx

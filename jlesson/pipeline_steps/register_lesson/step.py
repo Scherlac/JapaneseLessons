@@ -35,6 +35,7 @@ class RegisterLessonStep(ActionStep[RegisterLessonRequest, LessonRegistrationArt
 
     def merge_outputs(self, ctx: LessonContext, outputs: list[LessonRegistrationArtifact]) -> LessonContext:
         result = outputs[-1]
+        ctx.lesson_registration = result
         ctx.lesson_id = result.lesson_id
         ctx.created_at = result.created_at
         ctx.curriculum = result.curriculum

@@ -82,7 +82,8 @@ class NarrativeGrammarStep(ActionStep[BlockChunk, list[Sentence]]):
     def merge_outputs(
         self, ctx: LessonContext, outputs: list[list[Sentence]]
     ) -> LessonContext:
-        ctx.sentences = [s for block_sentences in outputs for s in block_sentences]
+        ctx.generated_sentence_blocks = outputs
+        ctx.review_results = []
         self._log(ctx, f"       {len(ctx.sentences)} sentences")
         if ctx.sentences:
             src_lbl = ctx.language_config.source_label

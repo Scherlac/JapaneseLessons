@@ -49,6 +49,6 @@ class CompileAssetsStep(ActionStep[AssetCompileRequest, CompiledItemSequence]):
 
     def merge_outputs(self, ctx: LessonContext, outputs: list[CompiledItemSequence]) -> LessonContext:
         result = outputs[-1] if outputs else CompiledItemSequence(items=[])
-        ctx.compiled_items = result.items
+        ctx.compiled_sequence = result
         self._log(ctx, f"       {len(ctx.compiled_items)} compiled items")
         return ctx

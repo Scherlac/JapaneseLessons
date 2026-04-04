@@ -47,6 +47,6 @@ class ExtractNarrativeVocabStep(ActionStep[NarrativeFrame, NarrativeVocabPlan]):
         if not outputs:
             self._log(ctx, "       (no narrative blocks — skipping vocab extraction)")
             return ctx
-        ctx.narrative_vocab_terms = outputs[0].blocks
+        ctx.narrative_vocab_plan = outputs[0]
         self._log(ctx, f"       {len(ctx.narrative_vocab_terms)} block vocab plans")
         return ctx

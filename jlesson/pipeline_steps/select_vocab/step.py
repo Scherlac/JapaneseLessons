@@ -70,9 +70,7 @@ class SelectVocabStep(ActionStep[SelectVocabRequest, SelectedVocabSet]):
 
     def merge_outputs(self, ctx: LessonContext, outputs: list[SelectedVocabSet]) -> LessonContext:
         result = outputs[-1]
-        ctx.vocab = result.vocab
-        ctx.nouns = result.nouns
-        ctx.verbs = result.verbs
+        ctx.selected_vocab = result
         self._log(ctx, f"       nouns : {[n.source.display_text for n in ctx.nouns]}")
         self._log(ctx, f"       verbs : {[v.source.display_text for v in ctx.verbs]}")
         return ctx

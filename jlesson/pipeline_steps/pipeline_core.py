@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from jlesson.language_config import LanguageConfig, get_language_config
 from jlesson.lesson_report import ReportBuilder
@@ -13,6 +13,12 @@ from jlesson.models import CanonicalItem
 from jlesson.curriculum import CurriculumData
 from jlesson.runtime.interfaces import RuntimeServices
 from jlesson.curriculum import create_curriculum
+
+if TYPE_CHECKING:
+    from jlesson.pipeline_steps.review_sentences.action import SentenceReviewResult
+
+
+_UNSET = object()
 
 
 @dataclass
@@ -73,21 +79,36 @@ class LessonContext:
     report: ReportBuilder = field(default_factory=ReportBuilder)
     step_info: StepInfo | None = None
     curriculum: CurriculumData = field(default_factory=CurriculumData)
-    vocab: VocabFile | None = None
-    nouns: list[GeneralItem] = field(default_factory=list)
-    verbs: list[GeneralItem] = field(default_factory=list)
+
+    # Step 1: narrative_generator -> extract_narrative_vocab
+    narrative_frame: NarrativeFrame | None = None
+    # Step 2: extract_narrative_vocab -> canonical_vocab_select
+    narrative_vocab_plan: NarrativeVocabPlan | None = None
+    # Step 3: canonical_vocab_select -> select_vocab / lesson_planner / grammar_select
     canonical_vocab: CanonicalVocabSelection | None = None
-    canonical_plan: CanonicalLessonPlan | None = None
-    narrative_blocks: list[str] = field(default_factory=list)
-    narrative_vocab_terms: list[NarrativeVocabBlock] = field(default_factory=list)
-    selected_grammar: list[GrammarItem] = field(default_factory=list)
-    selected_grammar_blocks: list[list[GrammarItem]] = field(default_factory=list)
-    lesson_outline: LessonOutline | None = None
-    sentences: list[Sentence] = field(default_factory=list)
-    noun_items: list[GeneralItem] = field(default_factory=list)
-    verb_items: list[GeneralItem] = field(default_factory=list)
-    compiled_items: list[CompiledItem] = field(default_factory=list)
-    touches: list[Touch] = field(default_factory=list)
+    # Step 4: select_vocab -> narrative_grammar / review_sentences / vocab_enhancement / register_lesson
+    selected_vocab: SelectedVocabSet | None = None
+    # Step 5: lesson_planner / grammar_select -> narrative_grammar / register_lesson / persist_content
+    grammar_selection: GrammarSelectionArtifact | None = None
+    # Step 6: narrative_grammar -> review_sentences
+    generated_sentence_blocks: list[list[Sentence]] = field(default_factory=list)
+    # Step 7: review_sentences -> register_lesson / persist_content / compile_assets
+    review_results: list[SentenceReviewResult] = field(default_factory=list)
+    # Step 8: vocab_enhancement -> register_lesson / persist_content / compile_assets / save_report
+    vocab_enhancement: VocabEnhancementArtifact | None = None
+    # Step 9: register_lesson -> persist_content
+    lesson_registration: LessonRegistrationArtifact | None = None
+    # Step 10: persist_content -> checkpoint/reporting
+    persisted_content: PersistedContentArtifact | None = None
+    # Step 11: compile_assets -> compile_touches
+    compiled_sequence: CompiledItemSequence | None = None
+    # Step 12: compile_touches -> render_video / save_report
+    touch_sequence: TouchSequence | None = None
+    # Step 13: render_video -> save_report
+    rendered_video: RenderedVideoArtifact | None = None
+    # Step 14: save_report -> terminal sink
+    saved_report: ReportArtifact | None = None
+
     lesson_id: int = 0
     artifact_lesson_id: int = 0
     created_at: str = ""
@@ -104,6 +125,216 @@ class LessonContext:
     def __post_init__(self) -> None:
         if self.language_config is None:
             self.language_config = get_language_config(self.config.language)
+
+    # def _update_selected_vocab(
+    #     self,
+    #     *,
+    #     vocab=_UNSET,
+    #     nouns=_UNSET,
+    #     verbs=_UNSET,
+    # ) -> None:
+    #     current = self.selected_vocab or SelectedVocabSet(vocab=None, nouns=[], verbs=[])
+    #     updated = SelectedVocabSet(
+    #         vocab=current.vocab if vocab is _UNSET else vocab,
+    #         nouns=list(current.nouns) if nouns is _UNSET else list(nouns),
+    #         verbs=list(current.verbs) if verbs is _UNSET else list(verbs),
+    #     )
+    #     self.selected_vocab = updated if (updated.vocab is not None or updated.nouns or updated.verbs) else None
+    #     if self.vocab_enhancement is not None:
+    #         self.vocab_enhancement = VocabEnhancementArtifact(
+    #             vocab=updated.vocab,
+    #             nouns=list(updated.nouns),
+    #             verbs=list(updated.verbs),
+    #             noun_items=list(self.vocab_enhancement.noun_items),
+    #             verb_items=list(self.vocab_enhancement.verb_items),
+    #         )
+
+    # def _update_grammar_selection(
+    #     self,
+    #     *,
+    #     selected_grammar=_UNSET,
+    #     selected_grammar_blocks=_UNSET,
+    #     lesson_outline=_UNSET,
+    #     canonical_plan=_UNSET,
+    # ) -> None:
+    #     current = self.grammar_selection or GrammarSelectionArtifact(
+    #         selected_grammar=[],
+    #         selected_grammar_blocks=[],
+    #         lesson_outline=None,
+    #         canonical_plan=None,
+    #     )
+    #     updated = GrammarSelectionArtifact(
+    #         selected_grammar=(
+    #             list(current.selected_grammar)
+    #             if selected_grammar is _UNSET
+    #             else list(selected_grammar)
+    #         ),
+    #         selected_grammar_blocks=(
+    #             [list(block) for block in current.selected_grammar_blocks]
+    #             if selected_grammar_blocks is _UNSET
+    #             else [list(block) for block in selected_grammar_blocks]
+    #         ),
+    #         lesson_outline=current.lesson_outline if lesson_outline is _UNSET else lesson_outline,
+    #         canonical_plan=current.canonical_plan if canonical_plan is _UNSET else canonical_plan,
+    #     )
+    #     self.grammar_selection = updated
+
+    # def _update_vocab_enhancement(
+    #     self,
+    #     *,
+    #     noun_items=_UNSET,
+    #     verb_items=_UNSET,
+    # ) -> None:
+    #     base_vocab = self.selected_vocab or SelectedVocabSet(vocab=None, nouns=[], verbs=[])
+    #     current = self.vocab_enhancement or VocabEnhancementArtifact(
+    #         vocab=base_vocab.vocab,
+    #         nouns=list(base_vocab.nouns),
+    #         verbs=list(base_vocab.verbs),
+    #         noun_items=[],
+    #         verb_items=[],
+    #     )
+    #     updated = VocabEnhancementArtifact(
+    #         vocab=current.vocab,
+    #         nouns=list(current.nouns),
+    #         verbs=list(current.verbs),
+    #         noun_items=list(current.noun_items) if noun_items is _UNSET else list(noun_items),
+    #         verb_items=list(current.verb_items) if verb_items is _UNSET else list(verb_items),
+    #     )
+    #     self.vocab_enhancement = updated if (
+    #         updated.vocab is not None or updated.nouns or updated.verbs or updated.noun_items or updated.verb_items
+    #     ) else None
+    #     self.selected_vocab = SelectedVocabSet(
+    #         vocab=updated.vocab,
+    #         nouns=list(updated.nouns),
+    #         verbs=list(updated.verbs),
+    #     ) if (updated.vocab is not None or updated.nouns or updated.verbs) else None
+
+    # @property
+    # def narrative_blocks(self) -> list[str]:
+    #     return list(self.narrative_frame.blocks) if self.narrative_frame is not None else []
+
+    # @narrative_blocks.setter
+    # def narrative_blocks(self, blocks: list[str]) -> None:
+    #     self.narrative_frame = NarrativeFrame(blocks=list(blocks)) if blocks else None
+
+    # @property
+    # def narrative_vocab_terms(self) -> list[NarrativeVocabBlock]:
+    #     return list(self.narrative_vocab_plan.blocks) if self.narrative_vocab_plan is not None else []
+
+    # @narrative_vocab_terms.setter
+    # def narrative_vocab_terms(self, blocks: list[NarrativeVocabBlock]) -> None:
+    #     self.narrative_vocab_plan = NarrativeVocabPlan(blocks=list(blocks)) if blocks else None
+
+    # @property
+    # def vocab(self) -> VocabFile | None:
+    #     if self.vocab_enhancement is not None:
+    #         return self.vocab_enhancement.vocab
+    #     if self.selected_vocab is not None:
+    #         return self.selected_vocab.vocab
+    #     return None
+
+    # @vocab.setter
+    # def vocab(self, value: VocabFile | None) -> None:
+    #     self._update_selected_vocab(vocab=value)
+
+    # @property
+    # def nouns(self) -> list[GeneralItem]:
+    #     if self.vocab_enhancement is not None:
+    #         return list(self.vocab_enhancement.nouns)
+    #     if self.selected_vocab is not None:
+    #         return list(self.selected_vocab.nouns)
+    #     return []
+
+    # @nouns.setter
+    # def nouns(self, items: list[GeneralItem]) -> None:
+    #     self._update_selected_vocab(nouns=items)
+
+    # @property
+    # def verbs(self) -> list[GeneralItem]:
+    #     if self.vocab_enhancement is not None:
+    #         return list(self.vocab_enhancement.verbs)
+    #     if self.selected_vocab is not None:
+    #         return list(self.selected_vocab.verbs)
+    #     return []
+
+    # @verbs.setter
+    # def verbs(self, items: list[GeneralItem]) -> None:
+    #     self._update_selected_vocab(verbs=items)
+
+    # @property
+    # def selected_grammar(self) -> list[GrammarItem]:
+    #     return list(self.grammar_selection.selected_grammar) if self.grammar_selection is not None else []
+
+    # @selected_grammar.setter
+    # def selected_grammar(self, items: list[GrammarItem]) -> None:
+    #     self._update_grammar_selection(selected_grammar=items)
+
+    # @property
+    # def selected_grammar_blocks(self) -> list[list[GrammarItem]]:
+    #     return [list(block) for block in self.grammar_selection.selected_grammar_blocks] if self.grammar_selection is not None else []
+
+    # @selected_grammar_blocks.setter
+    # def selected_grammar_blocks(self, blocks: list[list[GrammarItem]]) -> None:
+    #     self._update_grammar_selection(selected_grammar_blocks=blocks)
+
+    # @property
+    # def lesson_outline(self) -> LessonOutline | None:
+    #     return self.grammar_selection.lesson_outline if self.grammar_selection is not None else None
+
+    # @lesson_outline.setter
+    # def lesson_outline(self, outline: LessonOutline | None) -> None:
+    #     self._update_grammar_selection(lesson_outline=outline)
+
+    # @property
+    # def canonical_plan(self) -> CanonicalLessonPlan | None:
+    #     return self.grammar_selection.canonical_plan if self.grammar_selection is not None else None
+
+    # @canonical_plan.setter
+    # def canonical_plan(self, plan: CanonicalLessonPlan | None) -> None:
+    #     self._update_grammar_selection(canonical_plan=plan)
+
+    # @property
+    # def sentences(self) -> list[Sentence]:
+    #     if self.review_results:
+    #         return [sentence for result in self.review_results for sentence in result.sentences]
+    #     return [sentence for block in self.generated_sentence_blocks for sentence in block]
+
+    # @sentences.setter
+    # def sentences(self, items: list[Sentence]) -> None:
+    #     self.review_results = []
+    #     self.generated_sentence_blocks = [list(items)] if items else []
+
+    # @property
+    # def noun_items(self) -> list[GeneralItem]:
+    #     return list(self.vocab_enhancement.noun_items) if self.vocab_enhancement is not None else []
+
+    # @noun_items.setter
+    # def noun_items(self, items: list[GeneralItem]) -> None:
+    #     self._update_vocab_enhancement(noun_items=items)
+
+    # @property
+    # def verb_items(self) -> list[GeneralItem]:
+    #     return list(self.vocab_enhancement.verb_items) if self.vocab_enhancement is not None else []
+
+    # @verb_items.setter
+    # def verb_items(self, items: list[GeneralItem]) -> None:
+    #     self._update_vocab_enhancement(verb_items=items)
+
+    # @property
+    # def compiled_items(self) -> list[CompiledItem]:
+    #     return list(self.compiled_sequence.items) if self.compiled_sequence is not None else []
+
+    # @compiled_items.setter
+    # def compiled_items(self, items: list[CompiledItem]) -> None:
+    #     self.compiled_sequence = CompiledItemSequence(items=list(items)) if items else None
+
+    # @property
+    # def touches(self) -> list[Touch]:
+    #     return list(self.touch_sequence.items) if self.touch_sequence is not None else []
+
+    # @touches.setter
+    # def touches(self, items: list[Touch]) -> None:
+    #     self.touch_sequence = TouchSequence(items=list(items)) if items else None
 
 class PipelineStep(ABC):
     """Abstract base class for pipeline steps."""
@@ -297,6 +528,21 @@ class CanonicalLessonPlan:
     grammar_ids: list[str]
     grammar_blocks: list[list[str]]
     lesson_outline: "LessonOutline | None" = None
+
+
+@dataclass
+class GrammarSelectionArtifact:
+    """Unified grammar-planning artifact for lesson_planner and grammar_select.
+
+    Keeps the grammar-selection handoff explicit on ``LessonContext`` even
+    though the codebase currently has both the modern ``LessonPlannerStep`` and
+    the compatibility ``GrammarSelectStep``.
+    """
+
+    selected_grammar: list[GrammarItem]
+    selected_grammar_blocks: list[list[GrammarItem]]
+    lesson_outline: LessonOutline | None = None
+    canonical_plan: CanonicalLessonPlan | None = None
 
 
 @dataclass
