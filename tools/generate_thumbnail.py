@@ -39,6 +39,22 @@ CONTENTS = {
         "Gentle rain falling. Lush green forest surroundings. "
         "No copyrighted character likenesses, no anime screenshots."
     ),
+    "totoro-sky": (
+        "Two small girls ride joyfully on the back of a giant round forest creature with pointy ears "
+        "as it soars silently above the Japanese countryside at golden hour. "
+        "Below, patchwork rice fields, a winding river, and a small rural village glow in warm amber light. "
+        "Soft white cumulus clouds drift around them; the sky fades from deep blue above to warm orange at the horizon. "
+        "The characters are small against the vast glowing sky, evoking wonder and freedom. "
+        "No copyrighted character likenesses, no anime screenshots."
+    ),
+    "cat-bus": (
+        "A giant fluffy cat-shaped bus with twelve furry legs runs joyfully along a winding country road at night. "
+        "It has large bright round glowing eyes like headlights, a wide grinning mouth, and soft cream-coloured fur. "
+        "The windows are warm amber-lit silhouettes of happy passengers inside. "
+        "Tall grass sways in its wake, fireflies glow in the dark meadow around it, "
+        "and a starry indigo sky stretches above rolling forested hills. "
+        "No copyrighted character likenesses, no anime screenshots."
+    ),
 }
 
 LAYOUT = (
@@ -53,10 +69,26 @@ LAYOUT = (
     "Square 1:1 aspect ratio. No copyrighted character likenesses, no anime screenshots."
 )
 
+LAYOUT_COVER = (
+    "Wide cinematic 16:9 composition in the style of a Studio Ghibli film still. "
+    "The illustration fills the full frame with rich landscape depth: detailed foreground elements, "
+    "warm-lit midground with the main characters, and a soft atmospheric background that stretches to the horizon. "
+    "Top-right corner: a small circle that looks like the Japanese flag — a clean white circle with a solid red dot in its center. No text near it. "
+    "No pill badges. No color swatches. No text elements other than the flag circle. "
+    "Wide 16:9 landscape aspect ratio. No copyrighted character likenesses, no anime screenshots."
+)
+
+# Format definitions: format_name -> (api_size_landscape, output_size)
+FORMATS = {
+    "thumbnail":    {"api_landscape": False, "output_size": (600, 600)},
+    "cover-small":  {"api_landscape": True,  "output_size": (1280, 720)},
+    "cover-large":  {"api_landscape": True,  "output_size": (1920, 1080)},
+}
+
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output" / "totoro" / "eng-jap" / "my neighbor totoro" / "lesson_001"
 
 
-def build_prompt(style: str, content: str, level: str, content_type: str, lang: str, extra_tags: list[str]) -> str:
+def build_prompt(style: str, content: str, level: str, content_type: str, lang: str, extra_tags: list[str], fmt: str = "thumbnail") -> str:
     style_text = STYLES.get(style)
     if not style_text:
         print(f"Error: Unknown style '{style}'. Available: {', '.join(STYLES)}", file=sys.stderr)
@@ -96,18 +128,28 @@ def build_prompt(style: str, content: str, level: str, content_type: str, lang: 
         f"Pills with text (like numbers or 'EN') are wider. "
     )
 
-    return f"{style_text} {content_text} {LAYOUT} {tag_instructions}"
+    layout = LAYOUT_COVER if FORMATS.get(fmt, {}).get("api_landscape") else LAYOUT
+    is_cover = FORMATS.get(fmt, {}).get("api_landscape", False)
+    if is_cover:
+        return f"{style_text} {content_text} {layout}"
+    return f"{style_text} {content_text} {layout} {tag_instructions}"
 
 
 MODELS = ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini", "dall-e-3", "dall-e-2"]
 
-# Model-specific size mappings (square only)
+# API generation sizes per model, keyed by landscape flag
 MODEL_SIZES = {
-    "gpt-image-1.5": "1024x1024",
-    "gpt-image-1": "1024x1024",
-    "gpt-image-1-mini": "1024x1024",
-    "dall-e-3": "1024x1024",
-    "dall-e-2": "1024x1024",
+    # (model, landscape) -> api size
+    ("gpt-image-1.5",   False): "1024x1024",
+    ("gpt-image-1.5",   True):  "1536x1024",
+    ("gpt-image-1",     False): "1024x1024",
+    ("gpt-image-1",     True):  "1536x1024",
+    ("gpt-image-1-mini",False): "1024x1024",
+    ("gpt-image-1-mini",True):  "1536x1024",
+    ("dall-e-3",        False): "1024x1024",
+    ("dall-e-3",        True):  "1792x1024",
+    ("dall-e-2",        False): "1024x1024",
+    ("dall-e-2",        True):  "1024x1024",  # dall-e-2 doesn't support wide
 }
 
 
@@ -122,6 +164,9 @@ def main() -> None:
     parser.add_argument("--lang", default="eng-jap", help="Language pair tag (e.g. eng-jap, eng-kor)")
     parser.add_argument("--tags", nargs="*", default=[], help="Extra custom tags (e.g. 30-blocks 120-words)")
     parser.add_argument("--no-tags", action="store_true", help="Skip tag overlay entirely")
+    parser.add_argument("--format", default="thumbnail", choices=list(FORMATS),
+                        help="Output format: thumbnail (600x600), cover-small (1280x720), cover-large (1920x1080)")
+    parser.add_argument("--input-image", dest="input_image", help="Path to existing image (skip generation, just resize + apply tags)")
     args = parser.parse_args()
 
 
@@ -132,14 +177,18 @@ def main() -> None:
 
     client = OpenAI(api_key=api_key)
 
-    prompt = build_prompt(args.style, args.content, args.level, args.content_type, args.lang, args.tags)
-    print(f"Generating thumbnail [model={args.model}, style={args.style}, content={args.content}]...")
+    prompt = build_prompt(args.style, args.content, args.level, args.content_type, args.lang, args.tags, args.format)
+    print(f"Generating {args.format} [model={args.model}, style={args.style}, content={args.content}]...")
     print(f"Prompt: {prompt[:100]}...")
+
+    fmt_cfg = FORMATS[args.format]
+    landscape = fmt_cfg["api_landscape"]
+    output_size = fmt_cfg["output_size"]
 
     gen_kwargs = {
         "model": args.model,
         "prompt": prompt,
-        "size": MODEL_SIZES[args.model],
+        "size": MODEL_SIZES[(args.model, landscape)],
         "n": 1,
     }
     if args.model.startswith("dall-e"):
@@ -160,7 +209,7 @@ def main() -> None:
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = OUTPUT_DIR / f"thumbnail_{args.model}_{args.style}_{timestamp}.png"
+    output_path = OUTPUT_DIR / f"{args.format}_{args.model}_{args.style}_{timestamp}.png"
 
     print(f"Downloading to {output_path}...")
     if image_data.b64_json:
@@ -170,12 +219,13 @@ def main() -> None:
         resp.raise_for_status()
         output_path.write_bytes(resp.content)
 
-    # Resize to 600x600
+    # Resize to target output size
     img = Image.open(output_path)
-    img = img.resize((600, 600), Image.LANCZOS)
+    img = img.resize(output_size, Image.LANCZOS)
 
     img.save(output_path)
-    print(f"Saved (resized to 600x600): {output_path}")
+    w, h = output_size
+    print(f"Saved (resized to {w}x{h}): {output_path}")
     print(f"Size: {output_path.stat().st_size / 1024:.0f} KB")
 
 
