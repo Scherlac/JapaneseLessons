@@ -55,6 +55,20 @@ CONTENTS = {
         "and a starry indigo sky stretches above rolling forested hills. "
         "No copyrighted character likenesses, no anime screenshots."
     ),
+    "ponyo": (
+        "A small rosy-cheeked girl with short red hair sits happily inside a round glass jar at the water's edge. "
+        "A kind-faced little boy kneels on the sunlit rocky shore and peers at her with curiosity and delight. "
+        "Gentle ocean waves shimmer behind them, small fish dart in the shallows, "
+        "and a warm golden afternoon light falls over the coastal scene. "
+        "No copyrighted character likenesses, no anime screenshots."
+    ),
+    "ponyo-waves": (
+        "A small rosy-cheeked girl with short red hair runs joyfully across the surface of enormous rolling ocean waves "
+        "during a wild storm. The waves curl into the shapes of giant fish beneath her feet. "
+        "A small house glows warmly on a clifftop in the distance;"
+        "The sky is dark purple and stormy but full of energy and magic. "
+        "No copyrighted character likenesses, no anime screenshots."
+    ),
 }
 
 LAYOUT = (
@@ -85,7 +99,13 @@ FORMATS = {
     "cover-large":  {"api_landscape": True,  "output_size": (1920, 1080)},
 }
 
-OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output" / "totoro" / "eng-jap" / "my neighbor totoro" / "lesson_001"
+OUTPUT_DIRS = {
+    "totoro":      Path(__file__).resolve().parent.parent / "output" / "totoro" / "eng-jap" / "my neighbor totoro" / "lesson_001",
+    "totoro-sky":  Path(__file__).resolve().parent.parent / "output" / "totoro" / "eng-jap" / "my neighbor totoro" / "lesson_001",
+    "cat-bus":     Path(__file__).resolve().parent.parent / "output" / "totoro" / "eng-jap" / "my neighbor totoro" / "lesson_001",
+    "ponyo":       Path(__file__).resolve().parent.parent / "output" / "ponyo"  / "eng-jap" / "ghibli - Ponyo" / "lesson_001",
+    "ponyo-waves": Path(__file__).resolve().parent.parent / "output" / "ponyo"  / "eng-jap" / "ghibli - Ponyo" / "lesson_001",
+}
 
 
 def build_prompt(style: str, content: str, level: str, content_type: str, lang: str, extra_tags: list[str], fmt: str = "thumbnail") -> str:
@@ -207,9 +227,10 @@ def main() -> None:
 
     import httpx
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir = OUTPUT_DIRS.get(args.content, OUTPUT_DIRS["totoro"])
+    output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = OUTPUT_DIR / f"{args.format}_{args.model}_{args.style}_{timestamp}.png"
+    output_path = output_dir / f"{args.format}_{args.model}_{args.style}_{timestamp}.png"
 
     print(f"Downloading to {output_path}...")
     if image_data.b64_json:
