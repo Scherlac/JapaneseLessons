@@ -16,6 +16,11 @@ build/
 # Environment
 .env
 
+# OAuth credentials (never commit)
+tools/client_secrets.json
+client_secret_*.json
+tools/youtube_token.json
+
 # OS
 Thumbs.db
 .DS_Store
