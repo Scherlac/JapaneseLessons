@@ -723,6 +723,187 @@ def lesson_prompt(
 
 
 # ---------------------------------------------------------------------------
+# lesson shorts
+# ---------------------------------------------------------------------------
+
+@lesson.command("shorts")
+@click.option(
+    "--lesson-dir",
+    "lesson_dir",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Path to the lesson_NNN output folder (contains cards/, audio/, steps/).",
+)
+@click.option(
+    "--blocks",
+    default=5,
+    show_default=True,
+    type=click.IntRange(1),
+    help="Number of blocks to render as Shorts (first N blocks).",
+)
+@click.option(
+    "--block-list",
+    "block_list",
+    default=None,
+    help="Comma-separated list of block indices to render, e.g. '1,3,5'. Overrides --blocks.",
+)
+@click.option(
+    "--pause-card",
+    "pause_after",
+    default=1.0,
+    show_default=True,
+    type=float,
+    help="Pause in seconds after audio on each card.",
+)
+@click.option(
+    "--fps",
+    default=30,
+    show_default=True,
+    type=click.IntRange(1),
+    help="Output frames per second.",
+)
+def lesson_shorts(
+    lesson_dir: Path,
+    blocks: int,
+    block_list: str | None,
+    pause_after: float,
+    fps: int,
+) -> None:
+    """Render lesson blocks as vertical 9:16 YouTube Shorts.
+
+    Each Short is one block: vocab nouns → verbs → adjectives → grammar
+    sentences assembled into a 1080×1920 MP4 (≤60s target).
+
+    Existing cards and audio from LESSON_DIR are reused — no LLM calls,
+    no TTS regeneration.
+
+    Output: LESSON_DIR/shorts/short_block_NN.mp4
+
+    \b
+    Examples:
+      # First 5 blocks
+      jlesson lesson shorts --lesson-dir output/kiki/.../lesson_001 --blocks 5
+
+      # Specific blocks
+      jlesson lesson shorts --lesson-dir output/kiki/.../lesson_001 --block-list 1,3,5
+    """
+    import json
+    import tempfile
+
+    try:
+        from PIL import Image, ImageFilter, ImageEnhance
+    except ImportError:
+        raise click.ClickException("Pillow not installed. Run: pip install Pillow")
+
+    try:
+        import moviepy  # noqa: F401 — validate moviepy is available before starting
+    except ImportError:
+        raise click.ClickException("moviepy not installed. Run: pip install moviepy")
+
+    from jlesson.video.builder import VideoBuilder
+
+    # --- resolve block indices ---
+    if block_list:
+        try:
+            indices = [int(x.strip()) for x in block_list.split(",")]
+        except ValueError:
+            raise click.UsageError("--block-list must be comma-separated integers, e.g. '1,3,5'")
+    else:
+        indices = list(range(1, blocks + 1))
+
+    # --- load planner JSON ---
+    planner_path = lesson_dir / "steps" / "canonical_planner" / "output.json"
+    if not planner_path.exists():
+        raise click.ClickException(f"Planner output not found: {planner_path}")
+
+    with open(planner_path, encoding="utf-8") as f:
+        all_blocks = json.load(f)[0]["blocks"]
+    block_map = {b["block_index"]: b for b in all_blocks}
+
+    cards_dir = lesson_dir / "cards"
+    audio_dir = lesson_dir / "audio"
+    shorts_dir = lesson_dir / "shorts"
+    shorts_dir.mkdir(exist_ok=True)
+
+    SHORTS_W, SHORTS_H = 1080, 1920
+    CARD_W, CARD_H = 1920, 1080
+
+    def _make_vertical_frame(card_path: Path, tmp_dir: Path) -> Path:
+        out = tmp_dir / f"{card_path.stem}_v.png"
+        if out.exists():
+            return out
+        img = Image.open(card_path).convert("RGB")
+        scale = max(SHORTS_W / CARD_W, SHORTS_H / CARD_H)
+        bw, bh = int(CARD_W * scale), int(CARD_H * scale)
+        bg = img.resize((bw, bh), Image.LANCZOS)
+        left, top = (bw - SHORTS_W) // 2, (bh - SHORTS_H) // 2
+        bg = bg.crop((left, top, left + SHORTS_W, top + SHORTS_H))
+        bg = bg.filter(ImageFilter.GaussianBlur(radius=20))
+        bg = ImageEnhance.Brightness(bg).enhance(0.4)
+        fg_w = SHORTS_W
+        fg_h = int(CARD_H * (fg_w / CARD_W))
+        fg = img.resize((fg_w, fg_h), Image.LANCZOS)
+        frame = bg.copy()
+        frame.paste(fg, (0, (SHORTS_H - fg_h) // 2))
+        frame.save(out)
+        return out
+
+    def _build_block_short(block: dict, out_path: Path, tmp_dir: Path) -> None:
+        seqs = block["content_sequences"]
+        item_ids = [
+            item["id"]
+            for section in ("nouns", "verbs", "adjectives", "grammar")
+            for item in seqs.get(section, [])
+        ]
+        video_builder = VideoBuilder(fps=fps)
+        clips = []
+        running_dur = 0.0
+        for item_id in item_ids:
+            card_path = cards_dir / f"{item_id}_card_en_ja.png"
+            if not card_path.exists():
+                continue
+            if running_dur >= 55.0:
+                click.echo(f"  INFO: reached 55s limit, dropping remaining items")
+                break
+            v_frame = _make_vertical_frame(card_path, tmp_dir)
+            audio_en = audio_dir / f"{item_id}_audio_en.mp3"
+            audio_ja = audio_dir / f"{item_id}_audio_ja_f.mp3"
+            valid_audio = [p for p in [audio_en, audio_ja] if p.exists()]
+            clip = video_builder.create_multi_audio_clip(
+                v_frame, valid_audio,
+                pause_before=0.5, pause_between=0.3, pause_after=pause_after,
+            )
+            running_dur += clip.duration
+            clips.append(clip)
+
+        if not clips:
+            click.echo(f"  WARN: no clips for block {block['block_index']}, skipping")
+            return
+
+        total = sum(c.duration for c in clips)
+
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        video_builder.build_video(clips, out_path, method="ffmpeg")
+        click.echo(f"  Saved: {out_path.name} ({out_path.stat().st_size / (1024*1024):.1f} MB, {total:.1f}s)")
+
+    click.echo(f"Rendering {len(indices)} short(s) → {shorts_dir}")
+    with tempfile.TemporaryDirectory(prefix="jlesson_shorts_") as tmp:
+        tmp_dir = Path(tmp)
+        for idx in indices:
+            if idx not in block_map:
+                click.echo(f"  WARN: block {idx} not found, skipping")
+                continue
+            click.echo(f"\nBlock {idx}: {block_map[idx]['narrative']['narrative'][:60]}...")
+            out = shorts_dir / f"short_block_{idx:02d}.mp4"
+            try:
+                _build_block_short(block_map[idx], out, tmp_dir)
+            except Exception as exc:
+                raise click.ClickException(_friendly_error(exc)) from exc
+
+    click.echo(f"\nDone. Shorts in: {shorts_dir}")
+
+
+# ---------------------------------------------------------------------------
 # curriculum subgroup
 # ---------------------------------------------------------------------------
 

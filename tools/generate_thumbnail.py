@@ -134,11 +134,14 @@ LAYOUT_COVER = (
     "Wide 16:9 landscape aspect ratio. No copyrighted character likenesses, no anime screenshots."
 )
 
-# Format definitions: format_name -> (api_size_landscape, output_size)
+# Format definitions: format_name -> (api_size_landscape, output_size, layout_landscape)
+# api_landscape: controls the API generation size (True = wide source image)
+# layout_landscape: controls which LAYOUT prompt is used (False = square layout with pills/swatches)
 FORMATS = {
-    "thumbnail":    {"api_landscape": False, "output_size": (600, 600)},
-    "cover-small":  {"api_landscape": True,  "output_size": (1280, 720)},
-    "cover-large":  {"api_landscape": True,  "output_size": (1920, 1080)},
+    "thumbnail":        {"api_landscape": False, "output_size": (600, 600),   "layout_landscape": False},
+    "cover-small":      {"api_landscape": True,  "output_size": (1280, 720),  "layout_landscape": True},
+    "cover-large":      {"api_landscape": True,  "output_size": (1920, 1080), "layout_landscape": True},
+    "bundle-thumbnail": {"api_landscape": True,  "output_size": (448, 336),   "layout_landscape": False},
 }
 
 OUTPUT_DIRS = {
@@ -194,8 +197,8 @@ def build_prompt(style: str, content: str, level: str, content_type: str, lang: 
         f"Pills with text (like numbers or 'EN') are wider. "
     )
 
-    layout = LAYOUT_COVER if FORMATS.get(fmt, {}).get("api_landscape") else LAYOUT
-    is_cover = FORMATS.get(fmt, {}).get("api_landscape", False)
+    layout = LAYOUT_COVER if FORMATS.get(fmt, {}).get("layout_landscape") else LAYOUT
+    is_cover = FORMATS.get(fmt, {}).get("layout_landscape", False)
     if is_cover:
         return f"{style_text} {content_text} {layout}"
     return f"{style_text} {content_text} {layout} {tag_instructions}"
@@ -250,6 +253,7 @@ def main() -> None:
     fmt_cfg = FORMATS[args.format]
     landscape = fmt_cfg["api_landscape"]
     output_size = fmt_cfg["output_size"]
+    _ = fmt_cfg.get("layout_landscape", landscape)  # used in build_prompt
 
     gen_kwargs = {
         "model": args.model,
