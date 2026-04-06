@@ -69,6 +69,48 @@ CONTENTS = {
         "The sky is dark purple and stormy but full of energy and magic. "
         "No copyrighted character likenesses, no anime screenshots."
     ),
+    "kiki": (
+        "A young girl in a black dress and red bow rides a broomstick high above a sunlit European-style coastal city. "
+        "A small black cat clings to the broomstick behind her, looking slightly annoyed. "
+        "Below, red-roofed buildings and a glittering harbour stretch to the horizon. "
+        "The sky is bright blue with soft white clouds, and the girl's hair streams behind her in the wind. "
+        "The mood is adventurous, warm, and full of freedom. "
+        "No copyrighted character likenesses, no anime screenshots."
+    ),
+    "kiki-night": (
+        "A young girl in a black dress rides a broomstick silhouetted against a huge luminous full moon. "
+        "A small black cat rides behind her. "
+        "Below, the faint glow of a sleeping village and dark forested hills stretch to the horizon. "
+        "Stars fill the deep indigo sky; the full moon is soft and enormous. "
+        "The mood is magical, quiet, and full of wonder. "
+        "No copyrighted character likenesses, no anime screenshots."
+    ),
+    "bundle": (
+        "A single tranquil scene at golden hour that gently evokes three separate journeys. "
+        "In the center foreground, two young children sit side by side on a mossy hillside, "
+        "looking out over a vast panorama. To the left, a lush camphor forest edge with enormous ancient trees "
+        "and soft rain-wet leaves catches the last amber light. In the center, a glittering coastal bay with "
+        "gentle waves reflects the warm sky. To the right, the rooftops of a European-style seaside town "
+        "rise into a bright clear blue sky. A small black cat sits quietly beside the children. "
+        "A full moon rises softly on one side; a rainbow arc touches the bay in the middle. "
+        "The overall feeling is wonder, warmth, and the magic of three different worlds seen in one glance. "
+        "Unified palette: warm cream, moss green, sky blue, blush pink, soft gold. "
+        "No copyrighted character likenesses, no anime screenshots."
+    ),
+    "bundle-sky": (
+        "Almost entirely sky. A vast, luminous late-afternoon sky with enormous billowing cumulus clouds. "
+        "The largest cloud in the centre is subtly, softly round and rotund — its silhouette vaguely resembles "
+        "a sleeping gentle creature with a rounded belly and two small rounded ears at the top, "
+        "but it reads first and foremost as a beautiful natural cloud. "
+        "Smaller clouds drift to either side. The sky graduates from deep cerulean blue at the top "
+        "to pale gold and blush pink near the horizon. "
+        "At the very bottom edge, just a narrow sliver of landscape: a distant dark treeline on the left, "
+        "a faint glimmer of ocean in the centre, and the tiny silhouette of a church steeple or rooftop on the right — "
+        "each a quiet nod to a different world, barely visible. "
+        "No characters, no people, no text. The clouds are the whole story. "
+        "Mood: serene, infinite, full of quiet wonder. "
+        "No copyrighted character likenesses, no anime screenshots."
+    ),
 }
 
 LAYOUT = (
@@ -105,6 +147,10 @@ OUTPUT_DIRS = {
     "cat-bus":     Path(__file__).resolve().parent.parent / "output" / "totoro" / "eng-jap" / "my neighbor totoro" / "lesson_001",
     "ponyo":       Path(__file__).resolve().parent.parent / "output" / "ponyo"  / "eng-jap" / "ghibli - Ponyo" / "lesson_001",
     "ponyo-waves": Path(__file__).resolve().parent.parent / "output" / "ponyo"  / "eng-jap" / "ghibli - Ponyo" / "lesson_001",
+    "kiki":          Path(__file__).resolve().parent.parent / "output" / "kiki"   / "eng-jap" / "ghibli - Kiki's Delivery Service" / "lesson_001",
+    "kiki-night":    Path(__file__).resolve().parent.parent / "output" / "kiki"   / "eng-jap" / "ghibli - Kiki's Delivery Service" / "lesson_001",
+    "bundle":     Path(__file__).resolve().parent.parent / "output" / "bundle" / "ghibli-trilogy",
+    "bundle-sky": Path(__file__).resolve().parent.parent / "output" / "bundle" / "ghibli-trilogy",
 }
 
 
@@ -175,7 +221,7 @@ MODEL_SIZES = {
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate a Gumroad thumbnail with OpenAI image models")
-    parser.add_argument("--style", default="dark-minimal", choices=list(STYLES), help="Visual style preset")
+    parser.add_argument("--style", default="watercolor-kids", choices=list(STYLES), help="Visual style preset")
     parser.add_argument("--content", default="totoro", choices=list(CONTENTS), help="Scene content preset")
     parser.add_argument("--model", default="gpt-image-1.5", choices=MODELS, help="OpenAI image model")
     parser.add_argument("--level", default="from-zero", help="Level tag (e.g. from-zero, beginner, n5)")
