@@ -59,7 +59,7 @@ from .hun_ger import (
 )
 
 # English-French
-from .eng_fr import (
+from .eng_fre import (
     FRENCH_PERSONS,
     FRENCH_GRAMMAR_PATTERNS,
     EngFrPrompts,
