@@ -112,12 +112,19 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
         # Collect already-seen vocabulary from RCM to prevent cross-lesson repetition
         if config.rcm is not None:
             lang = config.language.code
-            covered_vocab: dict[Phase, set[str]] | None = {
-                phase: config.rcm.covered_texts(lang, phase)
-                for phase in (Phase.NOUNS, Phase.VERBS, Phase.ADJECTIVES)
+            vocab_phases = (Phase.NOUNS, Phase.VERBS, Phase.ADJECTIVES)
+            # Canonical text -> set[gloss] for gloss-aware dedup
+            covered_vocab: dict[Phase, dict[str, set[str]]] | None = {
+                phase: config.rcm.covered_vocab(lang, phase)
+                for phase in vocab_phases
             }
-            # Remove phases where no vocab has been covered yet
-            covered_vocab = {p: s for p, s in covered_vocab.items() if s}
+            # Also merge target-language texts so we catch same target word from two English entries
+            for phase in vocab_phases:
+                target_texts = config.rcm.covered_target_texts(lang, phase)
+                for tgt in target_texts:
+                    covered_vocab[phase].setdefault(tgt, set())
+            # Drop phases where nothing has been covered yet
+            covered_vocab = {p: m for p, m in covered_vocab.items() if m}
             if not covered_vocab:
                 covered_vocab = None
         else:

@@ -204,6 +204,11 @@ def run_pipeline(
         from jlesson.rcm import RCMStore
         _rcm_store = RCMStore(config.rcm_path / "rcm.db")
         ctx.rcm = _rcm_store
+        # Register the target-language dim map so grammar dims are populated on write
+        if hasattr(ctx, "language_config") and ctx.language_config is not None:
+            target_dim_map = ctx.language_config.target.rcm_dim_map
+            if target_dim_map:
+                _rcm_store.register_dim_map(config.language, target_dim_map)
 
     total = len(pipeline)
 

@@ -124,7 +124,7 @@ def build_lesson_plan_prompt(
     content_counts: dict[Phase, int],
     canonical_language: str = "english",
     previous_outline_json: str | None = None,
-    covered_vocab: dict[Phase, set[str]] | None = None,
+    covered_vocab: dict[Phase, dict[str, set[str]]] | None = None,
 ) -> str:
     """Build the language-agnostic lesson plan prompt.
 
@@ -215,16 +215,24 @@ def build_lesson_plan_prompt(
     dynamic_planning_constraints = "\n".join(filter(None, [_vocab_constraints, _grammar_constraints]))
     
     if covered_vocab:
-        covered_vocab_lines = "\n".join(
-            f"  {PHASE_PARSE_DETAILS[phase]['name'].capitalize()}s: "
-            + ", ".join(sorted(texts))
-            for phase, texts in covered_vocab.items()
-            if texts and phase in PHASE_PARSE_DETAILS
-        )
-        covered_vocab_section = f"""
-VOCABULARY ALREADY TAUGHT (do NOT reuse these words across lessons):
-{covered_vocab_lines}
-"""
+        covered_vocab_lines_parts = []
+        for phase, word_glosses in covered_vocab.items():
+            if not word_glosses or phase not in PHASE_PARSE_DETAILS:
+                continue
+            phase_label = PHASE_PARSE_DETAILS[phase]["name"].capitalize() + "s"
+            words_str = ", ".join(
+                f"{word} ({'; '.join(sorted(glosses))})" if glosses else word
+                for word, glosses in sorted(word_glosses.items())
+            )
+            covered_vocab_lines_parts.append(f"  {phase_label}: {words_str}")
+        if covered_vocab_lines_parts:
+            covered_vocab_section = (
+                "VOCABULARY ALREADY TAUGHT:\n"
+                + "\n".join(covered_vocab_lines_parts)
+                + "\n"
+            )
+        else:
+            covered_vocab_section = ""
     else:
         covered_vocab_section = ""
 
@@ -284,7 +292,7 @@ CONSTRAINTS:
   introduce a grammar point, then repeat it in subsequent blocks with
   gradually increasing gaps.
 - Assign items to blocks so they align with the narrative content
-  and the grammar being practised.{"" if not covered_vocab else chr(10) + "- Do NOT select any vocabulary word listed under VOCABULARY ALREADY TAUGHT above — choose fresh {canonical_language} words instead."}
+  and the grammar being practised.{"" if not covered_vocab else chr(10) + "- VOCABULARY ALREADY TAUGHT must not be reused unless the intended meaning is genuinely distinct from every gloss shown — in that case include a clear disambiguating gloss. Otherwise choose fresh " + canonical_language + " words."}
 - IMPORTANT: All {dynamic_json_item_list} MUST be in {canonical_language}.
   This is a canonical (language-neutral) plan. Use plain {canonical_language} words
   (e.g. "house", "father", "tree", "to move", "to find"). Do NOT use any

@@ -128,6 +128,12 @@ class PartialLanguageConfig:
     # "pronunciation: romaji romanisation (e.g. 'hikkōsu')" or
     # "extra.masu_form: polite -masu verb form (verbs only)".
     llm_content_hints: tuple[str, ...] = ()
+    # RCM grammar-dimension mapping.
+    # Maps Phase.value -> { dim_column_name -> target.extra key }.
+    # E.g. {"verbs": {"dim_1": "auxiliary", "dim_2": "past_participle"}, "nouns": {"dim_1": "article"}}
+    # Used by RCMStore to populate indexed dim columns on _BranchRow for SQL-level filtering.
+    # Use "" as outer key to apply a mapping to all phases.
+    rcm_dim_map: dict[str, dict[str, str]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

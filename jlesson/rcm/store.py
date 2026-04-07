@@ -7,8 +7,11 @@ branches       : Language-aware GeneralItem resolutions (one per item × languag
 assets         : Compiled asset paths (MP3 / PNG), keyed by item × language × asset_key
 lesson_items   : Many-to-many membership of items in lessons
 
-All serialisation to/from existing Pydantic types (CanonicalItem / GeneralItem)
+All serialisation to/from existing Pydantic types (CanonicalItem / GeneralItem / Sentence)
 is handled via model_dump_json / model_validate_json so no new models are needed.
+
+Grammar dimension columns (dim_1 … dim_8) on branches are populated at write time from
+target.extra using a per-language, per-phase mapping registered via register_dim_map().
 """
 
 from __future__ import annotations
@@ -27,9 +30,9 @@ from sqlalchemy import (
     create_engine,
     text,
 )
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-from jlesson.models import CanonicalItem, GeneralItem, Phase
+from jlesson.models import CanonicalItem, GeneralItem, Phase, Sentence
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +54,17 @@ class _ItemRow(_Base):
 
 
 class _BranchRow(_Base):
+    """One row per item × language resolution.
+
+    Fixed grammar-dimension columns (dim_1 … dim_8) are populated from
+    target.extra using the registered dim map — enabling SQL-level filtering
+    by language-specific grammar attributes (e.g. auxiliary verb, article,
+    verb conjugation type).
+
+    grammar_id and grammar_parameters_json are only set when the stored item
+    is a Sentence; they preserve the grammar-point connection that would
+    otherwise be lost when deserialising as a plain GeneralItem.
+    """
     __tablename__ = "branches"
     __table_args__ = (UniqueConstraint("item_id", "language_code", name="uq_branch"),)
 
@@ -58,6 +72,20 @@ class _BranchRow(_Base):
     item_id = Column(String, nullable=False, index=True)
     language_code = Column(String, nullable=False, index=True)
     general_item_json = Column(Text, nullable=False)
+    # Always populated from target.display_text
+    target_text_normalized = Column(String, nullable=True, index=True)
+    # Configurable grammar-dimension columns (populated from target.extra via dim map)
+    dim_1 = Column(String, nullable=True, index=True)
+    dim_2 = Column(String, nullable=True, index=True)
+    dim_3 = Column(String, nullable=True, index=True)
+    dim_4 = Column(String, nullable=True, index=True)
+    dim_5 = Column(String, nullable=True, index=True)
+    dim_6 = Column(String, nullable=True, index=True)
+    dim_7 = Column(String, nullable=True, index=True)
+    dim_8 = Column(String, nullable=True, index=True)
+    # Sentence-only fields
+    grammar_id = Column(String, nullable=True, index=True)
+    grammar_parameters_json = Column(Text, nullable=True)
 
 
 class _AssetRow(_Base):
@@ -83,6 +111,13 @@ class _LessonItemRow(_Base):
 
 
 # ---------------------------------------------------------------------------
+# Dim column names (ordered, matches schema)
+# ---------------------------------------------------------------------------
+
+_DIM_COLS = ("dim_1", "dim_2", "dim_3", "dim_4", "dim_5", "dim_6", "dim_7", "dim_8")
+
+
+# ---------------------------------------------------------------------------
 # Public store
 # ---------------------------------------------------------------------------
 
@@ -100,6 +135,45 @@ class RCMStore:
             conn.commit()
         _Base.metadata.create_all(self._engine)
         self._Session = sessionmaker(self._engine, expire_on_commit=False)
+        # language_code -> { phase_value -> { dim_col -> extra_key } }
+        self._dim_maps: dict[str, dict[str, dict[str, str]]] = {}
+
+    # ------------------------------------------------------------------
+    # Dim map registration
+    # ------------------------------------------------------------------
+
+    def register_dim_map(
+        self,
+        language_code: str,
+        dim_map: dict[str, dict[str, str]],
+    ) -> None:
+        """Register a grammar-dimension mapping for *language_code*.
+
+        *dim_map* is a dict as defined on PartialLanguageConfig.rcm_dim_map:
+            { phase_value_or_empty_str -> { dim_col_name -> target.extra_key } }
+
+        The empty string "" acts as a wildcard applied to all phases.
+        """
+        self._dim_maps[language_code] = dim_map
+
+    def _resolve_dims(
+        self,
+        language_code: str,
+        phase_value: str,
+        extra: dict,
+    ) -> dict[str, str | None]:
+        """Return a dict of dim_col -> value for the given language and phase."""
+        result: dict[str, str | None] = {col: None for col in _DIM_COLS}
+        lang_map = self._dim_maps.get(language_code, {})
+        # Wildcard mapping applied first, then phase-specific overrides on top
+        merged: dict[str, str] = {}
+        merged.update(lang_map.get("", {}))
+        merged.update(lang_map.get(phase_value, {}))
+        for dim_col, extra_key in merged.items():
+            if dim_col in result:
+                val = extra.get(extra_key)
+                result[dim_col] = str(val) if val is not None else None
+        return result
 
     # ------------------------------------------------------------------
     # Context manager support
@@ -119,10 +193,13 @@ class RCMStore:
     # ------------------------------------------------------------------
 
     def upsert_item(self, item: CanonicalItem) -> None:
-        """Insert or update a canonical item record."""
+        """Insert or update a canonical item record.
+
+        Embeddings are preserved if populated — do not exclude them.
+        """
         with self._Session() as session:
             row = session.get(_ItemRow, item.id)
-            canonical_json = item.model_dump_json(exclude={"embeddings"})
+            canonical_json = item.model_dump_json()
             text_norm = item.text.lower().strip()
             if row is None:
                 session.add(_ItemRow(
@@ -149,26 +226,63 @@ class RCMStore:
         language_code: str,
         general_item: GeneralItem,
     ) -> None:
-        """Insert or update the language-aware GeneralItem resolution for an item."""
+        """Insert or update the language-aware resolution for an item.
+
+        Populates grammar-dimension columns from target.extra using the registered
+        dim map.  Preserves grammar_id / grammar_parameters when the item is a
+        Sentence so the grammar-point connection survives round-trip.
+        """
+        phase_value = (general_item.phase or Phase.UNKNOWN).value
+        extra = general_item.target.extra if general_item.target else {}
+        dims = self._resolve_dims(language_code, phase_value, extra)
+
+        target_text_norm = (
+            general_item.target.display_text.lower().strip()
+            if general_item.target and general_item.target.display_text
+            else None
+        )
+
+        is_sentence = isinstance(general_item, Sentence)
+        grammar_id = general_item.grammar_id if is_sentence else None  # type: ignore[attr-defined]
+        grammar_params_json = (
+            json.dumps(general_item.grammar_parameters)  # type: ignore[attr-defined]
+            if is_sentence
+            else None
+        )
+
+        item_json = general_item.model_dump_json()
+
         with self._Session() as session:
             row = (
                 session.query(_BranchRow)
                 .filter_by(item_id=item_id, language_code=language_code)
                 .first()
             )
-            item_json = general_item.model_dump_json(exclude={"canonical": {"embeddings"}})
             if row is None:
                 session.add(_BranchRow(
                     item_id=item_id,
                     language_code=language_code,
                     general_item_json=item_json,
+                    target_text_normalized=target_text_norm,
+                    grammar_id=grammar_id,
+                    grammar_parameters_json=grammar_params_json,
+                    **dims,
                 ))
             else:
                 row.general_item_json = item_json
+                row.target_text_normalized = target_text_norm
+                row.grammar_id = grammar_id
+                row.grammar_parameters_json = grammar_params_json
+                for col, val in dims.items():
+                    setattr(row, col, val)
             session.commit()
 
     def get_branch(self, item_id: str, language_code: str) -> GeneralItem | None:
-        """Return the cached GeneralItem for an item×language pair, or None."""
+        """Return the cached item for an item×language pair.
+
+        Returns a ``Sentence`` when the stored branch has a ``grammar_id``
+        (i.e. it was written from a Sentence), otherwise a plain ``GeneralItem``.
+        """
         with self._Session() as session:
             row = (
                 session.query(_BranchRow)
@@ -177,7 +291,54 @@ class RCMStore:
             )
             if row is None:
                 return None
+            if row.grammar_id:
+                return Sentence.model_validate_json(row.general_item_json)
             return GeneralItem.model_validate_json(row.general_item_json)
+
+    def query_branches(
+        self,
+        language_code: str,
+        phase: Phase | None = None,
+        grammar_id: str | None = None,
+        dim_1: str | None = None,
+        dim_2: str | None = None,
+        dim_3: str | None = None,
+        dim_4: str | None = None,
+        dim_5: str | None = None,
+        dim_6: str | None = None,
+        dim_7: str | None = None,
+        dim_8: str | None = None,
+    ) -> list[GeneralItem | Sentence]:
+        """Return all branches matching the given filters.
+
+        Any ``None`` argument is ignored (not filtered on).  Use the dim
+        arguments to filter by language-specific grammar attributes, e.g.::
+
+            store.query_branches("eng-fre", Phase.VERBS, dim_1="être")
+            store.query_branches("eng-jap", Phase.VERBS, dim_1="る-verb")
+        """
+        with self._Session() as session:
+            q = session.query(_BranchRow).filter(
+                _BranchRow.language_code == language_code
+            )
+            if phase is not None:
+                q = q.join(_ItemRow, _ItemRow.id == _BranchRow.item_id).filter(
+                    _ItemRow.phase == phase.value
+                )
+            if grammar_id is not None:
+                q = q.filter(_BranchRow.grammar_id == grammar_id)
+            for col, val in zip(_DIM_COLS, (dim_1, dim_2, dim_3, dim_4, dim_5, dim_6, dim_7, dim_8)):
+                if val is not None:
+                    q = q.filter(getattr(_BranchRow, col) == val)
+            rows = q.all()
+
+        result: list[GeneralItem | Sentence] = []
+        for row in rows:
+            if row.grammar_id:
+                result.append(Sentence.model_validate_json(row.general_item_json))
+            else:
+                result.append(GeneralItem.model_validate_json(row.general_item_json))
+        return result
 
     # ------------------------------------------------------------------
     # Assets
@@ -228,19 +389,21 @@ class RCMStore:
             return p if p.exists() else None
 
     # ------------------------------------------------------------------
-    # Vocab coverage (text-level dedup)
+    # Vocab coverage (canonical + target text dedup)
     # ------------------------------------------------------------------
 
-    def covered_texts(self, language_code: str, phase: Phase) -> set[str]:
-        """Return the normalised text of all items registered for a given
-        language and phase — used to prevent vocabulary repetition across lessons.
+    def covered_vocab(self, language_code: str, phase: Phase) -> dict[str, set[str]]:
+        """Return a mapping of canonical text_normalized -> set[gloss] for all
+        items that have been LLM-resolved for *language_code* and *phase*.
 
-        Items are counted as covered if they have at least one branch for the
-        given *language_code*, meaning they have been LLM-resolved before.
+        The gloss set lets the caller distinguish genuinely different senses of
+        the same word (e.g. "father" with gloss "formal register" vs "informal
+        register") from meaningless duplicates.  An empty gloss set means the
+        word was stored without disambiguation.
         """
         with self._Session() as session:
             rows = (
-                session.query(_ItemRow.text_normalized)
+                session.query(_ItemRow.text_normalized, _ItemRow.canonical_json)
                 .join(
                     _BranchRow,
                     (_ItemRow.id == _BranchRow.item_id)
@@ -249,7 +412,35 @@ class RCMStore:
                 .filter(_ItemRow.phase == phase.value)
                 .all()
             )
-            return {row[0] for row in rows}
+        result: dict[str, set[str]] = {}
+        for text_norm, canonical_json in rows:
+            try:
+                gloss = json.loads(canonical_json).get("gloss", "") or ""
+            except (json.JSONDecodeError, AttributeError):
+                gloss = ""
+            result.setdefault(text_norm, set())
+            if gloss:
+                result[text_norm].add(gloss)
+        return result
+
+    def covered_target_texts(self, language_code: str, phase: Phase) -> set[str]:
+        """Return target-language display_text (normalised) for all resolved items.
+
+        Used to catch the case where two different canonical English words resolve
+        to the same target-language word (e.g. 'to say' and 'to tell' both → 'dire').
+        """
+        with self._Session() as session:
+            rows = (
+                session.query(_BranchRow.target_text_normalized)
+                .join(_ItemRow, _ItemRow.id == _BranchRow.item_id)
+                .filter(
+                    _BranchRow.language_code == language_code,
+                    _ItemRow.phase == phase.value,
+                    _BranchRow.target_text_normalized.isnot(None),
+                )
+                .all()
+            )
+        return {row[0] for row in rows if row[0]}
 
     # ------------------------------------------------------------------
     # Lesson membership
@@ -309,6 +500,8 @@ class RCMStore:
             "lesson_items": n_lesson_items,
             "duplicate_texts": duplicates,
         }
+
+
 
 
 # ---------------------------------------------------------------------------

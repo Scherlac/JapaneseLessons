@@ -66,6 +66,10 @@ GERMAN_LANGUAGE = PartialLanguageConfig(
     card_extra_font_keys={"article": "en_small"},
     vocab_source_key="german",
     vocab_phonetic_key="pronunciation",
+    rcm_dim_map={
+        "verbs": {"dim_1": "hilfsverb", "dim_2": "partizip_ii"},
+        "nouns": {"dim_1": "article"},
+    },
 )
 
 
@@ -101,6 +105,10 @@ JAPANESE_LANGUAGE = PartialLanguageConfig(
         "extra.masu_form: polite -masu form for VERBS only (e.g. '引っ越します'); omit for nouns/adjectives",
         "extra.type: for verbs — one of: る-verb, う-verb, irregular; for adjectives — one of: い-adj, な-adj; omit for nouns",
     ),
+    rcm_dim_map={
+        "verbs": {"dim_1": "type", "dim_2": "masu_form"},
+        "adjectives": {"dim_1": "type"},
+    },
 )
 
 FRENCH_LANGUAGE = PartialLanguageConfig(
@@ -133,4 +141,8 @@ FRENCH_LANGUAGE = PartialLanguageConfig(
         "extra.example_sentence_fr: a short, natural French sentence using the word",
         "extra.example_sentence_en: English translation of the example sentence",
     ),
+    rcm_dim_map={
+        "verbs": {"dim_1": "auxiliary", "dim_2": "past_participle"},
+        "nouns": {"dim_1": "article"},
+    },
 )
