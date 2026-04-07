@@ -36,8 +36,8 @@ LANGUAGE_OPTION = click.option(
     "--language",
     default="eng-jap",
     show_default=True,
-    type=click.Choice(["eng-jap", "hun-eng", "hun-ger"]),
-    help="Language pair: eng-jap (default), hun-eng, or hun-ger.",
+    type=click.Choice(["eng-jap", "hun-eng", "hun-ger", "eng-fre"]),
+    help="Language pair: eng-jap (default), hun-eng, hun-ger, or eng-fre.",
 )
 
 
@@ -228,6 +228,9 @@ def vocab_generate_prompt(theme: str, nouns: int, verbs: int, level: str, output
     if language == "hun-eng":
         from .prompt_template import hungarian_build_vocab_prompt
         prompt = hungarian_build_vocab_prompt(theme=theme, num_nouns=nouns, num_verbs=verbs, level=level)
+    elif language == "eng-fre":
+        from .prompt_template import french_build_vocab_prompt
+        prompt = french_build_vocab_prompt(theme=theme, num_nouns=nouns, num_verbs=verbs, level=level)
     else:
         prompt = build_vocab_prompt(theme=theme, num_nouns=nouns, num_verbs=verbs, level=level)
     if output:
@@ -265,6 +268,7 @@ def _run_lesson_generation(
     profile: str,
     narrative: tuple[str, ...],
     narrative_file: Path | None,
+    subtitle_file: Path | None,
     retrieval: bool,
     retrieval_store: Path | None,
     retrieval_backend: str,
@@ -305,6 +309,7 @@ def _run_lesson_generation(
         profile=profile,
         language=language,
         narrative=narrative_blocks,
+        subtitle_file=subtitle_file,
         retrieval_enabled=retrieval,
         retrieval_store_path=retrieval_store,
         retrieval_backend=retrieval_backend,
@@ -382,6 +387,12 @@ def _run_lesson_generation(
     help="Path to a text file with story context for sentence generation.",
 )
 @click.option(
+    "--subtitle-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to an SRT subtitle file; the LLM will synthesise narrative blocks from the full script.",
+)
+@click.option(
     "--retrieval/--no-retrieval",
     default=True,
     show_default=True,
@@ -432,6 +443,7 @@ def lesson_add(
     profile: str,
     narrative: tuple[str, ...],
     narrative_file: Path | None,
+    subtitle_file: Path | None,
     retrieval: bool,
     retrieval_store: Path | None,
     retrieval_backend: str,
@@ -463,6 +475,7 @@ def lesson_add(
         language=language,
         narrative=narrative,
         narrative_file=narrative_file,
+        subtitle_file=subtitle_file,
         retrieval=retrieval,
         retrieval_store=retrieval_store,
         retrieval_backend=retrieval_backend,
@@ -536,6 +549,12 @@ def lesson_add(
     help="Path to a text file with story context for sentence generation.",
 )
 @click.option(
+    "--subtitle-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to an SRT subtitle file; the LLM will synthesise narrative blocks from the full script.",
+)
+@click.option(
     "--retrieval/--no-retrieval",
     default=True,
     show_default=True,
@@ -599,6 +618,7 @@ def lesson_update(
     profile: str,
     narrative: tuple[str, ...],
     narrative_file: Path | None,
+    subtitle_file: Path | None,
     retrieval: bool,
     retrieval_store: Path | None,
     retrieval_backend: str,
@@ -634,6 +654,7 @@ def lesson_update(
             profile=profile,
             narrative=narrative,
             narrative_file=narrative_file,
+            subtitle_file=subtitle_file,
             retrieval=retrieval,
             retrieval_store=retrieval_store,
             retrieval_backend=retrieval_backend,
@@ -664,6 +685,7 @@ def lesson_update(
             profile=profile,
             narrative=narrative,
             narrative_file=narrative_file,
+            subtitle_file=subtitle_file,
             retrieval=retrieval,
             retrieval_store=retrieval_store,
             retrieval_backend=retrieval_backend,
@@ -702,6 +724,13 @@ def lesson_prompt(
     if language == "hun-eng":
         from .prompt_template import hungarian_build_lesson_prompt
         prompt = hungarian_build_lesson_prompt(
+            theme=theme,
+            nouns=selected_nouns,
+            verbs=selected_verbs,
+        )
+    elif language == "eng-fre":
+        from .prompt_template import french_build_lesson_prompt
+        prompt = french_build_lesson_prompt(
             theme=theme,
             nouns=selected_nouns,
             verbs=selected_verbs,

@@ -9,7 +9,12 @@ from __future__ import annotations
 
 from ..pipeline_core import ActionConfig, NarrativeBlock, NarrativeFrame, NarrativeConfig, StepAction
 from .config import build_narrative_generator_language_config
-from .prompt import build_narrative_generator_prompt
+from .prompt import build_narrative_generator_prompt, build_subtitle_narrative_prompt
+
+# If the number of pre-split blocks from a narrative file differs from the
+# requested lesson_blocks by more than this ratio, treat the file content as a
+# raw script and ask the LLM to synthesise the correct number of blocks.
+_BLOCK_MISMATCH_RATIO = 0.25
 
 
 class NarrativeGeneratorAction(StepAction[NarrativeConfig, NarrativeFrame]):
@@ -41,19 +46,44 @@ class NarrativeGeneratorAction(StepAction[NarrativeConfig, NarrativeFrame]):
                 lesson_number=chunk.lesson_number,
                 lesson_blocks=chunk.lesson_blocks,
                 seed_blocks=provided,
+                raw_script=chunk.raw_script,
                 blocks=seed_narrative_blocks,
             )
 
         language_config = config.language
         curriculum = config.curriculum
         step_config = build_narrative_generator_language_config(language_config)
-        prompt = build_narrative_generator_prompt(
-            theme=chunk.theme,
-            level_details=curriculum.level_details,
-            lesson_blocks=chunk.lesson_blocks,
-            canonical_language=step_config.canonical_language,
-            seed_blocks=provided,
-        )
+
+        # ------------------------------------------------------------------ #
+        # Subtitle / raw-script path                                          #
+        # Use the LLM to synthesise blocks from the full script when:        #
+        #   - a raw_script is available (parsed from an SRT file), OR        #
+        #   - seed_blocks were supplied but their count differs from the      #
+        #     requested lesson_blocks by more than _BLOCK_MISMATCH_RATIO      #
+        #     (i.e. the user fed a long pre-split narrative file into the     #
+        #     wrong slot — the LLM reshapes it to the right count).           #
+        # ------------------------------------------------------------------ #
+        use_subtitle_path = bool(chunk.raw_script)
+        if not use_subtitle_path and provided:
+            ratio = abs(len(provided) - chunk.lesson_blocks) / max(chunk.lesson_blocks, 1)
+            use_subtitle_path = ratio > _BLOCK_MISMATCH_RATIO
+
+        if use_subtitle_path:
+            script = chunk.raw_script or "\n".join(provided)
+            prompt = build_subtitle_narrative_prompt(
+                script=script,
+                lesson_blocks=chunk.lesson_blocks,
+                canonical_language=step_config.canonical_language,
+                seed_blocks=provided if chunk.raw_script else [],
+            )
+        else:
+            prompt = build_narrative_generator_prompt(
+                theme=chunk.theme,
+                level_details=curriculum.level_details,
+                lesson_blocks=chunk.lesson_blocks,
+                canonical_language=step_config.canonical_language,
+                seed_blocks=provided,
+            )
         result = config.runtime.call_llm(prompt)
         generated: list[NarrativeBlock] = [
             NarrativeBlock(
@@ -69,7 +99,9 @@ class NarrativeGeneratorAction(StepAction[NarrativeConfig, NarrativeFrame]):
             curriculum.level_details,
             chunk.lesson_blocks,
         )
-        blocks: list[NarrativeBlock] = [NarrativeBlock(narrative=s) for s in provided]
+        # When using the subtitle path the LLM rewrites the full progression,
+        # so we start from an empty list rather than prepending seed blocks.
+        blocks: list[NarrativeBlock] = [] if use_subtitle_path else [NarrativeBlock(narrative=s) for s in provided]
         for nb in generated:
             if len(blocks) < chunk.lesson_blocks:
                 blocks.append(nb)
@@ -80,5 +112,6 @@ class NarrativeGeneratorAction(StepAction[NarrativeConfig, NarrativeFrame]):
             lesson_number=chunk.lesson_number,
             lesson_blocks=chunk.lesson_blocks,
             seed_blocks=provided,
+            raw_script=chunk.raw_script,
             blocks=blocks[:chunk.lesson_blocks],
         )

@@ -99,6 +99,8 @@ VOICES = {
     "hungarian_male": "hu-HU-TamasNeural",
     "german_female": "de-DE-KatjaNeural",
     "german_male": "de-DE-ConradNeural",
+    "french_female": "fr-FR-DeniseNeural",
+    "french_male": "fr-FR-HenriNeural",
 }
 
 

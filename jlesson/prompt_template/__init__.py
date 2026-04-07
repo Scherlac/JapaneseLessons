@@ -58,6 +58,20 @@ from .hun_ger import (
     german_build_sentence_review_prompt,
 )
 
+# English-French
+from .eng_fr import (
+    FRENCH_PERSONS,
+    FRENCH_GRAMMAR_PATTERNS,
+    EngFrPrompts,
+    french_build_lesson_prompt,
+    french_build_vocab_prompt,
+    french_build_noun_practice_prompt,
+    french_build_verb_practice_prompt,
+    french_build_grammar_select_prompt,
+    french_build_grammar_generate_prompt,
+    french_build_sentence_review_prompt,
+)
+
 __all__ = [
     # base
     "PromptInterface",
@@ -97,4 +111,15 @@ __all__ = [
     "german_build_grammar_select_prompt",
     "german_build_grammar_generate_prompt",
     "german_build_sentence_review_prompt",
+    # eng-fre
+    "FRENCH_PERSONS",
+    "FRENCH_GRAMMAR_PATTERNS",
+    "EngFrPrompts",
+    "french_build_lesson_prompt",
+    "french_build_vocab_prompt",
+    "french_build_noun_practice_prompt",
+    "french_build_verb_practice_prompt",
+    "french_build_grammar_select_prompt",
+    "french_build_grammar_generate_prompt",
+    "french_build_sentence_review_prompt",
 ]

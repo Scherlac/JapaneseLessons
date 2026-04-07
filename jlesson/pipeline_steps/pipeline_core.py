@@ -53,6 +53,9 @@ class LessonConfig:
     regenerate_lesson_id: int | None = None
     # Step name to resume from (loads checkpoint; skips content generation)
     from_step: str | None = None
+    # Path to an SRT subtitle file; NarrativeGeneratorStep will parse it and
+    # ask the LLM to synthesise narrative blocks from the full script.
+    subtitle_file: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -179,12 +182,15 @@ class NarrativeConfig:
     Carries everything needed for one narrative generation call.
     ``lesson_number`` is resolved from curriculum state inside
     ``build_input`` so the action remains free of ``LessonContext``.
+    ``raw_script`` is the plain-text dialogue extracted from an SRT file;
+    when set the action calls the LLM to synthesise blocks from the full script.
     """
 
     theme: str
     lesson_number: int
     lesson_blocks: int
     seed_blocks: list[str]
+    raw_script: str = ""
 
 
 @dataclass
@@ -199,7 +205,7 @@ class NarrativeFrame(NarrativeConfig):
     Context field: ``LessonContext.narrative_frame``
     """
 
-    blocks: list[NarrativeBlock]
+    blocks: list[NarrativeBlock] = dataclass_field(default_factory=list)
 
 
 
