@@ -127,6 +127,9 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
             covered_vocab = {p: m for p, m in covered_vocab.items() if m}
             if not covered_vocab:
                 covered_vocab = None
+            else:
+                total = sum(len(m) for m in covered_vocab.values())
+                print(f"  [RCM] covered vocab: {total} entries across {len(covered_vocab)} phases")
         else:
             covered_vocab = None
         common_kwargs["covered_vocab"] = covered_vocab
