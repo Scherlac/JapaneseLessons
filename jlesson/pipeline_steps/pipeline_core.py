@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from jlesson.pipeline_steps.review_sentences.action import SentenceReviewResult
+    from jlesson.rcm import RCMStore
 
 
 _UNSET = object()
@@ -56,6 +57,9 @@ class LessonConfig:
     # Path to an SRT subtitle file; NarrativeGeneratorStep will parse it and
     # ask the LLM to synthesise narrative blocks from the full script.
     subtitle_file: Path | None = None
+    # Path to the RCM root directory (rcm.db lives here). When set, the pipeline
+    # will reuse previously resolved items and compiled assets.
+    rcm_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -98,6 +102,9 @@ class LessonContext:
     # Registration artifacts — populated by RegisterLessonStep
     lesson_id: int | None = None
     created_at: str | None = None
+
+    # Optional RCM store — opened by the pipeline runner when rcm_path is set
+    rcm: "RCMStore | None" = None
 
 class PipelineStep(ABC):
     """Abstract base class for pipeline steps."""
@@ -407,12 +414,16 @@ class ActionConfig:
         Language-pair specific prompts, generators, and labels.
     runtime
         I/O facade for LLM calls, retrieval, storage, and cache.
+    rcm
+        Optional RCMStore instance for cross-lesson item reuse.  ``None`` when
+        ``--rcm-path`` was not supplied.
     """
     curriculum: CurriculumData
     lesson: LessonConfig
     block_index: int
     language: LanguageConfig
     runtime: RuntimeServices
+    rcm: "RCMStore | None" = None
 
 
 # ---------------------------------------------------------------------------
@@ -522,6 +533,7 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
                 block_index=block_index,
                 language=ctx.language_config,
                 runtime=rt,
+                rcm=ctx.rcm,
             )
             outputs.append(self.action.run(cfg, chunk))
 
@@ -540,6 +552,7 @@ class ActionStep(PipelineStep, Generic[_I, _O]):
             block_index=0,
             language=ctx.language_config,
             runtime=rt,
+            rcm=ctx.rcm,
         )
         output = self.action.run(cfg, inputs)
 

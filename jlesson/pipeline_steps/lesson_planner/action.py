@@ -24,20 +24,63 @@ class LessonPlannerAction(StepAction[CanonicalLessonBlock, LessonBlock]):
     """
 
     def run(self, config: ActionConfig, input: CanonicalLessonBlock) -> LessonBlock:
-        prompt = build_item_resolve_prompt(
-            source_language=config.language.source.display_name,
-            target_language=config.language.target.display_name,
-            canonical_language=config.language.canonical_language,
-            block_index=input.block_index,
-            narrative_content=input.narrative.narrative,
-            grammar_ids=input.grammar_ids,
-            content_sequences=input.content_sequences,
-            source_config=config.language.source,
-            target_config=config.language.target,
-        )
+        lang = config.language.code
 
-        raw = config.runtime.call_llm(prompt)
-        return self._parse_response(raw, input)
+        # --- RCM cache lookup ---
+        cached: list[GeneralItem] = []
+        uncached_sequences: dict[Phase, list[CanonicalItem]] = {}
+        if config.rcm is not None:
+            for phase, items in input.content_sequences.items():
+                for canonical_item in items:
+                    gi = config.rcm.get_branch(canonical_item.id, lang)
+                    if gi is not None:
+                        cached.append(gi)
+                    else:
+                        uncached_sequences.setdefault(phase, []).append(canonical_item)
+        else:
+            uncached_sequences = dict(input.content_sequences)
+
+        # Build an input block with only uncached items for the LLM
+        newly_resolved: list[GeneralItem] = []
+        if uncached_sequences:
+            modified_input = input.model_copy(update={"content_sequences": uncached_sequences})
+            prompt = build_item_resolve_prompt(
+                source_language=config.language.source.display_name,
+                target_language=config.language.target.display_name,
+                canonical_language=config.language.canonical_language,
+                block_index=modified_input.block_index,
+                narrative_content=modified_input.narrative.narrative,
+                grammar_ids=modified_input.grammar_ids,
+                content_sequences=modified_input.content_sequences,
+                source_config=config.language.source,
+                target_config=config.language.target,
+            )
+            raw = config.runtime.call_llm(prompt)
+            lesson_block = self._parse_response(raw, modified_input)
+            for phase_items in lesson_block.content_sequences.values():
+                newly_resolved.extend(phase_items)
+
+            # Persist new resolutions to RCM
+            if config.rcm is not None:
+                for gi in newly_resolved:
+                    if gi.canonical is not None:
+                        config.rcm.upsert_item(gi.canonical)
+                    config.rcm.upsert_branch(gi.id, lang, gi)
+
+        # Merge cached + newly resolved into a single LessonBlock
+        all_items = cached + newly_resolved
+        content_sequences: dict[Phase, list[GeneralItem]] = {}
+        for gi in all_items:
+            phase = gi.phase or Phase.UNKNOWN
+            content_sequences.setdefault(phase, []).append(gi)
+        for phase in input.content_sequences:
+            content_sequences.setdefault(phase, [])
+
+        return LessonBlock(
+            block_index=input.block_index,
+            grammar_ids=list(input.grammar_ids),
+            content_sequences=content_sequences,
+        )
 
     @staticmethod
     def _parse_response(

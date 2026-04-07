@@ -77,6 +77,12 @@ def _render_item_cards(
         if asset_key not in _CARD_FILENAME:
             continue
         path = cards_dir / _CARD_FILENAME[asset_key]
+        if path.exists():
+            if asset_key == "card_src":
+                item.source.assets[asset_key] = path
+            else:
+                item.target.assets[asset_key] = path
+            continue
         card = renderer.render_card(
             item=item,
             touch=None,
@@ -135,8 +141,14 @@ async def _render_item_audio(
     for asset_key, (voice_key, text) in voice_map.items():
         if asset_key not in required or not text or not voice_key:
             continue
-        engine = create_engine_fn(lang_cfg.voices.get(voice_key, voice_key), rate="-20%")
         path = audio_dir / _AUDIO_FILENAME.get(asset_key, f"{stem}_{asset_key}.mp3")
+        if path.exists():
+            if asset_key == "audio_src":
+                item.source.assets[asset_key] = path
+            else:
+                item.target.assets[asset_key] = path
+            continue
+        engine = create_engine_fn(lang_cfg.voices.get(voice_key, voice_key), rate="-20%")
         for attempt in range(3):
             try:
                 await engine.generate_audio(text, path)

@@ -277,6 +277,7 @@ def _run_lesson_generation(
     language: str,
     regenerate_lesson_id: int | None,
     from_step: str | None = None,
+    rcm_path: Path | None = None,
 ) -> None:
     """Run lesson generation, optionally overwriting an existing lesson ID."""
     from .lesson_pipeline import LessonConfig, run_pipeline
@@ -317,6 +318,7 @@ def _run_lesson_generation(
         retrieval_min_coverage=retrieval_min_coverage,
         regenerate_lesson_id=regenerate_lesson_id,
         from_step=from_step,
+        rcm_path=rcm_path,
     )
     try:
         run_pipeline(config)
@@ -424,6 +426,12 @@ def _run_lesson_generation(
     show_default=True,
     help="Minimum retrieval coverage required before retrieved material is used.",
 )
+@click.option(
+    "--rcm-path",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Path to the RCM store directory. Enables cross-lesson item reuse and asset caching.",
+)
 @LANGUAGE_OPTION
 def lesson_add(
     theme: str,
@@ -450,6 +458,7 @@ def lesson_add(
     retrieval_embedding_model: str,
     retrieval_min_coverage: float,
     language: str,
+    rcm_path: Path | None,
 ) -> None:
     """Run the full pipeline for the next lesson.
 
@@ -482,6 +491,7 @@ def lesson_add(
         retrieval_embedding_model=retrieval_embedding_model,
         retrieval_min_coverage=retrieval_min_coverage,
         regenerate_lesson_id=None,
+        rcm_path=rcm_path,
     )
 
 
@@ -598,6 +608,12 @@ def lesson_add(
         "'compile_assets' recompiles cards and TTS before rendering."
     ),
 )
+@click.option(
+    "--rcm-path",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Path to the RCM store directory. Enables cross-lesson item reuse and asset caching.",
+)
 @LANGUAGE_OPTION
 def lesson_update(
     lesson_id: int,
@@ -626,6 +642,7 @@ def lesson_update(
     retrieval_min_coverage: float,
     from_step: str | None,
     language: str,
+    rcm_path: Path | None,
 ) -> None:
     """Run or re-render an existing lesson ID.
 
@@ -663,6 +680,7 @@ def lesson_update(
             language=language,
             regenerate_lesson_id=lesson_id,
             from_step=from_step,
+            rcm_path=rcm_path,
         )
     else:
         if not theme:
@@ -693,6 +711,7 @@ def lesson_update(
             retrieval_min_coverage=retrieval_min_coverage,
             language=language,
             regenerate_lesson_id=lesson_id,
+            rcm_path=rcm_path,
         )
 
 

@@ -124,6 +124,7 @@ def build_lesson_plan_prompt(
     content_counts: dict[Phase, int],
     canonical_language: str = "english",
     previous_outline_json: str | None = None,
+    covered_vocab: dict[Phase, set[str]] | None = None,
 ) -> str:
     """Build the language-agnostic lesson plan prompt.
 
@@ -213,6 +214,20 @@ def build_lesson_plan_prompt(
     )
     dynamic_planning_constraints = "\n".join(filter(None, [_vocab_constraints, _grammar_constraints]))
     
+    if covered_vocab:
+        covered_vocab_lines = "\n".join(
+            f"  {PHASE_PARSE_DETAILS[phase]['name'].capitalize()}s: "
+            + ", ".join(sorted(texts))
+            for phase, texts in covered_vocab.items()
+            if texts and phase in PHASE_PARSE_DETAILS
+        )
+        covered_vocab_section = f"""
+VOCABULARY ALREADY TAUGHT (do NOT reuse these words across lessons):
+{covered_vocab_lines}
+"""
+    else:
+        covered_vocab_section = ""
+
     revision_section = ""
     if previous_outline_json is not None:
         revision_section = f"""
@@ -253,7 +268,7 @@ ALREADY COVERED GRAMMAR (from previous lessons, with Fibonacci pacing stage):
 
 AVAILABLE VOCABULARY:
 {dynamic_vocab_str}
-
+{covered_vocab_section}
 UNLOCKED GRAMMAR POINTS (prerequisites met, ready to teach):
 {grammar_lines}
 
@@ -269,7 +284,7 @@ CONSTRAINTS:
   introduce a grammar point, then repeat it in subsequent blocks with
   gradually increasing gaps.
 - Assign items to blocks so they align with the narrative content
-  and the grammar being practised.
+  and the grammar being practised.{"" if not covered_vocab else chr(10) + "- Do NOT select any vocabulary word listed under VOCABULARY ALREADY TAUGHT above — choose fresh {canonical_language} words instead."}
 - IMPORTANT: All {dynamic_json_item_list} MUST be in {canonical_language}.
   This is a canonical (language-neutral) plan. Use plain {canonical_language} words
   (e.g. "house", "father", "tree", "to move", "to find"). Do NOT use any

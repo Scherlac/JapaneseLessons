@@ -198,6 +198,13 @@ def run_pipeline(
         ctx.language_config = get_language_config(config.language)
         ctx.curriculum = load_curriculum_fn(config.curriculum_path)
 
+    # Open RCM store if a path was configured
+    _rcm_store = None
+    if config.rcm_path is not None:
+        from jlesson.rcm import RCMStore
+        _rcm_store = RCMStore(config.rcm_path / "rcm.db")
+        ctx.rcm = _rcm_store
+
     total = len(pipeline)
 
     print(f"\n{'=' * 60}")
@@ -238,4 +245,8 @@ def run_pipeline(
         print(f"  Video   : {video_path}")
     if report_path:
         print(f"  Report  : {report_path}")
+
+    if _rcm_store is not None:
+        _rcm_store.close()
+
     return ctx

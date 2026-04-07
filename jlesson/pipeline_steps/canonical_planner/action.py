@@ -109,6 +109,21 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
             canonical_language=config.language.canonical_language,
         )
 
+        # Collect already-seen vocabulary from RCM to prevent cross-lesson repetition
+        if config.rcm is not None:
+            lang = config.language.code
+            covered_vocab: dict[Phase, set[str]] | None = {
+                phase: config.rcm.covered_texts(lang, phase)
+                for phase in (Phase.NOUNS, Phase.VERBS, Phase.ADJECTIVES)
+            }
+            # Remove phases where no vocab has been covered yet
+            covered_vocab = {p: s for p, s in covered_vocab.items() if s}
+            if not covered_vocab:
+                covered_vocab = None
+        else:
+            covered_vocab = None
+        common_kwargs["covered_vocab"] = covered_vocab
+
         # ── Pass 1: draft outline ────────────────────────────────────────
         prompt_1 = build_lesson_plan_prompt(**common_kwargs, previous_outline_json=None)
         result_1 = config.runtime.call_llm(prompt_1)
