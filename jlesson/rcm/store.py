@@ -116,6 +116,9 @@ class _LessonItemRow(_Base):
 
 _DIM_COLS = ("dim_1", "dim_2", "dim_3", "dim_4", "dim_5", "dim_6", "dim_7", "dim_8")
 
+# Asset keys that populate item.source.assets; every other key → item.target.assets
+_ASSET_SOURCE_KEYS: frozenset[str] = frozenset({"audio_src", "card_src"})
+
 
 # ---------------------------------------------------------------------------
 # Public store
@@ -126,6 +129,9 @@ class RCMStore:
 
     def __init__(self, db_path: Path) -> None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._store_root = db_path.parent
+        self.assets_dir = self._store_root / "assets"
+        self.assets_dir.mkdir(parents=True, exist_ok=True)
         url = f"sqlite:///{db_path}"
         self._engine = create_engine(url, connect_args={"check_same_thread": False})
         # Enable WAL mode for concurrent reads during pipeline runs
@@ -350,15 +356,33 @@ class RCMStore:
         language_code: str,
         asset_key: str,
         file_path: Path,
+        copy_to_store: bool = False,
     ) -> None:
-        """Record a compiled asset path for an item×language×asset_key triple."""
+        """Record a compiled asset path for an item×language×asset_key triple.
+
+        When *copy_to_store* is True the file is copied into ``self.assets_dir``
+        and the stored path is saved as a relative path (``assets/{filename}``).
+        This makes the store relocatable — relative paths are resolved against
+        ``self._store_root`` at read time.
+
+        When *copy_to_store* is False the path is stored as-is (absolute or
+        relative).  Existing absolute-path entries written by older imports
+        remain valid.
+        """
+        if copy_to_store:
+            dest = self.assets_dir / file_path.name
+            if not dest.exists():
+                import shutil
+                shutil.copy2(file_path, dest)
+            path_str = f"assets/{file_path.name}"
+        else:
+            path_str = str(file_path)
         with self._Session() as session:
             row = (
                 session.query(_AssetRow)
                 .filter_by(item_id=item_id, language_code=language_code, asset_key=asset_key)
                 .first()
             )
-            path_str = str(file_path)
             if row is None:
                 session.add(_AssetRow(
                     item_id=item_id,
@@ -376,7 +400,12 @@ class RCMStore:
         language_code: str,
         asset_key: str,
     ) -> Path | None:
-        """Return the registered path for an asset, or None if not registered."""
+        """Return the resolved path for an asset, or None if not registered or missing.
+
+        Relative paths (starting with ``assets/``) are resolved against
+        ``self._store_root``.  Absolute paths are used as-is (backward
+        compatibility with entries written before central-store migration).
+        """
         with self._Session() as session:
             row = (
                 session.query(_AssetRow)
@@ -385,8 +414,91 @@ class RCMStore:
             )
             if row is None:
                 return None
-            p = Path(row.file_path)
-            return p if p.exists() else None
+            stored = row.file_path
+        p = (
+            self._store_root / stored
+            if not Path(stored).is_absolute()
+            else Path(stored)
+        )
+        return p if p.exists() else None
+
+    def pre_populate_assets(
+        self,
+        content_sequences: dict,
+        suffix_map: dict[str, str],
+        language_code: str,
+        project_assets_dir: "Path | None" = None,
+    ) -> None:
+        """Pre-populate item asset paths before compilation.
+
+        For each item × asset key, resolves the asset from (in order):
+          1. RCM central store
+          2. Project-level ``assets/`` drop zone (*project_assets_dir*)
+
+        Sets the resolved path directly on ``item.source.assets`` or
+        ``item.target.assets`` so that ``compile_assets()`` skips rendering
+        for files that already exist.
+
+        *suffix_map* must be the result of
+        :func:`~jlesson.asset_compiler.build_asset_suffix_map`.
+        """
+        for _phase, items in content_sequences.items():
+            for item in items:
+                if not item.canonical or not item.canonical.id:
+                    continue
+                item_id = item.canonical.id
+                for key, suffix in suffix_map.items():
+                    is_src = key in _ASSET_SOURCE_KEYS
+                    bucket = item.source.assets if is_src else item.target.assets
+                    if bucket.get(key):
+                        continue
+
+                    resolved: Path | None = self.get_asset(item_id, language_code, key)
+
+                    if resolved is None and project_assets_dir:
+                        candidate = project_assets_dir / f"{item_id}_{suffix}"
+                        if candidate.exists():
+                            resolved = candidate
+
+                    if resolved is not None:
+                        bucket[key] = resolved
+
+    def post_register_assets(
+        self,
+        content_sequences: dict,
+        suffix_map: dict[str, str],
+        language_code: str,
+        lesson_dir: Path,
+    ) -> None:
+        """Copy newly compiled assets into the RCM central store.
+
+        Iterates all items after ``compile_assets()`` has run.  For each asset
+        path that lives inside *lesson_dir* (i.e. was just freshly rendered),
+        copies the file into ``self.assets_dir`` and registers a relative path.
+
+        Assets already fetched from the RCM or project-level dir are skipped
+        because their paths do not reside under *lesson_dir*.
+        """
+        for _phase, items in content_sequences.items():
+            for item in items:
+                if not item.canonical or not item.canonical.id:
+                    continue
+                item_id = item.canonical.id
+                for key in suffix_map:
+                    is_src = key in _ASSET_SOURCE_KEYS
+                    bucket = item.source.assets if is_src else item.target.assets
+                    path = bucket.get(key)
+                    if not path:
+                        continue
+                    path = Path(path)
+                    if not path.exists():
+                        continue
+                    try:
+                        path.relative_to(lesson_dir)
+                    except ValueError:
+                        continue  # from RCM / project-level — skip
+                    self.register_asset(item_id, language_code, key, path, copy_to_store=True)
+                    print(f"  [RCM] registered asset: {path.name}")
 
     # ------------------------------------------------------------------
     # Vocab coverage (canonical + target text dedup)

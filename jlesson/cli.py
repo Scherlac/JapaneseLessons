@@ -951,6 +951,85 @@ def lesson_shorts(
     click.echo(f"\nDone. Shorts in: {shorts_dir}")
 
 
+@lesson.command("bundle")
+@click.argument(
+    "lesson_dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+@click.option(
+    "--rcm-path",
+    required=True,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Path to the RCM store directory (same value used with --rcm-path during lesson generation).",
+)
+@LANGUAGE_OPTION
+def lesson_bundle(lesson_dir: Path, rcm_path: Path, language: str) -> None:
+    """Copy RCM-stored assets into a lesson folder to make it self-contained.
+
+    LESSON_DIR should be the lesson_NNN folder, e.g.:
+      output/eng-fre/01 northern exposure.../lesson_001
+
+    Assets are copied into LESSON_DIR/audio/ and LESSON_DIR/cards/ so the
+    folder can be used standalone (for video rendering, archival, or sharing)
+    without requiring the RCM store to be present.
+    """
+    import shutil
+    from jlesson.rcm import open_rcm
+    from jlesson.asset_compiler import build_asset_suffix_map
+
+    planner_path = lesson_dir / "steps" / "lesson_planner" / "output.json"
+    if not planner_path.exists():
+        raise click.ClickException(f"Lesson planner output not found: {planner_path}")
+
+    with open(planner_path, encoding="utf-8") as f:
+        blocks = json.load(f)
+
+    from jlesson.models import GeneralItem
+
+    items: list[GeneralItem] = []
+    for block in blocks:
+        for phase_items in block.get("content_sequences", {}).values():
+            for raw in phase_items:
+                try:
+                    items.append(GeneralItem.model_validate(raw))
+                except Exception:
+                    pass
+
+    audio_dir = lesson_dir / "audio"
+    cards_dir = lesson_dir / "cards"
+    audio_dir.mkdir(exist_ok=True)
+    cards_dir.mkdir(exist_ok=True)
+
+    _SUFFIX = build_asset_suffix_map(language)
+
+    copied = 0
+    already_present = 0
+    missing = 0
+
+    with open_rcm(rcm_path) as store:
+        for item in items:
+            if not item.canonical or not item.canonical.id:
+                continue
+            item_id = item.canonical.id
+            for key, suffix in _SUFFIX.items():
+                dest_dir = audio_dir if "audio" in key else cards_dir
+                dest = dest_dir / f"{item_id}_{suffix}"
+                if dest.exists():
+                    already_present += 1
+                    continue
+                src_path = store.get_asset(item_id, language, key)
+                if src_path is None:
+                    missing += 1
+                    continue
+                shutil.copy2(src_path, dest)
+                copied += 1
+
+    click.echo(f"Bundle complete for: {lesson_dir.name}")
+    click.echo(f"  Copied          : {copied}")
+    click.echo(f"  Already present : {already_present}")
+    click.echo(f"  Not in store    : {missing}")
+
+
 # ---------------------------------------------------------------------------
 # curriculum subgroup
 # ---------------------------------------------------------------------------

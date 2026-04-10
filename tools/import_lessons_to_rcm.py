@@ -30,44 +30,9 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from jlesson.asset_compiler import build_asset_suffix_map
 from jlesson.models import GeneralItem, Phase
 from jlesson.rcm import open_rcm
-
-# Asset keys and the filename suffixes the asset_compiler produces per key.
-# Pattern: {item_id}_{suffix}
-_AUDIO_SUFFIXES: dict[str, str] = {
-    "audio_src": "audio_en.mp3",        # source language audio (always English for eng-* pairs)
-    "audio_tar_f": "audio_fr_f.mp3",    # target language female
-    "audio_tar_m": "audio_fr_m.mp3",    # target language male
-}
-_CARD_SUFFIXES: dict[str, str] = {
-    "card_src": "card_en.png",
-    "card_tar": "card_fr.png",
-    "card_src_tar": "card_en_fr.png",
-}
-
-
-def _derive_audio_suffix(language_code: str) -> dict[str, str]:
-    """Derive audio filename suffixes from language code like 'eng-fre'."""
-    parts = language_code.split("-")
-    src = parts[0][:2] if parts else "en"
-    tar = parts[1][:2] if len(parts) > 1 else "fr"
-    return {
-        "audio_src": f"audio_{src}.mp3",
-        "audio_tar_f": f"audio_{tar}_f.mp3",
-        "audio_tar_m": f"audio_{tar}_m.mp3",
-    }
-
-
-def _derive_card_suffix(language_code: str) -> dict[str, str]:
-    parts = language_code.split("-")
-    src = parts[0][:2] if parts else "en"
-    tar = parts[1][:2] if len(parts) > 1 else "fr"
-    return {
-        "card_src": f"card_{src}.png",
-        "card_tar": f"card_{tar}.png",
-        "card_src_tar": f"card_{src}_{tar}.png",
-    }
 
 
 def _load_lesson_id_map(curriculum_path: Path) -> dict[str, int]:
@@ -103,9 +68,7 @@ def run_import(
     rcm_path: Path,
     curriculum_path: Path | None,
 ) -> None:
-    audio_suffixes = _derive_audio_suffix(language_code)
-    card_suffixes = _derive_card_suffix(language_code)
-    all_suffixes = {**audio_suffixes, **card_suffixes}
+    all_suffixes = build_asset_suffix_map(language_code)
 
     lesson_id_map: dict[str, int] = {}
     if curriculum_path:
@@ -153,15 +116,17 @@ def run_import(
                 store.upsert_item(canonical)
                 store.upsert_branch(canonical.id, language_code, item)
 
-                # Register existing compiled assets
+                # Register existing compiled assets — copy into central store
                 for asset_key, suffix in all_suffixes.items():
-                    # Audio assets
                     if "audio" in asset_key:
                         candidate = audio_dir / f"{canonical.id}_{suffix}"
                     else:
                         candidate = cards_dir / f"{canonical.id}_{suffix}"
                     if candidate.exists():
-                        store.register_asset(canonical.id, language_code, asset_key, candidate)
+                        store.register_asset(
+                            canonical.id, language_code, asset_key, candidate,
+                            copy_to_store=True,
+                        )
                         total_assets += 1
 
                 total_items += 1

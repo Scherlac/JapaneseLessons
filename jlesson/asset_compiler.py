@@ -51,6 +51,30 @@ def _lang_codes(lang_cfg: LanguageConfig | None) -> tuple[str, str]:
     return lang_cfg.source.code, lang_cfg.target.code
 
 
+def build_asset_suffix_map(language_code: str) -> dict[str, str]:
+    """Return the canonical asset-key → filename-suffix mapping for *language_code*.
+
+    The suffix is the part after ``{item_id}_``, e.g. ``audio_fr_f.mp3``.
+    Language codes are derived from the first two characters of each part:
+    ``eng-fre`` → src=``en``, tar=``fr``.
+
+    This is the single source of truth for the asset filename convention used
+    by :mod:`asset_compiler`, :class:`~jlesson.rcm.RCMStore`, and the import /
+    bundle tools.
+    """
+    parts = language_code.split("-")
+    src = parts[0][:2] if parts else "en"
+    tar = parts[1][:2] if len(parts) > 1 else "fr"
+    return {
+        "audio_src":   f"audio_{src}.mp3",
+        "audio_tar_f": f"audio_{tar}_f.mp3",
+        "audio_tar_m": f"audio_{tar}_m.mp3",
+        "card_src":    f"card_{src}.png",
+        "card_tar":    f"card_{tar}.png",
+        "card_src_tar":f"card_{src}_{tar}.png",
+    }
+
+
 def _render_item_cards(
     item: GeneralItem,
     required: set[str],
