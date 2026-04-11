@@ -58,6 +58,7 @@ def ask_llm_cached(
     """
     resolved = _resolve_cache_dir(cache_dir)
     path = _cache_path(prompt, resolved)
+    path_prompt = path.with_suffix(".prompt.txt")
 
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8"))
@@ -68,6 +69,7 @@ def ask_llm_cached(
         json.dumps(result, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    path_prompt.write_text(prompt, encoding="utf-8")
     return result
 
 
