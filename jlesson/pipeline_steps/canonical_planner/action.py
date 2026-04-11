@@ -79,6 +79,17 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
             )
             for gid in covered
         ]
+
+        # Build a lookup of covered grammar items for reinforcement.
+        # Include any covered grammar point that is not yet mastered (< 21 lessons seen)
+        # so the LLM can include them in blocks alongside newly unlocked points.
+        MASTERY_THRESHOLD = 21
+        grammar_by_id: Dict[str, GrammarItem] = {g.id: g for g in progression}
+        reinforcement_grammar: List[GrammarItem] = [
+            grammar_by_id[gid]
+            for gid in covered
+            if gid in grammar_by_id and grammar_lesson_counts.get(gid, 0) < MASTERY_THRESHOLD
+        ]
         canonical = None
         if canonical is None:
             canonical = CanonicalLessonBlock(
@@ -96,6 +107,7 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
             narrative_blocks=input.blocks,
             unlocked_grammar=unlocked,
             covered_grammar=covered_grammar,
+            reinforcement_grammar=reinforcement_grammar,
             grammar_points_per_lesson=config.lesson.grammar_points_per_lesson,
             grammar_points_per_block=config.lesson.grammar_points_per_block,
             content_counts={
@@ -214,6 +226,14 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
                 narrative=narrative,
                 content_sequences=content_sequences,
             ))
+        # Safety-net: ensure every block has at least one grammar_id.
+        # The LLM sometimes leaves grammar_ids empty despite the prompt constraint;
+        # fall back to the lesson-level grammar_ids so downstream steps always have
+        # a grammar point to work with.
+        for block in blocks:
+            if not block.grammar_ids and grammar_ids:
+                block.grammar_ids = grammar_ids[:1]
+
         # Pad missing blocks
         while len(blocks) < expected_blocks:
             idx = len(blocks) + 1

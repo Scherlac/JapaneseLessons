@@ -118,6 +118,7 @@ def build_lesson_plan_prompt(
     narrative_blocks: list[NarrativeBlock],
     unlocked_grammar: list[GrammarItem],
     covered_grammar: list[GrammarCoverageInfo],
+    reinforcement_grammar: list[GrammarItem] | None = None,
     grammar_points_per_lesson: int,
     grammar_points_per_block: int,
     content_sequences: dict[Phase, list[CanonicalItem]],
@@ -138,6 +139,22 @@ def build_lesson_plan_prompt(
         f"    example: {g.example_source} → {g.example_target}"
         for g in unlocked_grammar
     )
+    if not grammar_lines:
+        grammar_lines = "  (none — only reinforcement grammar is available this lesson)"
+
+    # Build reinforcement section: covered grammar that is not yet mastered
+    _covered_by_id: dict[str, GrammarCoverageInfo] = {c.grammar_id: c for c in covered_grammar}
+    if reinforcement_grammar:
+        reinforcement_lines = "\n".join(
+            f"  - id: {g.id}  |  level: {g.level}\n"
+            f"    pattern: {g.pattern}\n"
+            f"    description: {g.description}\n"
+            f"    example: {g.example_source} → {g.example_target}\n"
+            f"    pacing: {_covered_by_id[g.id].fibonacci_label if g.id in _covered_by_id else '0× seen: not yet introduced'}"
+            for g in reinforcement_grammar
+        )
+    else:
+        reinforcement_lines = "  (none)"
     if covered_grammar:
         covered_lines = "\n".join(
             f"  - {c.grammar_id}  ({c.fibonacci_label})"
@@ -248,8 +265,9 @@ You are revising your own earlier outline. Improve it by:
 1. Ensuring Fibonacci pacing is respected — new grammar appears densely first,
    then spaces out. Check the block assignments above against the cycle table.
 2. Balancing vocabulary across blocks — no block should be overloaded.
-3. Making sure every grammar point appears in at least {grammar_points_per_block} blocks
-   to give learners enough practice.
+3. Making sure every block has at least 1 grammar point in its grammar_ids list.
+   Unlocked grammar points must each appear in at least {grammar_points_per_block} blocks.
+   Reinforcement grammar points should appear according to their Fibonacci pacing label.
 4. Ensuring sentence alignment across blocks is consistent and logical given the narrative flow.
 5. Avoid spoiling the narrative, add believable backstory to support the grammar and
    vocabulary choices, but do not alter or break any narrative content that was not in the narrative blocks.
@@ -277,16 +295,22 @@ ALREADY COVERED GRAMMAR (from previous lessons, with Fibonacci pacing stage):
 AVAILABLE VOCABULARY:
 {dynamic_vocab_str}
 {covered_vocab_section}
-UNLOCKED GRAMMAR POINTS (prerequisites met, ready to teach):
+UNLOCKED GRAMMAR POINTS (new this lesson — prerequisites met, ready to teach):
 {grammar_lines}
+
+REINFORCEMENT GRAMMAR POINTS (introduced in earlier lessons — still being consolidated, available for use in any block):
+{reinforcement_lines}
 
 NARRATIVE BLOCKS:
 {narrative_section}
 
 CONSTRAINTS:
-- Select exactly {grammar_points_per_lesson} grammar points for this lesson
+- Select exactly {grammar_points_per_lesson} grammar points for this lesson from the UNLOCKED list
   (or all available if fewer than {grammar_points_per_lesson} are unlocked).
-- Each block should practise up to {grammar_points_per_block} grammar points.
+- Blocks may additionally use any grammar point from the REINFORCEMENT list following its Fibonacci pacing guidance.
+- Every block MUST include at least 1 grammar point (from either the UNLOCKED or REINFORCEMENT list).
+  Each block may practise up to {grammar_points_per_block} grammar points total.
+  Do NOT leave any block with an empty grammar_ids list.
 {dynamic_planning_constraints}
 - Distribute grammar across blocks following Fibonacci pacing:
   introduce a grammar point, then repeat it in subsequent blocks with
