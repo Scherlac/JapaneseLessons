@@ -230,7 +230,7 @@ def compile_assets_sync(
     cards_dir = output_dir / "cards"
     cards_dir.mkdir(parents=True, exist_ok=True)
 
-    for phase in (Phase.NOUNS, Phase.VERBS, Phase.GRAMMAR):
+    for phase in (Phase.NOUNS, Phase.VERBS, Phase.ADJECTIVES, Phase.GRAMMAR):
         items = items_by_phase.get(phase, [])
         required = profile.required_assets(phase)
 
@@ -279,7 +279,7 @@ async def compile_assets(
     cards_dir.mkdir(parents=True, exist_ok=True)
     audio_dir.mkdir(parents=True, exist_ok=True)
 
-    for phase in (Phase.NOUNS, Phase.VERBS, Phase.GRAMMAR):
+    for phase in (Phase.NOUNS, Phase.VERBS, Phase.ADJECTIVES, Phase.GRAMMAR):
         items = items_by_phase.get(phase, [])
         required = profile.required_assets(phase)
 

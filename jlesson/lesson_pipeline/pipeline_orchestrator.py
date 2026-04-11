@@ -146,6 +146,7 @@ def restore_context_from_checkpoint(
     # --- Restore lesson_plan from persisted words ---
     nouns = [w for w in content.words if w.phase == Phase.NOUNS]
     verbs = [w for w in content.words if w.phase == Phase.VERBS]
+    adjectives = [w for w in content.words if w.phase == Phase.ADJECTIVES]
     sentences = list(content.sentences)
 
     lesson_blocks = [
@@ -154,6 +155,7 @@ def restore_context_from_checkpoint(
             content_sequences={
                 Phase.NOUNS: [n for n in nouns if n.block_index == i],
                 Phase.VERBS: [v for v in verbs if v.block_index == i],
+                Phase.ADJECTIVES: [a for a in adjectives if a.block_index == i],
                 Phase.GRAMMAR: [s for s in sentences if s.block_index == i],
             },
         )
