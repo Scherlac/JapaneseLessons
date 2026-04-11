@@ -19,7 +19,7 @@ from .config import (
     LLM_DEBUG,
     LLM_MAX_TOKENS,
     LLM_MODEL,
-    LLM_NO_THINK,
+    LLM_REASONING_EFFORT,
     LLM_REQUEST_TIMEOUT,
     LLM_TEMPERATURE,
 )
@@ -153,15 +153,21 @@ class LLMClient:
             max_retries=0,
         )
         self.model = LLM_MODEL
-        self.no_think = LLM_NO_THINK
+        self.default_effort = LLM_REASONING_EFFORT
 
-    def _build_messages(self, prompt: str) -> list[dict]:
+    def _build_messages(self, prompt: str, effort: str | None = None) -> list[dict]:
         """Build message list with correct role structure for the configured model.
+
+        *effort* controls the reasoning level for thinking-capable models:
+        - ``"none"``  — sends ``/no_think`` to suppress the <think> block (fastest).
+        - ``"low"`` / ``"medium"`` / ``"high"`` / ``"xhigh"`` — enables thinking.
+        - ``None``    — falls back to the instance default (``LLM_REASONING_EFFORT``).
 
         Models whose GGUF chat template has no system-role slot (Mistral v0.x) get
         the /no_think prefix folded into the user turn instead.
         """
-        if self.no_think:
+        effective = effort if effort is not None else self.default_effort
+        if effective == "none":
             system = "/no_think"
             if any(p in self.model.lower() for p in _NO_SYSTEM_ROLE_PATTERNS):
                 # Old Mistral [INST] template has no system slot — prepend to user turn
@@ -178,6 +184,7 @@ class LLMClient:
         json_mode: bool = False,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
+        effort: str | None = None,
     ) -> str:
         """
         Generate text from LLM.
@@ -203,7 +210,7 @@ class LLMClient:
 
         kwargs = {
             "model": self.model,
-            "messages": self._build_messages(prompt),
+            "messages": self._build_messages(prompt, effort=effort),
             "temperature": temperature,
         }
         if _uses_max_completion_tokens(self.model, LLM_BASE_URL):
@@ -372,6 +379,7 @@ def ask_llm_json_free(
     prompt: str,
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None,
+    effort: str | None = None,
 ) -> Dict[str, Any]:
     """Ask the LLM for a JSON response without schema enforcement.
 
@@ -398,6 +406,7 @@ def ask_llm_json_free(
         json_mode=False,
         temperature=temperature,
         max_tokens=max_tokens,
+        effort=effort,
     )
     parsed = _extract_json(response_text)
     if parsed is not None:

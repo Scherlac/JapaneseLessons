@@ -148,12 +148,12 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
 
         # ── Pass 1: draft outline ────────────────────────────────────────
         prompt_1 = build_lesson_plan_prompt(**common_kwargs, previous_outline_json=None)
-        result_1 = config.runtime.call_llm(prompt_1)
+        result_1 = config.runtime.call_llm(prompt_1, effort="medium")
 
         # ── Pass 2: revised outline ──────────────────────────────────────
         pass_1_json = json.dumps(result_1, indent=2, ensure_ascii=False)
         prompt_2 = build_lesson_plan_prompt(**common_kwargs, previous_outline_json=pass_1_json)
-        result_2 = config.runtime.call_llm(prompt_2)
+        result_2 = config.runtime.call_llm(prompt_2, effort="medium")
 
         # ── Parse the final result ───────────────────────────────────────
         outline = self._parse_outline(

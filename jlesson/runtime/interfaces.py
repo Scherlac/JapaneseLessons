@@ -43,8 +43,13 @@ class RuntimeServices(Protocol):
 
     # ── LLM ──────────────────────────────────────────────────────────────────
 
-    def call_llm(self, prompt: str) -> dict[str, Any]:
-        """Send *prompt* to the LLM; return the parsed JSON response dict."""
+    def call_llm(self, prompt: str, effort: str | None = None) -> dict[str, Any]:
+        """Send *prompt* to the LLM; return the parsed JSON response dict.
+
+        *effort* controls the reasoning level: ``\"none\"`` disables thinking (fastest),
+        ``\"low\"`` / ``\"medium\"`` / ``\"high\"`` / ``\"xhigh\"`` enable progressively deeper
+        reasoning.  ``None`` defers to the instance/global default.
+        """
         ...
 
     # ── Retrieval / vector store ──────────────────────────────────────────────

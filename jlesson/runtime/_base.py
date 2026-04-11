@@ -27,11 +27,11 @@ class PipelineRuntime:
     """
 
     @staticmethod
-    def ask_llm(ctx, prompt: str) -> dict[str, Any]:
+    def ask_llm(ctx, prompt: str, effort: str | None = None) -> dict[str, Any]:
         """Invoke the configured LLM path (cached or direct)."""
         if ctx.config.use_cache:
             return ask_llm_cached(prompt)
-        return ask_llm_json_free(prompt)
+        return ask_llm_json_free(prompt, effort=effort)
 
     @staticmethod
     def read_json(path: Path, default: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -72,9 +72,9 @@ class ContextRuntime:
 
     # ── LLM ──────────────────────────────────────────────────────────────────
 
-    def call_llm(self, prompt: str) -> dict[str, Any]:
+    def call_llm(self, prompt: str, effort: str | None = None) -> dict[str, Any]:
         """Route to the cached or direct LLM path based on ``ctx.config.use_cache``."""
-        return PipelineRuntime.ask_llm(self._ctx, prompt)
+        return PipelineRuntime.ask_llm(self._ctx, prompt, effort=effort)
 
     # ── Retrieval / vector store ──────────────────────────────────────────────
 
