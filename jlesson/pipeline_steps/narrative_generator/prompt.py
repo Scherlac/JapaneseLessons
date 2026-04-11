@@ -54,6 +54,12 @@ Guidelines:
   a language-learning lesson context.
 - Make each block feel like a natural story continuation, not a list of facts.
 - If seed blocks are provided, weave them into the appropriate positions.
+- ENGAGEMENT: actively identify the most memorable or emotionally charged
+  moments in the script — iconic lines of dialogue, turning points, comic
+  scenes, or moments of high emotion. Give each such moment its own block and
+  write it vividly so learners feel the drama. Use the alignment_notes field
+  to flag why a block is a highlight (e.g. "iconic line", "emotional peak",
+  "comic reversal") so downstream steps can spotlight it.
 
 Return ONLY a raw JSON object:
 {{
@@ -62,7 +68,8 @@ Return ONLY a raw JSON object:
             "index": 1,
             "narrative": "...",
             "alignment_notes": "A brief note on tone or scene context for the teacher.",
-            "sentiment": "One-word tone label, e.g. heartwarming, tense, playful, melancholic."
+            "sentiment": "One-word tone label, e.g. heartwarming, tense, playful, melancholic.",
+            "engagement_note": "If this is a memorable or emotionally charged moment (iconic dialogue, turning point, comic reversal, emotional peak), write one direct instruction sentence for the lesson planner, e.g. 'Iconic line: Joel learns he cannot leave — prioritise vocabulary of obligation and shock; ideal block to introduce a grammar point for expressing constraint or inevitability.' Leave empty string for ordinary blocks."
         }}
     ]
 }}
@@ -103,6 +110,10 @@ Create a narrative progression with {lesson_blocks} blocks.
 Each block should be 2-4 short sentences of story context.
 Keep the overall situation coherent, but make each block meaningfully different.
 The progression should stay concrete and {level_details}.
+ENGAGEMENT: identify the most memorable or emotionally charged moments in the
+theme — turning points, comic scenes, dramatic reveals, or lines of iconic
+dialogue. Give each highlight its own block and write it vividly. Flag it in
+alignment_notes (e.g. "iconic line", "emotional peak", "comic reversal").
 
 Return ONLY a raw JSON object:
 {{
@@ -111,7 +122,8 @@ Return ONLY a raw JSON object:
             "index": 1,
             "narrative": "...",
             "alignment_notes": "A backstory for the same scene (different angle, simpler vocabulary, or avoiding spoilers for later events).",
-            "sentiment": "One-word tone label, e.g. heartwarming, tense, playful, melancholic."
+            "sentiment": "One-word tone label, e.g. heartwarming, tense, playful, melancholic.",
+            "engagement_note": "If this is a memorable or emotionally charged moment (iconic dialogue, turning point, comic reversal, emotional peak), write one direct instruction sentence for the lesson planner, e.g. 'Iconic line: Joel learns he cannot leave — prioritise vocabulary of obligation and shock; ideal block to introduce a grammar point for expressing constraint or inevitability.' Leave empty string for ordinary blocks."
         }}
     ]
 }}

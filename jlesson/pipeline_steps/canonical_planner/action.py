@@ -185,6 +185,7 @@ class CanonicalPlannerAction(StepAction[NarrativeFrame, CanonicalLessonPlan]):
                 narrative=block_raw.get("narrative_content", nb.narrative),
                 alignment_notes=block_raw.get("alignment_notes_content", nb.alignment_notes),
                 sentiment=block_raw.get("sentiment", nb.sentiment),
+                engagement_note=nb.engagement_note,  # preserve engagement note from narrative generator
             )
             content_sequences = {}
             # using PHASE_PARSE_DETAILS

@@ -90,6 +90,7 @@ class NarrativeGeneratorAction(StepAction[NarrativeConfig, NarrativeFrame]):
                 narrative=(block.get("narrative") or "").strip(),
                 alignment_notes=(block.get("alignment_notes") or "").strip(),
                 sentiment=(block.get("sentiment") or "").strip(),
+                engagement_note=(block.get("engagement_note") or "").strip(),
             )
             for block in result.get("blocks", [])
             if isinstance(block, dict) and (block.get("narrative") or "").strip()

@@ -179,8 +179,11 @@ class NarrativeBlock:
     narrative: str
     alignment_notes: str = "" # alignment_notes
     sentiment: str = ""
+    engagement_note: str = ""  # direct instruction for the canonical planner, e.g.
+    # "Iconic moment: Joel realises he owes four years. Prioritise vocabulary of
+    # obligation and shock; good place to introduce a grammar point for constraint."
 
-EmptyNarrativeBlock = NarrativeBlock(narrative="", alignment_notes="", sentiment="")
+EmptyNarrativeBlock = NarrativeBlock(narrative="", alignment_notes="", sentiment="", engagement_note="")
 
 @dataclass
 class NarrativeConfig:

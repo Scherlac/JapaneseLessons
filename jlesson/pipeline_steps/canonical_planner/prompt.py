@@ -170,6 +170,7 @@ def build_lesson_plan_prompt(
             f"    Narrative: {block.narrative}" if block.narrative else None,
             f"    Alignment Notes: {block.alignment_notes}" if block.alignment_notes else None,
             f"    Sentiment: {block.sentiment}" if block.sentiment else None,
+            f"    Engagement Note: {block.engagement_note}" if block.engagement_note else None,
         ]))
         for i, block in enumerate(narrative_blocks)
     )
@@ -273,6 +274,9 @@ You are revising your own earlier outline. Improve it by:
    vocabulary choices, but do not alter or break any narrative content that was not in the narrative blocks.
 6. Checking that each block has close to the required item counts:
 {dynamic_item_counts_str}
+7. ENGAGEMENT CHECK: verify that blocks with an Engagement Note have vocabulary
+   and grammar that match the planner's directive. A flat block at a dramatic
+   moment is a missed opportunity — fix it.
 """
 
     return f"""\
@@ -286,6 +290,11 @@ sacrifice the quality of grammar practice. The narrative shall follow the one pr
 but you can add believable backstory to support the grammar and vocabulary choices, as long as you do not alter
 or break any narrative content that was not in the narrative blocks.
 Follow the constraints carefully, especially the Fibonacci learning cycle for spaced repetition of grammar points.
+
+ENGAGEMENT PRIORITY: some blocks carry an "Engagement Note" field — a direct
+instruction written by the narrative analyst. Follow it when assigning
+vocabulary and grammar to that block. Where the note suggests introducing a
+new grammar point, do so if one is available and not yet placed earlier.
 
 {FIBONACCI_CYCLE_DESCRIPTION}
 
