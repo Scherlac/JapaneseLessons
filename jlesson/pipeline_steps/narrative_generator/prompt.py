@@ -48,18 +48,25 @@ narrative blocks that cover the story arc from start to finish.
 Guidelines:
 - Distribute coverage evenly: early blocks summarise early events, later blocks
   cover later events.
-- Each block should be 2-4 short, vivid sentences that capture a meaningful
-  scene or story beat.
-- Write in {canonical_language}, using simple, clear vocabulary suitable for
-  a language-learning lesson context.
-- Make each block feel like a natural story continuation, not a list of facts.
+- Each block should be 2-4 short, vivid sentences in {canonical_language}.
+- VARY THE STYLE across blocks. A block can be any of:
+    * a vivid scene summary (what happens and how it feels)
+    * a short dialogue fragment — quote a key exchange almost word-for-word,
+      then briefly explain its significance
+    * a joke or comic reversal — set up the situation, deliver the punchline
+    * an emotional beat — capture the feeling of a decisive or moving moment
+  Mixing styles keeps learners engaged and mirrors how real storytelling works.
+- Make each block feel self-contained but part of a flowing whole.
+- Use simple, clear vocabulary suitable for a language-learning context.
 - If seed blocks are provided, weave them into the appropriate positions.
-- ENGAGEMENT: actively identify the most memorable or emotionally charged
-  moments in the script — iconic lines of dialogue, turning points, comic
-  scenes, or moments of high emotion. Give each such moment its own block and
-  write it vividly so learners feel the drama. Use the alignment_notes field
-  to flag why a block is a highlight (e.g. "iconic line", "emotional peak",
-  "comic reversal") so downstream steps can spotlight it.
+- ENGAGEMENT: identify the most memorable or emotionally charged moments in
+  the script — iconic lines, turning points, comic scenes, high-emotion beats.
+  Give each such moment its own block and write it vividly. Use the
+  alignment_notes to flag why it is a highlight ("iconic line",
+  "emotional peak", "comic reversal") and fill engagement_note with a direct
+  instruction for the lesson planner (e.g. "Iconic line: Joel discovers he
+  cannot leave — use vocabulary of obligation; ideal to introduce a grammar
+  point expressing constraint or inevitability.").
 
 Return ONLY a raw JSON object:
 {{
@@ -106,14 +113,16 @@ OPTIONAL USER-PROVIDED SEED BLOCKS:
 {seed_lines}
 
 TASK:
-Create a narrative progression with {lesson_blocks} blocks.
-Each block should be 2-4 short sentences of story context.
-Keep the overall situation coherent, but make each block meaningfully different.
-The progression should stay concrete and {level_details}.
-ENGAGEMENT: identify the most memorable or emotionally charged moments in the
-theme — turning points, comic scenes, dramatic reveals, or lines of iconic
-dialogue. Give each highlight its own block and write it vividly. Flag it in
-alignment_notes (e.g. "iconic line", "emotional peak", "comic reversal").
+Create a progression of {lesson_blocks} varied scene blocks in {canonical_language}.
+Each block is 2-4 sentences and can take different forms: a vivid scene
+summary, a short dialogue fragment (quote a key exchange and explain it),
+a joke or comic reversal (setup + punchline), or an emotional beat.
+Vary the style across the lesson to keep learners engaged.
+The progression should suit {level_details} learners and stay coherent.
+ENGAGEMENT: identify the most memorable or emotionally charged moments —
+turning points, comic scenes, dramatic reveals, iconic lines. Give each
+highlight its own block, write it vividly, flag it in alignment_notes, and
+fill engagement_note with a direct planner instruction (see field description).
 
 Return ONLY a raw JSON object:
 {{

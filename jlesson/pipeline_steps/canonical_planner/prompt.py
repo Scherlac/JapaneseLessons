@@ -167,8 +167,8 @@ def build_lesson_plan_prompt(
     narrative_section = "\n\n".join(
         "\n".join(filter(None, [
             f"--- Block {i + 1} ---",
-            f"    Narrative: {block.narrative}" if block.narrative else None,
-            f"    Alignment Notes: {block.alignment_notes}" if block.alignment_notes else None,
+            f"    Scene: {block.narrative}" if block.narrative else None,
+            f"    Notes: {block.alignment_notes}" if block.alignment_notes else None,
             f"    Sentiment: {block.sentiment}" if block.sentiment else None,
             f"    Engagement Note: {block.engagement_note}" if block.engagement_note else None,
         ]))
@@ -232,20 +232,34 @@ def build_lesson_plan_prompt(
     )
     dynamic_planning_constraints = "\n".join(filter(None, [_vocab_constraints, _grammar_constraints]))
     
+    # Limit covered vocab per phase to avoid blowing the LLM context window.
+    # At later lessons the list can reach 1 000+ entries; showing them all
+    # exceeds most context windows and causes the model to return empty blocks.
+    _MAX_COVERED_VOCAB_PER_PHASE = 120
+
     if covered_vocab:
         covered_vocab_lines_parts = []
         for phase, word_glosses in covered_vocab.items():
             if not word_glosses or phase not in PHASE_PARSE_DETAILS:
                 continue
             phase_label = PHASE_PARSE_DETAILS[phase]["name"].capitalize() + "s"
+            all_items = sorted(word_glosses.items())
+            total = len(all_items)
+            # Show the LAST N entries (most recently introduced items) so the
+            # model avoids repeating the freshest vocabulary.
+            shown = all_items[-_MAX_COVERED_VOCAB_PER_PHASE:]
             words_str = ", ".join(
                 f"{word} ({'; '.join(sorted(glosses))})" if glosses else word
-                for word, glosses in sorted(word_glosses.items())
+                for word, glosses in shown
             )
-            covered_vocab_lines_parts.append(f"  {phase_label}: {words_str}")
+            omitted = total - len(shown)
+            suffix = f" ... (+{omitted} earlier entries omitted)" if omitted else ""
+            covered_vocab_lines_parts.append(
+                f"  {phase_label} ({total} total, showing most recent {len(shown)}): {words_str}{suffix}"
+            )
         if covered_vocab_lines_parts:
             covered_vocab_section = (
-                "VOCABULARY ALREADY TAUGHT:\n"
+                "VOCABULARY ALREADY TAUGHT (do not reuse — choose fresh words):\n"
                 + "\n".join(covered_vocab_lines_parts)
                 + "\n"
             )
@@ -284,11 +298,11 @@ You are a lesson planner for an educational language course.
 You are planning lesson {lesson_number} which has {lesson_blocks} blocks.
 
 Main goal to design a lesson plan that effectively teaches the unlocked grammar points
-while creating engaging and motivating content for learners. 
-Use believable and exciting narrative or small backstory if needed to keep learners hooked, but do not
-sacrifice the quality of grammar practice. The narrative shall follow the one provided in the narrative blocks, 
-but you can add believable backstory to support the grammar and vocabulary choices, as long as you do not alter
-or break any narrative content that was not in the narrative blocks.
+while creating engaging and motivating content for learners.
+Each block's Scene field may be a prose summary, a dialogue fragment, a joke, or an
+emotional beat — assign vocabulary and grammar that fit the specific type and mood.
+The plan should feel like a bilingual companion to the story: learners encounter
+the grammar naturally inside memorable scenes, not in isolation.
 Follow the constraints carefully, especially the Fibonacci learning cycle for spaced repetition of grammar points.
 
 ENGAGEMENT PRIORITY: some blocks carry an "Engagement Note" field — a direct
