@@ -67,23 +67,18 @@ def compile_touches(
     list[Touch] — ordered sequence ready for rendering
     """
     touches: list[Touch] = []
-    phase_order = [Phase.NOUNS, Phase.VERBS, Phase.GRAMMAR]
+    # Derive phase order from the profile so any phase with a cycle is included
+    # (e.g. ADJECTIVES, NARRATIVE) without requiring manual updates here.
+    phase_order = [p for p in Phase if profile.cycle_for(p)]
     block_indices = sorted({max(1, getattr(ci, "block_index", 1)) for ci in compiled_items})
 
     for block_index in block_indices:
         phase_queues: dict[Phase, list[GeneralItem]] = {
-            Phase.NOUNS: [
+            phase: [
                 ci for ci in compiled_items
-                if ci.phase == Phase.NOUNS and max(1, getattr(ci, "block_index", 1)) == block_index
-            ],
-            Phase.VERBS: [
-                ci for ci in compiled_items
-                if ci.phase == Phase.VERBS and max(1, getattr(ci, "block_index", 1)) == block_index
-            ],
-            Phase.GRAMMAR: [
-                ci for ci in compiled_items
-                if ci.phase == Phase.GRAMMAR and max(1, getattr(ci, "block_index", 1)) == block_index
-            ],
+                if ci.phase == phase and max(1, getattr(ci, "block_index", 1)) == block_index
+            ]
+            for phase in phase_order
         }
 
         while any(phase_queues[p] for p in phase_order):
@@ -119,14 +114,17 @@ def count_touches(
     n_verbs: int,
     n_sentences: int,
     profile: Profile,
+    n_adjectives: int = 0,
 ) -> dict[str, int]:
     """Return touch counts per phase and total for the given profile."""
     noun_t = n_nouns * len(profile.cycle_for(Phase.NOUNS))
     verb_t = n_verbs * len(profile.cycle_for(Phase.VERBS))
+    adj_t = n_adjectives * len(profile.cycle_for(Phase.ADJECTIVES))
     grammar_t = n_sentences * len(profile.cycle_for(Phase.GRAMMAR))
     return {
         "nouns": noun_t,
         "verbs": verb_t,
+        "adjectives": adj_t,
         "grammar": grammar_t,
-        "total": noun_t + verb_t + grammar_t,
+        "total": noun_t + verb_t + adj_t + grammar_t,
     }

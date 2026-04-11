@@ -118,11 +118,13 @@ PASSIVE_VIDEO = Profile(
     cycles={
         Phase.NOUNS: _PASSIVE_NOUN_VERB_CYCLE,
         Phase.VERBS: _PASSIVE_NOUN_VERB_CYCLE,
+        Phase.ADJECTIVES: _PASSIVE_NOUN_VERB_CYCLE,
         Phase.GRAMMAR: _PASSIVE_GRAMMAR_CYCLE,
     },
     batch_sizes={
         Phase.NOUNS: 4,
         Phase.VERBS: 4,
+        Phase.ADJECTIVES: 4,
         Phase.GRAMMAR: 6,
     },
 )
@@ -151,11 +153,13 @@ ACTIVE_FLASH_CARDS = Profile(
     cycles={
         Phase.NOUNS: _ACTIVE_NOUN_VERB_CYCLE,
         Phase.VERBS: _ACTIVE_NOUN_VERB_CYCLE,
+        Phase.ADJECTIVES: _ACTIVE_NOUN_VERB_CYCLE,
         Phase.GRAMMAR: _ACTIVE_GRAMMAR_CYCLE,
     },
     batch_sizes={
         Phase.NOUNS: 4,
         Phase.VERBS: 4,
+        Phase.ADJECTIVES: 4,
         Phase.GRAMMAR: 6,
     },
 )
@@ -174,11 +178,13 @@ SIMPLE_LISTEN = Profile(
     cycles={
         Phase.NOUNS: _SIMPLE_LISTEN_CYCLE,
         Phase.VERBS: _SIMPLE_LISTEN_CYCLE,
+        Phase.ADJECTIVES: _SIMPLE_LISTEN_CYCLE,
         Phase.GRAMMAR: _SIMPLE_LISTEN_CYCLE,
     },
     batch_sizes={
         Phase.NOUNS: 4,
         Phase.VERBS: 4,
+        Phase.ADJECTIVES: 4,
         Phase.GRAMMAR: 6,
     },
 )
