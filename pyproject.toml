@@ -41,6 +41,7 @@ all = [
 ]
 dev = [
     "japanese-lesson-generator[all,test]",
+    "alembic>=1.13",
 ]
 
 [project.scripts]

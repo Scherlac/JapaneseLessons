@@ -52,6 +52,10 @@ class RuntimeServices(Protocol):
         """
         ...
 
+    def latest_llm_trace(self) -> Any | None:
+        """Return the latest trace recorded for the current step, if any."""
+        ...
+
     # ── Retrieval / vector store ──────────────────────────────────────────────
 
     def query_retrieval(self, theme: str, **kwargs: Any) -> RetrievalResult:

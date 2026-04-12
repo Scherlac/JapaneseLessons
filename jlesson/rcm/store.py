@@ -19,10 +19,11 @@ from __future__ import annotations
 import json
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator
+from typing import Generator, cast
 
 from sqlalchemy import (
     Column,
+    ForeignKey,
     String,
     Text,
     Integer,
@@ -32,6 +33,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
+from jlesson.llm_cache import LlmCacheTrace
 from jlesson.models import CanonicalItem, GeneralItem, Phase, Sentence
 
 
@@ -108,6 +110,43 @@ class _LessonItemRow(_Base):
     theme = Column(String, nullable=False)
     language_code = Column(String, nullable=False)
     item_id = Column(String, nullable=False, index=True)
+
+
+class _LlmUsageRecordRow(_Base):
+    __tablename__ = "llm_usage_records"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    step_name = Column(String, nullable=True, index=True)
+    step_index = Column(Integer, nullable=True)
+    prompt_hash = Column(String, nullable=False, index=True)
+    response_hash = Column(String, nullable=False)
+    cache_key = Column(String, nullable=True)
+    cache_hit = Column(Integer, nullable=False, default=0)
+    effort = Column(String, nullable=True)
+    prompt_tokens = Column(Integer, nullable=False, default=0)
+    completion_tokens = Column(Integer, nullable=False, default=0)
+    total_tokens = Column(Integer, nullable=False, default=0)
+
+
+class _LlmUsageLinkRow(_Base):
+    __tablename__ = "llm_usage_links"
+    __table_args__ = (
+        UniqueConstraint(
+            "usage_record_id",
+            "relation_type",
+            "item_id",
+            "language_code",
+            "partial_role",
+            name="uq_usage_link",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    usage_record_id = Column(Integer, ForeignKey("llm_usage_records.id"), nullable=False, index=True)
+    relation_type = Column(String, nullable=False, index=True)
+    item_id = Column(String, nullable=False, index=True)
+    language_code = Column(String, nullable=True, index=True)
+    partial_role = Column(String, nullable=True)
 
 
 # ---------------------------------------------------------------------------
@@ -587,6 +626,160 @@ class RCMStore:
             session.commit()
 
     # ------------------------------------------------------------------
+    # LLM usage value tracking
+    # ------------------------------------------------------------------
+
+    def record_llm_usage(self, trace: LlmCacheTrace) -> int:
+        """Persist one LLM usage record and return its record ID."""
+        with self._Session() as session:
+            row = _LlmUsageRecordRow(
+                step_name=trace.step_name,
+                step_index=trace.step_index,
+                prompt_hash=trace.prompt_hash,
+                response_hash=trace.response_hash,
+                cache_key=trace.cache_key,
+                cache_hit=1 if trace.cache_hit else 0,
+                effort=trace.effort,
+                prompt_tokens=trace.prompt_tokens,
+                completion_tokens=trace.completion_tokens,
+                total_tokens=trace.total_tokens,
+            )
+            session.add(row)
+            session.commit()
+            return cast(int, row.id)
+
+    def link_llm_usage(
+        self,
+        usage_record_id: int,
+        *,
+        relation_type: str,
+        item_id: str,
+        language_code: str | None = None,
+        partial_role: str | None = None,
+    ) -> None:
+        """Associate a stored usage record with a canonical, branch, or partial item."""
+        with self._Session() as session:
+            existing = (
+                session.query(_LlmUsageLinkRow)
+                .filter_by(
+                    usage_record_id=usage_record_id,
+                    relation_type=relation_type,
+                    item_id=item_id,
+                    language_code=language_code,
+                    partial_role=partial_role,
+                )
+                .first()
+            )
+            if existing is None:
+                session.add(_LlmUsageLinkRow(
+                    usage_record_id=usage_record_id,
+                    relation_type=relation_type,
+                    item_id=item_id,
+                    language_code=language_code,
+                    partial_role=partial_role,
+                ))
+                session.commit()
+
+    def record_item_llm_usage(
+        self,
+        trace: LlmCacheTrace,
+        language_code: str,
+        items: list[GeneralItem | Sentence],
+    ) -> int:
+        """Persist one usage record and link it to canonical, branch, and partial items."""
+        usage_record_id = self.record_llm_usage(trace)
+        linked_keys: set[tuple[str, str, str | None, str | None]] = set()
+
+        for item in items:
+            canonical_id = item.canonical.id if item.canonical is not None else item.id
+            relations = [
+                ("canonical", canonical_id, None, None),
+                ("branch", item.id, language_code, None),
+                ("partial", item.id, language_code, "source"),
+                ("partial", item.id, language_code, "target"),
+            ]
+            for relation in relations:
+                if relation in linked_keys:
+                    continue
+                linked_keys.add(relation)
+                relation_type, linked_item_id, linked_language, partial_role = relation
+                self.link_llm_usage(
+                    usage_record_id,
+                    relation_type=relation_type,
+                    item_id=linked_item_id,
+                    language_code=linked_language,
+                    partial_role=partial_role,
+                )
+
+        return usage_record_id
+
+    def usage_totals_for_item(
+        self,
+        item_id: str,
+        *,
+        language_code: str | None = None,
+        relation_type: str | None = None,
+        partial_role: str | None = None,
+    ) -> dict[str, int]:
+        """Return aggregated LLM usage totals for one linked item."""
+        with self._Session() as session:
+            query = (
+                session.query(_LlmUsageLinkRow, _LlmUsageRecordRow)
+                .join(_LlmUsageRecordRow, _LlmUsageRecordRow.id == _LlmUsageLinkRow.usage_record_id)
+                .filter(_LlmUsageLinkRow.item_id == item_id)
+            )
+            if language_code is not None:
+                query = query.filter(_LlmUsageLinkRow.language_code == language_code)
+            if relation_type is not None:
+                query = query.filter(_LlmUsageLinkRow.relation_type == relation_type)
+            if partial_role is not None:
+                query = query.filter(_LlmUsageLinkRow.partial_role == partial_role)
+            rows = query.all()
+
+        unique_records: dict[int, _LlmUsageRecordRow] = {}
+        for _link, record in rows:
+            unique_records[record.id] = record
+
+        return {
+            "records": len(unique_records),
+            "prompt_tokens": sum(cast(int, record.prompt_tokens) for record in unique_records.values()),
+            "completion_tokens": sum(cast(int, record.completion_tokens) for record in unique_records.values()),
+            "total_tokens": sum(cast(int, record.total_tokens) for record in unique_records.values()),
+        }
+
+    def usage_records_for_item(
+        self,
+        item_id: str,
+        *,
+        language_code: str | None = None,
+    ) -> list[dict]:
+        """Return persisted usage records linked to an item for inspection/reporting."""
+        with self._Session() as session:
+            query = (
+                session.query(_LlmUsageLinkRow, _LlmUsageRecordRow)
+                .join(_LlmUsageRecordRow, _LlmUsageRecordRow.id == _LlmUsageLinkRow.usage_record_id)
+                .filter(_LlmUsageLinkRow.item_id == item_id)
+            )
+            if language_code is not None:
+                query = query.filter(_LlmUsageLinkRow.language_code == language_code)
+            rows = query.all()
+
+        return [
+            {
+                "usage_record_id": record.id,
+                "relation_type": link.relation_type,
+                "language_code": link.language_code,
+                "partial_role": link.partial_role,
+                "step_name": record.step_name,
+                "cache_hit": bool(record.cache_hit),
+                "prompt_tokens": record.prompt_tokens,
+                "completion_tokens": record.completion_tokens,
+                "total_tokens": record.total_tokens,
+            }
+            for link, record in rows
+        ]
+
+    # ------------------------------------------------------------------
     # Stats / reporting
     # ------------------------------------------------------------------
 
@@ -597,6 +790,12 @@ class RCMStore:
             n_branches = session.query(_BranchRow).count()
             n_assets = session.query(_AssetRow).count()
             n_lesson_items = session.query(_LessonItemRow).count()
+            n_llm_usage_records = session.query(_LlmUsageRecordRow).count()
+            n_llm_usage_links = session.query(_LlmUsageLinkRow).count()
+            llm_token_totals = session.execute(text(
+                "SELECT COALESCE(SUM(prompt_tokens), 0), COALESCE(SUM(completion_tokens), 0), COALESCE(SUM(total_tokens), 0) "
+                "FROM llm_usage_records"
+            )).fetchone()
 
             # Find text-normalised duplicates (same word, different IDs)
             dup_rows = session.execute(text(
@@ -610,6 +809,11 @@ class RCMStore:
             "branches": n_branches,
             "assets": n_assets,
             "lesson_items": n_lesson_items,
+            "llm_usage_records": n_llm_usage_records,
+            "llm_usage_links": n_llm_usage_links,
+            "llm_prompt_tokens": llm_token_totals[0] if llm_token_totals else 0,
+            "llm_completion_tokens": llm_token_totals[1] if llm_token_totals else 0,
+            "llm_total_tokens": llm_token_totals[2] if llm_token_totals else 0,
             "duplicate_texts": duplicates,
         }
 

@@ -95,6 +95,12 @@ class ContextRuntime:
         """Route to the cached or direct LLM path based on ``ctx.config.use_cache``."""
         return PipelineRuntime.ask_llm(self._ctx, prompt, effort=effort)
 
+    def latest_llm_trace(self) -> Any | None:
+        """Return the latest step-local LLM trace, if one has been recorded."""
+        if not self._ctx.llm_traces:
+            return None
+        return self._ctx.llm_traces[-1]
+
     # ── Retrieval / vector store ──────────────────────────────────────────────
 
     def query_retrieval(self, theme: str, **kwargs: Any) -> Any:

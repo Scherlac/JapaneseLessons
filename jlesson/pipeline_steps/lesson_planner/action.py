@@ -66,6 +66,9 @@ class LessonPlannerAction(StepAction[CanonicalLessonBlock, LessonBlock]):
                     if gi.canonical is not None:
                         config.rcm.upsert_item(gi.canonical)
                     config.rcm.upsert_branch(gi.id, lang, gi)
+                trace = config.runtime.latest_llm_trace()
+                if trace is not None and newly_resolved:
+                    config.rcm.record_item_llm_usage(trace, lang, newly_resolved)
 
         # Merge cached + newly resolved into a single LessonBlock
         all_items = cached + newly_resolved
