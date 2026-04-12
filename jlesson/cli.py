@@ -29,6 +29,10 @@ from .prompt_template import (
     build_lesson_prompt,
     build_vocab_prompt,
 )
+# load env variables from .env (e.g. LLM API keys, RCM path)
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 VOCAB_DIR = Path(__file__).parent.parent / "vocab"
 DEFAULT_CURRICULUM_PATH = Path(__file__).parent.parent / "curriculum" / "curriculum.json"

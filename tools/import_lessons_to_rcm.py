@@ -31,6 +31,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from jlesson.asset_compiler import build_asset_suffix_map
+from jlesson.llm_cache import LlmCacheTrace
 from jlesson.models import GeneralItem, Phase
 from jlesson.rcm import open_rcm
 
@@ -47,6 +48,72 @@ def _load_lesson_id_map(curriculum_path: Path) -> dict[str, int]:
         if theme:
             result[theme] = lesson["id"]
     return result
+
+
+def _load_step_traces(step_dir: Path) -> list[LlmCacheTrace]:
+    """Read llm_cache.json from a step directory and return typed trace objects."""
+    cache_file = step_dir / "llm_cache.json"
+    if not cache_file.exists():
+        return []
+    with open(cache_file, encoding="utf-8") as f:
+        data = json.load(f)
+    traces = []
+    for raw in data.get("calls", []):
+        traces.append(LlmCacheTrace(
+            prompt_hash=raw["prompt_hash"],
+            response_hash=raw["response_hash"],
+            cache_key=raw.get("cache_key"),
+            cache_hit=bool(raw.get("cache_hit", False)),
+            prompt_file=raw.get("prompt_file"),
+            response_file=raw.get("response_file"),
+            effort=raw.get("effort"),
+            call_index=raw.get("call_index", 0),
+            step_name=raw.get("step_name"),
+            step_index=raw.get("step_index"),
+            prompt_tokens=raw.get("prompt_tokens", 0),
+            completion_tokens=raw.get("completion_tokens", 0),
+            total_tokens=raw.get("total_tokens", 0),
+        ))
+    return traces
+
+
+def _import_llm_usage(
+    store,
+    steps_dir: Path,
+    block_items: dict[int, list[GeneralItem]],
+    language_code: str,
+) -> tuple[int, int]:
+    """Import LLM usage traces from all step directories.
+
+    For `lesson_planner` traces the call_index maps directly to block_index,
+    so each trace is linked to the items produced in that block via
+    ``record_item_llm_usage``.  For all other steps only the token counts are
+    recorded (no per-item links, because there's no reliable 1-to-1 mapping).
+
+    Returns (records_added, records_linked).
+    """
+    records_added = 0
+    records_linked = 0
+
+    # lesson_planner: one call per block — link to items in that block
+    planner_traces = _load_step_traces(steps_dir / "lesson_planner")
+    for trace in planner_traces:
+        items_for_block = block_items.get(trace.call_index, [])
+        if items_for_block:
+            store.record_item_llm_usage(trace, language_code, items_for_block)
+            records_linked += 1
+        else:
+            store.record_llm_usage(trace)
+        records_added += 1
+
+    # All other steps: record token usage without item links
+    other_steps = ["canonical_planner", "review_sentences", "narrative_generator"]
+    for step_name in other_steps:
+        for trace in _load_step_traces(steps_dir / step_name):
+            store.record_llm_usage(trace)
+            records_added += 1
+
+    return records_added, records_linked
 
 
 def _items_from_block(block: dict) -> list[GeneralItem]:
@@ -101,8 +168,11 @@ def run_import(
                 blocks = json.load(f)
 
             lesson_items: list[GeneralItem] = []
+            block_items: dict[int, list[GeneralItem]] = {}
             for block in blocks:
-                lesson_items.extend(_items_from_block(block))
+                block_gi = _items_from_block(block)
+                lesson_items.extend(block_gi)
+                block_items[block["block_index"]] = block_gi
 
             for item in lesson_items:
                 canonical = item.canonical
@@ -136,6 +206,11 @@ def run_import(
             if lesson_id and lesson_items:
                 store.record_lesson_items(lesson_id, theme, language_code, lesson_items)
 
+            steps_dir = lesson_dir / "steps"
+            llm_added, llm_linked = _import_llm_usage(store, steps_dir, block_items, language_code)
+            if llm_added:
+                print(f"    LLM usage records : {llm_added} added ({llm_linked} linked to items)")
+
         # Print stats
         stats = store.stats()
         print(f"\n{'='*50}")
@@ -144,6 +219,7 @@ def run_import(
         print(f"  New to store    : {total_new}")
         print(f"  Assets found    : {total_assets}")
         print(f"  Store totals    : {stats['items']} items | {stats['branches']} branches | {stats['assets']} assets")
+        print(f"  LLM usage       : {stats['llm_usage_records']} records | {stats['llm_usage_links']} links | {stats['llm_total_tokens']} tokens")
 
         if stats["duplicate_texts"]:
             print(f"\nDuplicate words (same text, different IDs):")
