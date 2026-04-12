@@ -44,30 +44,6 @@ jlesson lesson next --theme food
 jlesson lesson next --theme travel --nouns 5 --verbs 4 --seed 7
 jlesson lesson next --theme food --no-video          # skip video render
 jlesson lesson next --theme food --no-cache           # bypass LLM cache
-
-# Print an LLM-ready lesson prompt to stdout (no LLM call)
-jlesson lesson prompt food
-jlesson lesson prompt travel -n 4 -v 4 -s 7
-jlesson lesson prompt food -o prompt.md
-
-# Generate a vocab file for a new theme via LLM (saves to vocab/<theme>.json)
-jlesson vocab create animals
-jlesson vocab create school --nouns 15 --verbs 12 --level intermediate
-# Generate a total count while guaranteeing minimum nouns/verbs
-jlesson vocab create school --count 120 --nouns 40 --verbs 20
-# Include adjectives too (exact if no --count, minimum if --count is set)
-jlesson vocab create school --count 120 --nouns 35 --verbs 20 --adjectives 15
-# If theme exists, create is blocked by default (to prevent overwrite)
-jlesson vocab create school --force
-
-# Extend an existing theme by adding unique items (merge + dedup)
-jlesson vocab extend animals --nouns 20 --verbs 8
-# Extend by total count with minimum guarantees
-jlesson vocab extend animals --count 60 --nouns 20 --verbs 10
-jlesson vocab extend animals --count 60 --nouns 15 --verbs 10 --adjectives 10
-
-# Print a vocab-generation prompt without calling the LLM
-jlesson vocab generate-prompt shopping
 ```
 
 ## RCM — Runtime Content Management
@@ -176,22 +152,22 @@ Or pass a new theme name to the demo — it will generate the vocab automaticall
 ```
 jlesson/              ← all production Python source
 ├── cli.py            # CLI entry point (click subcommands)
-├── curriculum.py     # Grammar progression table + lesson dictionary CRUD
-├── vocab_generator.py# LLM-driven vocab generation + schema validation
-├── prompt_template.py# LLM prompt builders (7 pure functions)
+├── language_config/  # Per-language-pair settings and registry
+├── lesson_pipeline/  # Ordered pipeline steps: plan → generate → compile
+├── pipeline_steps/   # Individual step actions (canonical planner, asset compiler, …)
+├── rcm/              # Runtime Content Management store (SQLite)
+├── runtime/          # Pipeline runtime services (LLM routing, caching)
 ├── llm_client.py     # Universal LLM client (OpenAI SDK)
 ├── config.py         # LLM provider settings
-├── video/
-│   ├── tts_engine.py # TTS audio generation (edge-tts)
-│   ├── cards.py      # 1080p lesson card renderer (Pillow)
-│   └── builder.py    # Video assembler (moviepy + ffmpeg)
-└── exporters/        # Export adapters (video, Anki, text — planned)
+└── video/
+    ├── tts_engine.py # TTS audio generation (edge-tts)
+    ├── cards.py      # 1080p lesson card renderer (Pillow)
+    └── builder.py    # Video assembler (moviepy + ffmpeg)
 vocab/                # Vocabulary JSON files
 curriculum/           # Lesson dictionary (curriculum.json)
 docs/                 # Technology decision documents
-tests/                # Unit test suite (274 tests)
+tests/                # Unit test suite
 spike/                # Proof-of-concept scripts
-└── spike_09_demo.py  # End-to-end two-lesson demo with video output
 output/               # Generated lessons and videos (gitignored)
 ```
 
