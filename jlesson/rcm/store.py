@@ -322,6 +322,14 @@ class RCMStore:
                     setattr(row, col, val)
             session.commit()
 
+    def get_item(self, item_id: str) -> CanonicalItem | None:
+        """Return the canonical item for *item_id*, or None if not found."""
+        with self._Session() as session:
+            row = session.get(_ItemRow, item_id)
+            if row is None:
+                return None
+            return CanonicalItem.model_validate_json(row.canonical_json)
+
     def get_branch(self, item_id: str, language_code: str) -> GeneralItem | None:
         """Return the cached item for an item×language pair.
 

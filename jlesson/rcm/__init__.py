@@ -17,5 +17,6 @@ Usage::
 """
 
 from .store import RCMStore, open_rcm
+from .retrieval import RCMVectorRetrievalService
 
-__all__ = ["RCMStore", "open_rcm"]
+__all__ = ["RCMStore", "open_rcm", "RCMVectorRetrievalService"]

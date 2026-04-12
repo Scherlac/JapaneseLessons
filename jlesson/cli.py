@@ -1209,6 +1209,342 @@ def rcm_item_usage(item_id: str, language: str, rcm_path: Path, verbose: bool) -
 
 
 # ---------------------------------------------------------------------------
+# rcm vector-status
+# ---------------------------------------------------------------------------
+
+@rcm.command("vector-status")
+@RCM_PATH_OPTION
+@click.option("--phase", default=None,
+              type=click.Choice(["nouns", "verbs", "adjectives", "vocab", "grammar", "narrative"]),
+              help="Filter by item phase.")
+@click.option("--list-missing", is_flag=True, default=False,
+              help="Print IDs and texts of SQL items not yet indexed in the vector DB.")
+def rcm_vector_status(
+    rcm_path: Path | None,
+    phase: str | None,
+    list_missing: bool,
+) -> None:
+    """Compare SQL canonical items against the Chroma vector index.
+
+    The Chroma DB is always located at <rcm>/chroma (same directory as rcm.db).
+    Use --rcm or JLESSON_RCM_PATH to point at the RCM directory.
+
+    Examples:
+
+    \b
+      # Overall summary
+      jlesson rcm vector-status
+
+      # Nouns only, show what needs to be added
+      jlesson rcm vector-status --phase nouns --list-missing
+    """
+    if rcm_path is None:
+        raise click.UsageError("Specify --rcm or set JLESSON_RCM_PATH.")
+
+    from sqlalchemy import text as sa_text
+    from .rcm import open_rcm
+
+    resolved_chroma = rcm_path / "chroma"
+
+    # --- Load SQL items ---
+    with open_rcm(rcm_path) as store:
+        with store._Session() as session:
+            where = "WHERE i.phase = :phase" if phase else ""
+            params: dict = {"phase": phase} if phase else {}
+            sql_rows = session.execute(sa_text(f"""
+                SELECT i.id, i.text, i.phase
+                FROM items i
+                {where}
+                ORDER BY i.phase, i.text_normalized
+            """), params).fetchall()
+
+    sql_ids: dict[str, tuple[str, str]] = {row[0]: (row[1], row[2]) for row in sql_rows}
+
+    # --- Load Chroma IDs ---
+    chroma_ids: set[str] = set()
+    chroma_total: int = 0
+    chroma_available = False
+    chroma_error: str = ""
+
+    if resolved_chroma.exists():
+        try:
+            import chromadb
+            from .rcm.retrieval import RCMVectorRetrievalService
+            client = chromadb.PersistentClient(path=str(resolved_chroma))
+            try:
+                collection = client.get_collection(RCMVectorRetrievalService.COLLECTION_NAME)
+                chroma_total = collection.count()
+                # Fetch all IDs without embeddings (cheap)
+                if chroma_total > 0:
+                    result = collection.get(include=[])
+                    chroma_ids = set(result.get("ids", []))
+                chroma_available = True
+            except Exception:
+                chroma_error = "collection not found — no items ingested yet"
+                chroma_available = True
+        except ImportError:
+            chroma_error = "chromadb is not installed"
+    else:
+        chroma_error = f"Chroma path does not exist: {resolved_chroma}"
+
+    # --- Compute diff ---
+    in_sql = len(sql_ids)
+    in_chroma = len(chroma_ids & sql_ids.keys())
+    missing_ids = {k: v for k, v in sql_ids.items() if k not in chroma_ids}
+    extra_ids = chroma_ids - sql_ids.keys()   # in Chroma but not in SQL (stale)
+
+    # --- Report ---
+    filter_label = f" (phase={phase})" if phase else ""
+    click.echo(f"\nRCM Vector Status{filter_label}")
+    click.echo(f"  RCM path   : {rcm_path}")
+    click.echo(f"  Chroma path: {resolved_chroma}")
+
+    if chroma_error:
+        click.echo(f"\n  Chroma     : {chroma_error}")
+    else:
+        click.echo(f"\n  SQL items        : {in_sql}")
+        click.echo(f"  Chroma indexed   : {in_chroma}")
+        click.echo(f"  Missing (SQL→Vec): {len(missing_ids)}")
+        if extra_ids:
+            click.echo(f"  Stale  (Vec→SQL) : {len(extra_ids)}  (in Chroma but no longer in SQL)")
+
+    if list_missing and missing_ids:
+        click.echo(f"\n  Items not yet indexed ({len(missing_ids)}):")
+        click.echo(f"  {'ID':<36}  {'Phase':<12}  Text")
+        click.echo(f"  {'-'*36}  {'-'*12}  {'-'*40}")
+        for item_id, (text, item_phase) in sorted(missing_ids.items(), key=lambda x: (x[1][1], x[1][0])):
+            click.echo(f"  {item_id:<36}  {item_phase:<12}  {text}")
+    elif list_missing and not missing_ids:
+        click.echo("\n  All SQL items are indexed in the vector DB.")
+
+    click.echo()
+
+
+@rcm.command("vector-sync")
+@RCM_PATH_OPTION
+@click.option("--phase", default=None,
+              type=click.Choice(["nouns", "verbs", "adjectives", "vocab", "grammar", "narrative"]),
+              help="Sync only items of this phase.")
+@click.option("--embedding-model", default="text-embedding-3-small", show_default=True,
+              help="Embedding model to use for items that need a new embedding.")
+@click.option("--dry-run", is_flag=True, default=False,
+              help="Show what would be synced without making any changes.")
+def rcm_vector_sync(
+    rcm_path: Path | None,
+    phase: str | None,
+    embedding_model: str,
+    dry_run: bool,
+) -> None:
+    """Sync SQL canonical items into the Chroma vector index.
+
+    Only items not yet present in Chroma are processed.  Items whose
+    embeddings are already stored in SQL are reused (no API call);
+    only genuinely new items require an embedding model call.
+
+    Examples:
+
+    \b
+      # Sync everything
+      jlesson rcm vector-sync
+
+      # Preview without writing
+      jlesson rcm vector-sync --dry-run
+
+      # Sync nouns only
+      jlesson rcm vector-sync --phase nouns
+    """
+    if rcm_path is None:
+        raise click.UsageError("Specify --rcm or set JLESSON_RCM_PATH.")
+
+    from sqlalchemy import text as sa_text
+    from .rcm import open_rcm, RCMVectorRetrievalService
+
+    resolved_chroma = rcm_path / "chroma"
+
+    with open_rcm(rcm_path) as store:
+        # Fetch SQL items
+        with store._Session() as session:
+            where = "WHERE phase = :phase" if phase else ""
+            params: dict = {"phase": phase} if phase else {}
+            sql_rows = session.execute(sa_text(f"""
+                SELECT id FROM items {where} ORDER BY phase, text_normalized
+            """), params).fetchall()
+
+        sql_ids: list[str] = [row[0] for row in sql_rows]
+
+        # Determine which are already in Chroma
+        chroma_ids: set[str] = set()
+        try:
+            import chromadb
+            if resolved_chroma.exists():
+                client = chromadb.PersistentClient(path=str(resolved_chroma))
+                try:
+                    collection = client.get_collection(RCMVectorRetrievalService.COLLECTION_NAME)
+                    if collection.count() > 0:
+                        result = collection.get(include=[])
+                        chroma_ids = set(result.get("ids", []))
+                except Exception:
+                    pass  # collection doesn't exist yet — all items are missing
+        except ImportError:
+            click.echo("Error: chromadb is not installed. Run: pip install chromadb", err=True)
+            raise SystemExit(1)
+
+        missing = [item_id for item_id in sql_ids if item_id not in chroma_ids]
+        filter_label = f" (phase={phase})" if phase else ""
+        click.echo(f"\nRCM Vector Sync{filter_label}")
+        click.echo(f"  SQL items   : {len(sql_ids)}")
+        click.echo(f"  Already indexed: {len(sql_ids) - len(missing)}")
+        click.echo(f"  To index    : {len(missing)}")
+
+        if not missing:
+            click.echo("\n  Nothing to sync.")
+            click.echo()
+            return
+
+        if dry_run:
+            click.echo(f"\n  Dry run — would ingest {len(missing)} item(s):")
+            for item_id in missing:
+                item = store.get_item(item_id)
+                cached = " (embedding cached)" if item and item.embeddings else ""
+                click.echo(f"    {item_id}  {item.text if item else '?'}{cached}")
+            click.echo()
+            return
+
+        # Ingest missing items
+        items_to_sync = [store.get_item(item_id) for item_id in missing]
+        items_to_sync = [it for it in items_to_sync if it is not None]
+
+        svc = RCMVectorRetrievalService(store, resolved_chroma, embedding_model=embedding_model)
+
+        with click.progressbar(length=len(items_to_sync), label="  Indexing", show_pos=True) as bar:
+            def _progress(n_done: int, _n_total: int) -> None:
+                bar.update(n_done - bar.pos)
+
+            n_cached, n_generated = svc.ingest_items_batch(items_to_sync, progress_callback=_progress)
+
+        click.echo(f"\n  Done.  Indexed {len(items_to_sync)} item(s).")
+        click.echo(f"  Embeddings reused from SQL : {n_cached}")
+        click.echo(f"  Embeddings generated (API) : {n_generated}")
+        click.echo()
+
+
+@rcm.command("vector-search")
+@RCM_PATH_OPTION
+@click.argument("query")
+@click.option("--language", default=None,
+              help="Narrow results to items that have a branch for this language code (e.g. hun-ger).")
+@click.option("--phase", default=None,
+              type=click.Choice(["nouns", "verbs", "adjectives", "vocab", "grammar", "narrative"]),
+              help="Filter by item phase.")
+@click.option("--limit", default=10, show_default=True, help="Number of results to return.")
+@click.option("--embedding-model", default="text-embedding-3-small", show_default=True,
+              help="Embedding model used to encode the query.")
+def rcm_vector_search(
+    rcm_path: Path | None,
+    query: str,
+    language: str | None,
+    phase: str | None,
+    limit: int,
+    embedding_model: str,
+) -> None:
+    """Semantic vector search over canonical items.
+
+    QUERY is a free-text English phrase. Results are canonical items ranked
+    by similarity. Use --language to narrow to items that also have a branch
+    for a specific language.
+
+    Examples:
+
+    \b
+      # Find nouns related to farm animals with a German branch
+      jlesson rcm vector-search "farm animals" --language hun-ger --phase nouns
+
+      # Find grammar sentences about past tense
+      jlesson rcm vector-search "past tense action" --phase grammar --limit 5
+
+      # Canonical search only, no language filter
+      jlesson rcm vector-search "daily routine verbs"
+    """
+    if rcm_path is None:
+        raise click.UsageError("Specify --rcm or set JLESSON_RCM_PATH.")
+
+    from .models import Phase as PhaseEnum
+    from .rcm import open_rcm, RCMVectorRetrievalService
+
+    resolved_chroma = rcm_path / "chroma"
+
+    if not resolved_chroma.exists():
+        click.echo("Vector index not found. Run: jlesson rcm vector-sync", err=True)
+        raise SystemExit(1)
+
+    phase_enum = PhaseEnum(phase) if phase else None
+
+    with open_rcm(rcm_path) as store:
+        svc = RCMVectorRetrievalService(store, resolved_chroma, embedding_model=embedding_model)
+
+        if language:
+            results = svc.search(query, language, phase=phase_enum, limit=limit)
+            click.echo(f"\nVector search: '{query}'  language={language}" + (f"  phase={phase}" if phase else ""))
+            click.echo(f"  {'Score':<7}  {'Phase':<12}  {'Canonical':<35}  Target")
+            click.echo(f"  {'-'*7}  {'-'*12}  {'-'*35}  {'-'*35}")
+            if not results:
+                click.echo("  No results.")
+            for canonical, branch in results:
+                target_text = branch.target.display_text if branch.target else ""
+                click.echo(
+                    f"           "
+                    f"  {(canonical.type.value if canonical.type else ''):12}"
+                    f"  {canonical.text:<35}"
+                    f"  {target_text}"
+                )
+        else:
+            # No language filter — search canonical only via Chroma directly
+            try:
+                import chromadb
+            except ImportError:
+                click.echo("chromadb is not installed.", err=True)
+                raise SystemExit(1)
+
+            query_embedding = svc._embed_texts([query])[0]
+            client = chromadb.PersistentClient(path=str(resolved_chroma))
+            collection = client.get_collection(RCMVectorRetrievalService.COLLECTION_NAME)
+
+            kwargs: dict = {
+                "query_embeddings": [query_embedding],
+                "n_results": limit,
+                "include": ["distances", "documents", "metadatas"],
+            }
+            if phase:
+                kwargs["where"] = {"phase": phase}
+
+            result = collection.query(**kwargs)
+            ids = result.get("ids") or [[]]
+            ids = ids[0]
+            distances = (result.get("distances") or [[]])[0]
+            metadatas = (result.get("metadatas") or [[]])[0]
+
+            click.echo(f"\nVector search: '{query}'" + (f"  phase={phase}" if phase else ""))
+            click.echo(f"  {'Score':<7}  {'Phase':<12}  {'ID':<36}  Text")
+            click.echo(f"  {'-'*7}  {'-'*12}  {'-'*36}  {'-'*35}")
+            if not ids:
+                click.echo("  No results.")
+            for i, item_id in enumerate(ids):
+                dist = distances[i] if i < len(distances) else 0.0
+                score = 1.0 / (1.0 + dist)
+                meta = metadatas[i] if i < len(metadatas) else {}
+                item = store.get_item(item_id)
+                text = item.text if item else item_id
+                click.echo(
+                    f"  {score:.4f}  "
+                    f"  {meta.get('phase', ''):12}"
+                    f"  {item_id:<36}"
+                    f"  {text}"
+                )
+
+    click.echo()
+
+
+# ---------------------------------------------------------------------------
 # curriculum subgroup
 # ---------------------------------------------------------------------------
 
