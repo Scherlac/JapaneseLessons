@@ -197,12 +197,13 @@ Override the focused boundaries if needed:
 
 ## LLM Setup
 
-All LLM settings are in `.env` (project root, gitignored):
+All runtime settings are in `.env` (project root, gitignored). A `.env.template` file is included with supported keys.
 
 ```env
 LLM_BASE_URL=http://localhost:1234/v1   # LM Studio default
 LLM_MODEL=qwen/qwen3-14b                # recommended model
 LLM_NO_THINK=true
+JLESSON_RCM_PATH=/path/to/.jlesson/rcm  # path to the RCM directory for lesson generation and rcm CLI commands
 ```
 
 The client uses the OpenAI SDK and works with LM Studio, Ollama, or OpenAI. LM Studio requires `json_schema` response format (not `json_object`) — this is handled automatically.
