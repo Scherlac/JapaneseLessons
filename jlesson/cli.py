@@ -1112,6 +1112,115 @@ def rcm_lessons(rcm_path: Path | None) -> None:
         click.echo(f"  {row[0]:>4}  {row[1]:<12}  {row[3]:>5}  {row[2]}")
 
 
+@rcm.command("lesson-assets")
+@click.argument("lesson_id", type=int)
+@LANGUAGE_OPTION
+@RCM_PATH_OPTION
+@click.option(
+    "--fix",
+    is_flag=True,
+    default=False,
+    help=(
+        "Migrate legacy absolute-path entries to relative paths: copies each file "
+        "into the RCM assets directory and re-registers it as assets/<filename>."
+    ),
+)
+def rcm_lesson_assets(lesson_id: int, language: str, rcm_path: Path | None, fix: bool) -> None:
+    """Check compiled asset availability for all items in LESSON_ID.
+
+    Lists every registered asset entry, shows whether the stored path is
+    relative (preferred) or absolute (legacy), and whether the file exists.
+
+    With --fix, absolute-path entries whose files still exist are copied into
+    the RCM assets directory and re-registered as relative paths.
+
+    Example:
+        jlesson rcm lesson-assets 3 --language eng-fre
+        jlesson rcm lesson-assets 3 --language eng-fre --fix
+    """
+    if rcm_path is None:
+        raise click.UsageError("Specify --rcm or set JLESSON_RCM_PATH.")
+    from sqlalchemy import text as sa_text
+    from .rcm import open_rcm
+
+    with open_rcm(rcm_path) as store:
+        with store._Session() as session:
+            item_ids = [
+                row[0] for row in session.execute(sa_text(
+                    "SELECT item_id FROM lesson_items "
+                    "WHERE lesson_id = :lid AND language_code = :lang "
+                    "ORDER BY item_id"
+                ), {"lid": lesson_id, "lang": language}).fetchall()
+            ]
+
+        if not item_ids:
+            with store._Session() as session:
+                available = [
+                    row[0] for row in session.execute(sa_text(
+                        "SELECT DISTINCT language_code FROM lesson_items WHERE lesson_id = :lid"
+                    ), {"lid": lesson_id}).fetchall()
+                ]
+            if available:
+                hint = f"  Available languages: {', '.join(sorted(available))}"
+                raise click.UsageError(
+                    f"No items found for lesson {lesson_id} with language '{language}'.\n{hint}"
+                )
+            raise click.UsageError(f"Lesson {lesson_id} not found in the RCM store.")
+
+        # Collect all asset rows for these items in one query
+        placeholders = ",".join(f"'{i}'" for i in item_ids)
+        with store._Session() as session:
+            asset_rows = session.execute(sa_text(
+                f"SELECT item_id, asset_key, file_path FROM assets "
+                f"WHERE item_id IN ({placeholders}) AND language_code = :lang "
+                f"ORDER BY item_id, asset_key"
+            ), {"lang": language}).fetchall()
+
+        total = missing = n_absolute = fixed = 0
+
+        click.echo(f"\nLesson {lesson_id}  [{language}]  —  {len(item_ids)} item(s)\n")
+        click.echo(f"  {'Item ID':<36}  {'Key':<20}  {'OK':>2}  {'Path type':>9}  Stored path")
+        click.echo(f"  {'-'*36}  {'-'*20}  {'--':>2}  {'-'*9}  {'-'*55}")
+
+        to_fix: list[tuple[str, str, Path]] = []  # (item_id, asset_key, resolved_path)
+
+        for item_id, asset_key, stored_path in asset_rows:
+            total += 1
+            is_relative = not Path(stored_path).is_absolute()
+            resolved = (
+                store._store_root / stored_path
+                if is_relative
+                else Path(stored_path)
+            )
+            exists = resolved.exists()
+            if not exists:
+                missing += 1
+            if not is_relative:
+                n_absolute += 1
+                if fix and exists:
+                    to_fix.append((item_id, asset_key, resolved))
+
+            ok_mark = "✓" if exists else "✗"
+            path_type = "relative" if is_relative else "absolute"
+            click.echo(
+                f"  {item_id:<36}  {asset_key:<20}  {ok_mark:>2}  {path_type:>9}  {stored_path}"
+            )
+
+        # Run fixes (outside the session loop)
+        for item_id, asset_key, resolved in to_fix:
+            store.register_asset(item_id, language, asset_key, resolved, copy_to_store=True)
+            fixed += 1
+
+        click.echo(f"\n  Items in lesson  : {len(item_ids)}")
+        click.echo(f"  Asset records    : {total}")
+        click.echo(f"  Missing on disk  : {missing}")
+        click.echo(f"  Absolute paths   : {n_absolute}")
+        if fix:
+            click.echo(f"  Fixed (migrated) : {fixed}")
+        elif n_absolute:
+            click.echo(f"  Run with --fix to migrate absolute paths to relative.")
+
+
 @rcm.command("lesson-usage")
 @click.argument("lesson_id", type=int)
 @LANGUAGE_OPTION
@@ -1132,8 +1241,20 @@ def rcm_lesson_usage(lesson_id: int, language: str, rcm_path: Path, verbose: boo
     totals = report["totals"]
 
     if not items:
-        click.echo(f"No items found for lesson {lesson_id} / {language}.")
-        return
+        from sqlalchemy import text as sa_text
+        with open_rcm(rcm_path) as store:
+            with store._Session() as session:
+                available = [
+                    row[0] for row in session.execute(sa_text(
+                        "SELECT DISTINCT language_code FROM lesson_items WHERE lesson_id = :lid"
+                    ), {"lid": lesson_id}).fetchall()
+                ]
+        if available:
+            hint = f"  Available languages: {', '.join(sorted(available))}"
+            raise click.UsageError(
+                f"No items found for lesson {lesson_id} with language '{language}'.\n{hint}"
+            )
+        raise click.UsageError(f"Lesson {lesson_id} not found in the RCM store.")
 
     click.echo(f"\nLesson {lesson_id}  [{language}]  —  {len(items)} item(s)\n")
     click.echo(f"  {'Item ID':<36}  {'Text':<30}  {'Phase':<10}  {'Theme':<18}  Calls  Tokens")
