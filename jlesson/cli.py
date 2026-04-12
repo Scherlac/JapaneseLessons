@@ -1043,9 +1043,11 @@ def lesson_bundle(lesson_dir: Path, rcm_path: Path, language: str) -> None:
 RCM_PATH_OPTION = click.option(
     "--rcm",
     "rcm_path",
-    required=True,
+    required=False,
+    default=None,
+    envvar="JLESSON_RCM_PATH",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
-    help="Path to the RCM directory (contains rcm.db).",
+    help="Path to the RCM directory (contains rcm.db). Defaults to JLESSON_RCM_PATH env var.",
 )
 
 
@@ -1056,8 +1058,10 @@ def rcm() -> None:
 
 @rcm.command("stats")
 @RCM_PATH_OPTION
-def rcm_stats(rcm_path: Path) -> None:
+def rcm_stats(rcm_path: Path | None) -> None:
     """Show a summary of all records in the RCM database."""
+    if rcm_path is None:
+        raise click.UsageError("Specify --rcm or set JLESSON_RCM_PATH.")
     from .rcm import open_rcm
 
     with open_rcm(rcm_path) as store:
@@ -1079,8 +1083,10 @@ def rcm_stats(rcm_path: Path) -> None:
 
 @rcm.command("lessons")
 @RCM_PATH_OPTION
-def rcm_lessons(rcm_path: Path) -> None:
+def rcm_lessons(rcm_path: Path | None) -> None:
     """List all lessons and their item counts."""
+    if rcm_path is None:
+        raise click.UsageError("Specify --rcm or set JLESSON_RCM_PATH.")
     from sqlalchemy import text as sa_text
     from .rcm import open_rcm
 
