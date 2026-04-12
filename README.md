@@ -103,7 +103,34 @@ jlesson rcm lesson-usage 3 --language eng-fre --verbose   # per-call breakdown
 jlesson rcm item-usage verbs_to_arrive_fe2171 --language eng-fre
 ```
 
-When the wrong language is passed to a lesson command, the error message lists which languages are actually stored for that lesson.
+### Vector index (semantic search)
+
+The RCM includes a Chroma-backed vector index over all canonical items, enabling semantic search independent of exact text matching.
+
+```bash
+# Check how many SQL items are indexed vs missing
+jlesson rcm vector-status
+jlesson rcm vector-status --phase nouns          # filter by phase
+jlesson rcm vector-status --list-missing         # print items not yet indexed
+
+# Populate (or update) the vector index from SQL
+jlesson rcm vector-sync                          # sync all items
+jlesson rcm vector-sync --phase grammar          # sync one phase only
+jlesson rcm vector-sync --dry-run                # preview without writing
+
+# Semantic search
+jlesson rcm vector-search "farm animals" --language hun-ger --phase nouns
+jlesson rcm vector-search "past tense action" --phase grammar --limit 5
+jlesson rcm vector-search "daily routine verbs"  # canonical-only, shows score
+```
+
+`vector-sync` is incremental — it only processes items not yet in Chroma.  Items whose embeddings are already stored in SQL are reused with no API calls; only genuinely new items hit the embedding model (batched, ~500 per API call).
+
+The Chroma index lives at `<rcm-path>/chroma/` alongside `rcm.db`. Both are controlled by the same `--rcm` flag / `JLESSON_RCM_PATH` environment variable.
+
+**Search behaviour:**
+- With `--language`: returns `(canonical text, target branch text)` pairs — only items that have been LLM-resolved for that language are included.
+- Without `--language`: returns raw Chroma hits with cosine similarity scores — useful for exploring coverage before branches exist.
 
 
 ## How a Lesson Works
@@ -155,7 +182,7 @@ jlesson/              ← all production Python source
 ├── language_config/  # Per-language-pair settings and registry
 ├── lesson_pipeline/  # Ordered pipeline steps: plan → generate → compile
 ├── pipeline_steps/   # Individual step actions (canonical planner, asset compiler, …)
-├── rcm/              # Runtime Content Management store (SQLite)
+├── rcm/              # Runtime Content Management store (SQLite + Chroma vector index)
 ├── runtime/          # Pipeline runtime services (LLM routing, caching)
 ├── llm_client.py     # Universal LLM client (OpenAI SDK)
 ├── config.py         # LLM provider settings
