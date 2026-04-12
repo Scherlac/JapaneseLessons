@@ -83,6 +83,43 @@ the existing pipeline prematurely.
 
 ---
 
+## LLM Optimization Audit
+
+This audit concentrates on the project’s prompt/response workflow, cache traceability,
+and lesson artifact associations.
+
+Key findings so far:
+
+- The local LLM cache is a simple prompt-hash store (`~/.jlesson/cache`) with prompt
+  text and raw JSON response pairs. It does not record step provenance, prompt version,
+  model or schema metadata, or lesson/curriculum linkage.
+- Current lesson output artifacts (`output/**/curriculum*.json`) capture lesson structure
+  and vocabulary but do not preserve prompt or response metadata at the block level.
+- A quick audit found 878 cached response entries, 228 prompt files, and 228 matched
+  prompt/response pairs. That leaves 650 response-only cached entries without an
+  associated saved prompt text, which is a major traceability gap.
+- Prompt builders are expressive and rich, but some of the prompt text is very long and
+  may be brittle for larger lessons or models with constrained context windows.
+- The JSON parser pipeline is permissive and relies on heuristics. There is a risk of
+  silent failure if the LLM returns invalid JSON, extra commentary, or structure drift.
+
+First optimization priorities:
+
+1. Add a traceable prompt/response metadata layer or lesson-generation log.
+2. Strengthen output-schema enforcement for the major prompt types.
+3. Reduce prompt size where possible by summarizing rather than fully enumerating
+   large vocab/grammar pools.
+4. Improve prompt cache semantics with versioning and step metadata.
+
+Audit tooling:
+- `tools/llm_audit.py` now scans `~/.jlesson/cache` and `output/` to summarize prompt/response
+  traces and curriculum artifacts.
+- The latest audit output is written to `output/llm_audit_summary.json`.
+
+This report will be updated as the audit script and issue-tracing work proceed.
+
+---
+
 ## Active Next Slice
 
 ### Slice A — Lean retrieval integration
