@@ -8,9 +8,25 @@ directories.
 
 Optionally reads a curriculum JSON file to populate lesson membership.
 
+Language detection
+------------------
+The language code is inferred from the output directory structure:
+  {source_dir}/{any_prefix}/{language_code}/{theme}/{lesson_NNN}/
+If detection fails, pass --language as an explicit fallback.
+
+Defaults
+--------
+--rcm-path  defaults to the JLESSON_RCM_PATH environment variable (.env is
+            loaded automatically from the project root).
+--language  auto-detected per lesson; only needed as a global override.
+
 Usage
 -----
     conda activate base
+    # Minimal — uses JLESSON_RCM_PATH from .env, detects language per lesson
+    python tools/import_lessons_to_rcm.py --source-dir W:/Users/JLesson/database/output
+
+    # With explicit overrides
     python tools/import_lessons_to_rcm.py \\
         --source-dir output/northern_exposure \\
         --language    eng-fre \\
@@ -22,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -29,6 +46,23 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
+
+# Load .env so JLESSON_RCM_PATH and other settings are available
+try:
+    from dotenv import load_dotenv
+    load_dotenv(_ROOT / ".env")
+except ImportError:
+    pass
+
+_KNOWN_LANGUAGE_CODES: frozenset[str] = frozenset({"eng-jap", "hun-eng", "hun-ger", "eng-fre"})
+
+
+def _detect_language(lesson_dir: Path) -> str | None:
+    """Infer language code from path parts, e.g. .../hun-ger/theme/lesson_001/."""
+    for part in lesson_dir.parts:
+        if part in _KNOWN_LANGUAGE_CODES:
+            return part
+    return None
 
 from jlesson.asset_compiler import build_asset_suffix_map
 from jlesson.llm_cache import LlmCacheTrace
@@ -131,12 +165,10 @@ def _items_from_block(block: dict) -> list[GeneralItem]:
 
 def run_import(
     source_dir: Path,
-    language_code: str,
+    language_code: str | None,
     rcm_path: Path,
     curriculum_path: Path | None,
 ) -> None:
-    all_suffixes = build_asset_suffix_map(language_code)
-
     lesson_id_map: dict[str, int] = {}
     if curriculum_path:
         lesson_id_map = _load_lesson_id_map(curriculum_path)
@@ -158,11 +190,19 @@ def run_import(
             audio_dir = lesson_dir / "audio"
             cards_dir = lesson_dir / "cards"
 
+            # Detect language per lesson; fall back to CLI override
+            lang = _detect_language(lesson_dir) or language_code
+            if lang is None:
+                print(f"  [skip] Cannot detect language for {lesson_dir} — pass --language")
+                continue
+
+            all_suffixes = build_asset_suffix_map(lang)
+
             # Derive theme from directory name (two levels up from lesson_NNN)
             theme = lesson_dir.parent.name.lower().strip()
             lesson_id = lesson_id_map.get(theme, 0)
 
-            print(f"\n  Lesson: {theme!r} (id={lesson_id})")
+            print(f"\n  Lesson: {theme!r}  [{lang}]  (id={lesson_id})")
 
             with open(planner_json, encoding="utf-8") as f:
                 blocks = json.load(f)
@@ -180,11 +220,11 @@ def run_import(
                     continue
 
                 # Check if branch already exists
-                existing = store.get_branch(canonical.id, language_code)
+                existing = store.get_branch(canonical.id, lang)
                 is_new = existing is None
 
                 store.upsert_item(canonical)
-                store.upsert_branch(canonical.id, language_code, item)
+                store.upsert_branch(canonical.id, lang, item)
 
                 # Register existing compiled assets — copy into central store
                 for asset_key, suffix in all_suffixes.items():
@@ -194,7 +234,7 @@ def run_import(
                         candidate = cards_dir / f"{canonical.id}_{suffix}"
                     if candidate.exists():
                         store.register_asset(
-                            canonical.id, language_code, asset_key, candidate,
+                            canonical.id, lang, asset_key, candidate,
                             copy_to_store=True,
                         )
                         total_assets += 1
@@ -204,10 +244,10 @@ def run_import(
                     total_new += 1
 
             if lesson_id and lesson_items:
-                store.record_lesson_items(lesson_id, theme, language_code, lesson_items)
+                store.record_lesson_items(lesson_id, theme, lang, lesson_items)
 
             steps_dir = lesson_dir / "steps"
-            llm_added, llm_linked = _import_llm_usage(store, steps_dir, block_items, language_code)
+            llm_added, llm_linked = _import_llm_usage(store, steps_dir, block_items, lang)
             if llm_added:
                 print(f"    LLM usage records : {llm_added} added ({llm_linked} linked to items)")
 
@@ -230,17 +270,34 @@ def run_import(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Import generated lessons into the RCM store.")
+    parser = argparse.ArgumentParser(
+        description="Import generated lessons into the RCM store.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--source-dir", required=True, type=Path, help="Root directory to search for lesson output.")
-    parser.add_argument("--language", required=True, help="Language code, e.g. eng-fre.")
-    parser.add_argument("--rcm-path", required=True, type=Path, help="RCM root directory (rcm.db will be created here).")
+    parser.add_argument(
+        "--language", default=None,
+        help="Language code override (e.g. eng-fre). Auto-detected from path when omitted.",
+    )
+    parser.add_argument(
+        "--rcm-path", type=Path, default=None,
+        help="RCM root directory (rcm.db will be created here). Defaults to JLESSON_RCM_PATH env var.",
+    )
     parser.add_argument("--curriculum", type=Path, default=None, help="Path to curriculum JSON for lesson ID mapping.")
     args = parser.parse_args()
+
+    rcm_path = args.rcm_path
+    if rcm_path is None:
+        env_rcm = os.environ.get("JLESSON_RCM_PATH")
+        if env_rcm:
+            rcm_path = Path(env_rcm)
+        else:
+            sys.exit("ERROR: --rcm-path not set and JLESSON_RCM_PATH is not configured in .env")
 
     run_import(
         source_dir=args.source_dir,
         language_code=args.language,
-        rcm_path=args.rcm_path,
+        rcm_path=rcm_path,
         curriculum_path=args.curriculum,
     )
 
