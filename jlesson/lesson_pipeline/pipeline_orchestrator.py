@@ -266,6 +266,21 @@ def run_pipeline(
     if report_path:
         print(f"  Report  : {report_path}")
 
+    # Record lesson membership in RCM now that lesson_id is known
+    if _rcm_store is not None and ctx.lesson_id is not None and ctx.lesson_plan is not None:
+        from jlesson.models import GeneralItem
+        all_items: list[GeneralItem] = []
+        for block in ctx.lesson_plan.blocks:
+            for phase_items in block.content_sequences.values():
+                all_items.extend(phase_items)
+        if all_items:
+            _rcm_store.record_lesson_items(
+                ctx.lesson_id,
+                ctx.config.theme,
+                ctx.config.language,
+                all_items,
+            )
+
     if _rcm_store is not None:
         _rcm_store.close()
 

@@ -13,6 +13,7 @@ Entry point: jlesson (defined in pyproject.toml)
 from __future__ import annotations
 
 import json
+import os
 import random
 from pathlib import Path
 
@@ -281,6 +282,11 @@ def _run_lesson_generation(
 ) -> None:
     """Run lesson generation, optionally overwriting an existing lesson ID."""
     from .lesson_pipeline import LessonConfig, run_pipeline
+
+    # Resolve the RCM path: explicit arg > env var > central default ~/.jlesson/rcm
+    if rcm_path is None:
+        env_rcm = os.environ.get("JLESSON_RCM_PATH")
+        rcm_path = Path(env_rcm) if env_rcm else Path.home() / ".jlesson" / "rcm"
 
     lang_cfg = get_language_config(language)
     resolved_curriculum = (
