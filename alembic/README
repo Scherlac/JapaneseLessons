@@ -1,1 +1,67 @@
-Generic single-database configuration.
+# Alembic — JapaneseLessons RCM Database Migrations
+
+## Database path
+
+Alembic does **not** use a hardcoded database URL. The target database is
+resolved in this priority order:
+
+1. **Command-line override** — `-x db_path=<absolute path>`
+2. **Environment variable** — `JLESSON_RCM_DB=<absolute path>`
+3. **alembic.ini** — `sqlalchemy.url` (left blank; used as a last-resort
+   fallback or for CI overrides)
+
+Set the env var once in your shell session before running any `alembic`
+command:
+
+```powershell
+$env:JLESSON_RCM_DB = "C:\Users\<you>\.jlesson\<project>\rcm.db"
+```
+
+## Revision chain
+
+| Revision | Description |
+|---|---|
+| `a9b2f1e5c44d` | Baseline — core RCM tables (`items`, `branches`, `assets`, `lesson_items`) |
+| `64573bb40ecc` | Add LLM usage tracking tables (`llm_usage_records`, `llm_usage_links`) |
+
+## Common workflows
+
+### First-time setup on an existing database
+
+If the database was created by `_Base.metadata.create_all()` before Alembic
+was introduced, stamp it at the baseline revision and then upgrade to head:
+
+```powershell
+$env:JLESSON_RCM_DB = "C:\Users\<you>\.jlesson\<project>\rcm.db"
+alembic stamp a9b2f1e5c44d
+alembic upgrade head
+```
+
+### Apply all pending migrations
+
+```powershell
+alembic upgrade head
+```
+
+### Generate a new migration after changing `store.py`
+
+```powershell
+alembic revision --autogenerate -m "describe the change"
+alembic upgrade head
+```
+
+> **Important**: always set `JLESSON_RCM_DB` (or pass `-x db_path=`) before
+> running autogenerate. If Alembic connects to a wrong or empty database it
+> will generate CREATE TABLE statements for tables that already exist.
+
+### Roll back one revision
+
+```powershell
+alembic downgrade -1
+```
+
+### Show current revision in the database
+
+```powershell
+alembic current
+```
