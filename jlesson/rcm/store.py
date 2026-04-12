@@ -780,6 +780,123 @@ class RCMStore:
         ]
 
     # ------------------------------------------------------------------
+    # Lesson / item usage reports
+    # ------------------------------------------------------------------
+
+    def lesson_usage_report(
+        self,
+        lesson_id: int,
+        language_code: str | None = None,
+    ) -> dict:
+        """Return a report of all items in a lesson and their LLM usage totals.
+
+        The result structure::
+
+            {
+                "lesson_id": 3,
+                "language_code": "eng-jap" | None,
+                "items": [
+                    {
+                        "item_id": "abc123",
+                        "text": "to run",
+                        "phase": "verbs",
+                        "theme": "sport",
+                        "language_code": "eng-jap",
+                        "llm_usage": {
+                            "records": 2,
+                            "prompt_tokens": 450,
+                            "completion_tokens": 120,
+                            "total_tokens": 570,
+                        },
+                        "llm_records": [ ... ]   # raw per-call detail
+                    },
+                    ...
+                ],
+                "totals": {
+                    "records": 5,
+                    "prompt_tokens": 1200,
+                    "completion_tokens": 380,
+                    "total_tokens": 1580,
+                }
+            }
+        """
+        with self._Session() as session:
+            q = session.query(_LessonItemRow, _ItemRow).join(
+                _ItemRow, _ItemRow.id == _LessonItemRow.item_id
+            ).filter(_LessonItemRow.lesson_id == lesson_id)
+            if language_code is not None:
+                q = q.filter(_LessonItemRow.language_code == language_code)
+            rows = q.order_by(_LessonItemRow.theme, _ItemRow.text).all()
+
+        items_out: list[dict] = []
+        totals: dict[str, int] = {"records": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+        for lesson_row, item_row in rows:
+            lang = lesson_row.language_code
+            usage = self.usage_totals_for_item(
+                item_row.id,
+                language_code=lang,
+                relation_type="branch",
+            )
+            raw = self.usage_records_for_item(item_row.id, language_code=lang)
+            items_out.append({
+                "item_id": item_row.id,
+                "text": item_row.text,
+                "phase": item_row.phase,
+                "theme": lesson_row.theme,
+                "language_code": lang,
+                "llm_usage": usage,
+                "llm_records": raw,
+            })
+            totals["records"] += usage["records"]
+            totals["prompt_tokens"] += usage["prompt_tokens"]
+            totals["completion_tokens"] += usage["completion_tokens"]
+            totals["total_tokens"] += usage["total_tokens"]
+
+        return {
+            "lesson_id": lesson_id,
+            "language_code": language_code,
+            "items": items_out,
+            "totals": totals,
+        }
+
+    def item_usage_report(self, item_id: str, language_code: str | None = None) -> dict:
+        """Return a report of LLM usage for a single canonical item.
+
+        The result structure::
+
+            {
+                "item_id": "abc123",
+                "text": "to run",
+                "phase": "verbs",
+                "language_code": "eng-jap" | None,
+                "llm_usage": { "records": 2, "prompt_tokens": ..., ... },
+                "llm_records": [ ... ],
+            }
+        """
+        with self._Session() as session:
+            item_row = session.get(_ItemRow, item_id)
+
+        if item_row is None:
+            return {"item_id": item_id, "error": "not found"}
+
+        usage = self.usage_totals_for_item(
+            item_id,
+            language_code=language_code,
+            relation_type="branch",
+        )
+        raw = self.usage_records_for_item(item_id, language_code=language_code)
+
+        return {
+            "item_id": item_id,
+            "text": item_row.text,
+            "phase": item_row.phase,
+            "language_code": language_code,
+            "llm_usage": usage,
+            "llm_records": raw,
+        }
+
+    # ------------------------------------------------------------------
     # Stats / reporting
     # ------------------------------------------------------------------
 

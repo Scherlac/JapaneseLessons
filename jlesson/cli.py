@@ -1031,6 +1031,164 @@ def lesson_bundle(lesson_dir: Path, rcm_path: Path, language: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# rcm subgroup
+# ---------------------------------------------------------------------------
+
+RCM_PATH_OPTION = click.option(
+    "--rcm",
+    "rcm_path",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Path to the RCM directory (contains rcm.db).",
+)
+
+
+@cli.group()
+def rcm() -> None:
+    """Query and inspect the RCM database."""
+
+
+@rcm.command("stats")
+@RCM_PATH_OPTION
+def rcm_stats(rcm_path: Path) -> None:
+    """Show a summary of all records in the RCM database."""
+    from .rcm import open_rcm
+
+    with open_rcm(rcm_path) as store:
+        s = store.stats()
+
+    click.echo(f"Items           : {s['items']}")
+    click.echo(f"Branches        : {s['branches']}")
+    click.echo(f"Assets          : {s['assets']}")
+    click.echo(f"Lesson items    : {s['lesson_items']}")
+    click.echo(f"LLM usage records: {s['llm_usage_records']}  (links: {s['llm_usage_links']})")
+    click.echo(f"LLM tokens      : prompt={s['llm_prompt_tokens']}  completion={s['llm_completion_tokens']}  total={s['llm_total_tokens']}")
+    if s["duplicate_texts"]:
+        click.echo(f"\nDuplicate canonical texts ({len(s['duplicate_texts'])}):")
+        for d in s["duplicate_texts"][:10]:
+            click.echo(f"  '{d['text']}' × {d['count']}")
+        if len(s["duplicate_texts"]) > 10:
+            click.echo(f"  … and {len(s['duplicate_texts']) - 10} more")
+
+
+@rcm.command("lessons")
+@RCM_PATH_OPTION
+def rcm_lessons(rcm_path: Path) -> None:
+    """List all lessons and their item counts."""
+    from sqlalchemy import text as sa_text
+    from .rcm import open_rcm
+
+    with open_rcm(rcm_path) as store:
+        with store._Session() as session:
+            rows = session.execute(sa_text(
+                "SELECT lesson_id, language_code, theme, COUNT(*) as cnt "
+                "FROM lesson_items GROUP BY lesson_id, language_code, theme "
+                "ORDER BY lesson_id, theme"
+            )).fetchall()
+
+    if not rows:
+        click.echo("No lessons found.")
+        return
+
+    click.echo(f"\n  {'ID':>4}  {'Language':<12}  {'Items':>5}  Theme")
+    click.echo(f"  {'-'*4}  {'-'*12}  {'-'*5}  {'-'*50}")
+    for row in rows:
+        click.echo(f"  {row[0]:>4}  {row[1]:<12}  {row[3]:>5}  {row[2]}")
+
+
+@rcm.command("lesson-usage")
+@click.argument("lesson_id", type=int)
+@LANGUAGE_OPTION
+@RCM_PATH_OPTION
+@click.option("--verbose", "-v", is_flag=True, default=False, help="Show per-call LLM records.")
+def rcm_lesson_usage(lesson_id: int, language: str, rcm_path: Path, verbose: bool) -> None:
+    """Show items and LLM usage for LESSON_ID.
+
+    Example:
+        jlesson rcm lesson-usage 3 --rcm ~/.jlesson/northern_exposure --language eng-jap
+    """
+    from .rcm import open_rcm
+
+    with open_rcm(rcm_path) as store:
+        report = store.lesson_usage_report(lesson_id, language_code=language)
+
+    items = report["items"]
+    totals = report["totals"]
+
+    if not items:
+        click.echo(f"No items found for lesson {lesson_id} / {language}.")
+        return
+
+    click.echo(f"\nLesson {lesson_id}  [{language}]  —  {len(items)} item(s)\n")
+    click.echo(f"  {'Item ID':<36}  {'Text':<30}  {'Phase':<10}  {'Theme':<18}  Calls  Tokens")
+    click.echo(f"  {'-'*36}  {'-'*30}  {'-'*10}  {'-'*18}  -----  ------")
+
+    for item in items:
+        u = item["llm_usage"]
+        click.echo(
+            f"  {item['item_id']:<36}  {item['text']:<30}  {item['phase']:<10}"
+            f"  {item['theme']:<18}  {u['records']:>5}  {u['total_tokens']:>6}"
+        )
+        if verbose and item["llm_records"]:
+            for rec in item["llm_records"]:
+                hit = "HIT " if rec["cache_hit"] else "MISS"
+                click.echo(
+                    f"      [{hit}] {rec['step_name'] or '(unknown)':25}"
+                    f"  rel={rec['relation_type']:<10}"
+                    f"  p={rec['prompt_tokens']:>5}  c={rec['completion_tokens']:>5}"
+                    f"  total={rec['total_tokens']:>6}"
+                )
+
+    click.echo(f"  {'-'*36}  {'-'*30}  {'-'*10}  {'-'*18}  -----  ------")
+    click.echo(
+        f"  {'TOTAL':<36}  {'':30}  {'':10}  {'':18}  {totals['records']:>5}  {totals['total_tokens']:>6}"
+    )
+    click.echo(
+        f"\n  Prompt tokens: {totals['prompt_tokens']}  "
+        f"Completion tokens: {totals['completion_tokens']}  "
+        f"Total tokens: {totals['total_tokens']}"
+    )
+
+
+@rcm.command("item-usage")
+@click.argument("item_id")
+@LANGUAGE_OPTION
+@RCM_PATH_OPTION
+@click.option("--verbose", "-v", is_flag=True, default=False, help="Show per-call LLM records.")
+def rcm_item_usage(item_id: str, language: str, rcm_path: Path, verbose: bool) -> None:
+    """Show LLM usage for a single canonical item ITEM_ID.
+
+    Example:
+        jlesson rcm item-usage abc123def456 --rcm ~/.jlesson/northern_exposure
+    """
+    from .rcm import open_rcm
+
+    with open_rcm(rcm_path) as store:
+        report = store.item_usage_report(item_id, language_code=language)
+
+    if "error" in report:
+        click.echo(f"Item '{item_id}' not found in the RCM database.", err=True)
+        raise SystemExit(1)
+
+    u = report["llm_usage"]
+    click.echo(f"\nItem: {report['text']}  ({report['item_id']})")
+    click.echo(f"Phase: {report['phase']}   Language: {language}")
+    click.echo(f"LLM calls: {u['records']}  —  "
+               f"prompt: {u['prompt_tokens']}  completion: {u['completion_tokens']}  total: {u['total_tokens']}")
+
+    if verbose and report["llm_records"]:
+        click.echo()
+        for rec in report["llm_records"]:
+            hit = "HIT " if rec["cache_hit"] else "MISS"
+            click.echo(
+                f"  [{hit}] {rec['step_name'] or '(unknown)':25}"
+                f"  rel={rec['relation_type']:<10}"
+                f"  p={rec['prompt_tokens']:>5}  c={rec['completion_tokens']:>5}"
+                f"  total={rec['total_tokens']:>6}"
+            )
+
+
+# ---------------------------------------------------------------------------
 # curriculum subgroup
 # ---------------------------------------------------------------------------
 
