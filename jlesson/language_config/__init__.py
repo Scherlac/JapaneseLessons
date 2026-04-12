@@ -10,6 +10,11 @@ Usage:
 """
 
 from ._base import FieldMap, LanguageConfig, PartialFieldMap, PartialLanguageConfig, _CONFIGS, get_language_config
+from .config_eng import ENGLISH_LANGUAGE
+from .config_fre import FRENCH_LANGUAGE
+from .config_jap import JAPANESE_LANGUAGE
+from .config_hun import HUNGARIAN_LANGUAGE
+from .config_ger import GERMAN_LANGUAGE
 from .eng_jap import ENG_JAP_CONFIG
 from .hun_eng import HUN_ENG_CONFIG
 from .hun_ger import HUN_GER_CONFIG
@@ -28,6 +33,13 @@ __all__ = [
     "PartialFieldMap",
     "PartialLanguageConfig",
     "get_language_config",
+    # Individual language configs
+    "ENGLISH_LANGUAGE",
+    "FRENCH_LANGUAGE",
+    "JAPANESE_LANGUAGE",
+    "HUNGARIAN_LANGUAGE",
+    "GERMAN_LANGUAGE",
+    # Language pair configs
     "ENG_JAP_CONFIG",
     "HUN_ENG_CONFIG",
     "HUN_GER_CONFIG",

@@ -191,7 +191,6 @@ class GrammarItem(BaseModel):
     id: str
     pattern: str
     description: str
-    example_source: str
     example_target: str
     requires: list[str] = Field(default_factory=list)
     level: int = 1

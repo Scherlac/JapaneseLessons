@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from jlesson.video import tts_engine
 
-from ..curriculum import ENG_TO_FRE_GRAMMAR_PROGRESSION
+from ..curriculum import FRE_GRAMMAR_PROGRESSION
 from ._base import FieldMap, LanguageConfig
-from ._partials import ENGLISH_LANGUAGE, FRENCH_LANGUAGE
+from .config_eng import ENGLISH_LANGUAGE
+from .config_fre import FRENCH_LANGUAGE
 
 ENG_FRE_CONFIG = LanguageConfig(
     code="eng-fre",
@@ -18,7 +19,7 @@ ENG_FRE_CONFIG = LanguageConfig(
 
     canonical_language="english",
 
-    grammar_progression=tuple(ENG_TO_FRE_GRAMMAR_PROGRESSION),
+    grammar_progression=tuple(FRE_GRAMMAR_PROGRESSION),
     vocab_dir="vocab/french",
     curriculum_file="curriculum/curriculum_french.json",
 

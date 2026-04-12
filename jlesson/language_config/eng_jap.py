@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from jlesson.video import tts_engine
 
-from ..curriculum import ENG_TO_JAP_GRAMMAR_PROGRESSION
+from ..curriculum import JAP_GRAMMAR_PROGRESSION
 from ._base import FieldMap, LanguageConfig
-from ._partials import ENGLISH_LANGUAGE, JAPANESE_LANGUAGE
+from .config_eng import ENGLISH_LANGUAGE
+from .config_jap import JAPANESE_LANGUAGE
 
 ENG_JAP_CONFIG = LanguageConfig(
     code="eng-jap",
@@ -16,7 +17,7 @@ ENG_JAP_CONFIG = LanguageConfig(
 
     voices=tts_engine.VOICES,
 
-    grammar_progression=tuple(ENG_TO_JAP_GRAMMAR_PROGRESSION),
+    grammar_progression=tuple(JAP_GRAMMAR_PROGRESSION),
     vocab_dir="vocab",
     curriculum_file="curriculum/curriculum.json",
 

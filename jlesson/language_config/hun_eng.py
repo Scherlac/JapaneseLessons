@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from jlesson.video import tts_engine
 
-from ..curriculum import HUN_TO_ENG_GRAMMAR_PROGRESSION
+from ..curriculum import ENG_GRAMMAR_PROGRESSION
 from ._base import FieldMap, LanguageConfig, PartialFieldMap, PartialLanguageConfig
-from ._partials import ENGLISH_LANGUAGE, HUNGARIAN_LANGUAGE
+from .config_eng import ENGLISH_LANGUAGE
+from .config_hun import HUNGARIAN_LANGUAGE
 
 HUN_ENG_CONFIG = LanguageConfig(
     code="hun-eng",
@@ -36,7 +37,7 @@ HUN_ENG_CONFIG = LanguageConfig(
 
     voices=tts_engine.VOICES,
 
-    grammar_progression=tuple(HUN_TO_ENG_GRAMMAR_PROGRESSION),
+    grammar_progression=tuple(ENG_GRAMMAR_PROGRESSION),
 
     vocab_dir="vocab/hungarian",
     curriculum_file="curriculum/curriculum_hungarian.json",

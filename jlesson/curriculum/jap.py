@@ -1,9 +1,9 @@
 """
-English-Japanese grammar progression table and derived helpers.
+Japanese grammar progression table and derived helpers.
 
-Provides the ordered, prerequisite-aware grammar sequence for the
-eng-jap language pair, plus convenience wrappers (get_next_grammar,
-get_grammar_by_id, summary) that default to this progression.
+Provides the ordered, prerequisite-aware grammar sequence for Japanese
+as a target language, plus convenience wrappers (get_next_grammar,
+get_grammar_by_id, summary).
 """
 
 from __future__ import annotations
@@ -15,13 +15,12 @@ from ._base import CurriculumData, create_curriculum, get_next_grammar_from, gra
 # ── Grammar Progression — English → Japanese (levels 1-4) ────────────────────
 # "level" is a rough JLPT-aligned difficulty bucket (1 = absolute beginner).
 
-ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
+JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
     # ── Level 1 — absolute beginner, no prerequisites ────────────────────────
     GrammarItem(
         id="action_present_affirmative",
         pattern="Subject + object + verb (polite)",
         description="Subject does verb to object — present affirmative (polite)",
-        example_source="I eat fish.",
         example_target="私は魚を食べます。",
         requires=[],
         level=1,
@@ -30,7 +29,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="identity_present_affirmative",
         pattern="Subject + は + noun + です",
         description="A is B — identity / description sentence",
-        example_source="This is bread.",
         example_target="これはパンです。",
         requires=[],
         level=1,
@@ -40,7 +38,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="action_present_negative",
         pattern="Subject + object + verb + ません",
         description="Subject does NOT verb object — present negative (polite)",
-        example_source="He does not eat meat.",
         example_target="彼は肉を食べません。",
         requires=["action_present_affirmative"],
         level=2,
@@ -49,7 +46,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="action_past_affirmative",
         pattern="Subject + object + verb + ました",
         description="Subject did verb to object — past affirmative (polite)",
-        example_source="I drank water.",
         example_target="私は水を飲みました。",
         requires=["action_present_affirmative"],
         level=2,
@@ -58,7 +54,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="question_ka",
         pattern="Sentence + か",
         description="Yes/no question — append か to any polite sentence",
-        example_source="Do you drink tea?",
         example_target="あなたはお茶を飲みますか。",
         requires=["action_present_affirmative"],
         level=2,
@@ -67,7 +62,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="direction_ni_ikimasu",
         pattern="Direction + に/へ + 行きます",
         description="Subject goes to destination — destination particle に/へ",
-        example_source="I go to the station.",
         example_target="私は駅に行きます。",
         requires=["action_present_affirmative"],
         level=2,
@@ -76,7 +70,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="existence_arimasu",
         pattern="Location + に + object + が + あります",
         description="There is X at/in Y — inanimate objects (あります)",
-        example_source="There is bread on the table.",
         example_target="テーブルにパンがあります。",
         requires=["action_present_affirmative"],
         level=2,
@@ -85,7 +78,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="adjective_na",
         pattern="Subject + は + な-adjective + です",
         description="な-adjective predicate — subject is [な-adjective]",
-        example_source="I like this dish.",
         example_target="この料理は好きです。",
         requires=["identity_present_affirmative"],
         level=2,
@@ -95,7 +87,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="action_past_negative",
         pattern="Subject + object + verb + ませんでした",
         description="Subject did NOT verb object — past negative (polite)",
-        example_source="I did not eat vegetables yesterday.",
         example_target="私は昨日野菜を食べませんでした。",
         requires=["action_present_negative", "action_past_affirmative"],
         level=3,
@@ -104,7 +95,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="desire_tai",
         pattern="Subject + verb-stem + たいです",
         description="Subject wants to do verb — verb stem + たいです",
-        example_source="I want to drink tea.",
         example_target="私はお茶を飲みたいです。",
         requires=["action_present_affirmative", "action_present_negative"],
         level=3,
@@ -113,7 +103,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="desire_hoshii",
         pattern="Subject + object + が + ほしいです",
         description="Subject wants noun — subject が ほしいです",
-        example_source="I want water.",
         example_target="私は水がほしいです。",
         requires=["action_present_affirmative"],
         level=3,
@@ -122,7 +111,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="reason_kara",
         pattern="Clause + から",
         description="Because … — append から to a clause to give a reason",
-        example_source="Because I am hungry, I eat rice.",
         example_target="お腹が空いていますから、ご飯を食べます。",
         requires=["action_present_affirmative", "action_present_negative"],
         level=3,
@@ -132,7 +120,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="te_form_request",
         pattern="Verb-te + ください",
         description="Please do verb — て-form + ください",
-        example_source="Please eat the bread.",
         example_target="パンを食べてください。",
         requires=["action_present_affirmative", "desire_tai"],
         level=4,
@@ -141,7 +128,6 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="te_form_progressive",
         pattern="Verb-te + います",
         description="Subject is doing verb — て-form + います (continuous aspect)",
-        example_source="He is eating rice now.",
         example_target="彼は今ご飯を食べています。",
         requires=["te_form_request"],
         level=4,
@@ -150,15 +136,15 @@ ENG_TO_JAP_GRAMMAR_PROGRESSION: list[GrammarItem] = [
         id="potential_dekimasu",
         pattern="Verb-potential + ます/できます",
         description="Subject can do verb — potential form / できます",
-        example_source="I can speak Japanese.",
         example_target="私は日本語が話せます。",
         requires=["action_present_affirmative", "action_present_negative"],
         level=4,
     ),
 ]
 
-# Backward-compat alias — existing code imports GRAMMAR_PROGRESSION everywhere.
-GRAMMAR_PROGRESSION = ENG_TO_JAP_GRAMMAR_PROGRESSION
+# Backward-compat alias.
+GRAMMAR_PROGRESSION = JAP_GRAMMAR_PROGRESSION
+ENG_TO_JAP_GRAMMAR_PROGRESSION = JAP_GRAMMAR_PROGRESSION  # backward compat
 
 # Fast lookup by id.
 _GRAMMAR_BY_ID: dict[str, GrammarItem] = {g.id: g for g in GRAMMAR_PROGRESSION}

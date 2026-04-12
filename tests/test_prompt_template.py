@@ -360,7 +360,6 @@ class TestBuildSentenceReviewPrompt:
                 id="action_present_affirmative",
                 pattern="A は B を V ます",
                 description="Subject does verb to object",
-                example_source="I eat fish.",
                 example_target="私は魚を食べます。",
                 level=1,
             ),

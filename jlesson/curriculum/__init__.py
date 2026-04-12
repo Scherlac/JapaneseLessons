@@ -23,23 +23,33 @@ from ._base import (
     grammar_summary_lines,
 )
 
-# English-Japanese
-from .eng_jap import (
-    ENG_TO_JAP_GRAMMAR_PROGRESSION,
-    GRAMMAR_PROGRESSION,
+# Japanese
+from .jap import (
+    JAP_GRAMMAR_PROGRESSION,
+    GRAMMAR_PROGRESSION,       # backward compat
+    ENG_TO_JAP_GRAMMAR_PROGRESSION,  # backward compat
     get_next_grammar,
     get_grammar_by_id,
     summary,
 )
 
-# Hungarian-English
-from .hun_eng import HUN_TO_ENG_GRAMMAR_PROGRESSION
+# French
+from .fre import (
+    FRE_GRAMMAR_PROGRESSION,
+    ENG_TO_FRE_GRAMMAR_PROGRESSION,  # backward compat
+)
 
-# Hungarian-German
-from .hun_ger import HUN_TO_GER_GRAMMAR_PROGRESSION
+# English (as target)
+from .eng import (
+    ENG_GRAMMAR_PROGRESSION,
+    HUN_TO_ENG_GRAMMAR_PROGRESSION,  # backward compat
+)
 
-# English-French
-from .eng_fre import ENG_TO_FRE_GRAMMAR_PROGRESSION
+# German (as target)
+from .ger import (
+    GER_GRAMMAR_PROGRESSION,
+    HUN_TO_GER_GRAMMAR_PROGRESSION,  # backward compat
+)
 
 __all__ = [
     # base
@@ -52,16 +62,20 @@ __all__ = [
     "recompute_coverage",
     "get_next_grammar_from",
     "grammar_summary_lines",
-    # eng-jap
-    "ENG_TO_JAP_GRAMMAR_PROGRESSION",
+    # Japanese
+    "JAP_GRAMMAR_PROGRESSION",
     "GRAMMAR_PROGRESSION",
+    "ENG_TO_JAP_GRAMMAR_PROGRESSION",
     "get_next_grammar",
     "get_grammar_by_id",
     "summary",
-    # hun-eng
-    "HUN_TO_ENG_GRAMMAR_PROGRESSION",
-    # hun-ger
-    "HUN_TO_GER_GRAMMAR_PROGRESSION",
-    # eng-fre
+    # French
+    "FRE_GRAMMAR_PROGRESSION",
     "ENG_TO_FRE_GRAMMAR_PROGRESSION",
+    # English (as target)
+    "ENG_GRAMMAR_PROGRESSION",
+    "HUN_TO_ENG_GRAMMAR_PROGRESSION",
+    # German (as target)
+    "GER_GRAMMAR_PROGRESSION",
+    "HUN_TO_GER_GRAMMAR_PROGRESSION",
 ]
