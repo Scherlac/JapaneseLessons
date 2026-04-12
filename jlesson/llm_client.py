@@ -8,6 +8,7 @@ Provides simple interface for text generation with optional JSON mode.
 import json
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from openai import OpenAI
@@ -30,6 +31,23 @@ if LLM_DEBUG:
     logging.basicConfig(level=logging.DEBUG)
 
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+@dataclass(frozen=True)
+class LlmUsageMetrics:
+    """Token usage returned by the provider for one LLM call."""
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+
+@dataclass(frozen=True)
+class LlmTextResponse:
+    """Text response plus optional provider usage metadata."""
+
+    content: str
+    usage: LlmUsageMetrics | None = None
 
 
 def _strip_think(text: str) -> str:
@@ -142,6 +160,17 @@ def _is_unsupported_max_tokens_error(err: Exception) -> bool:
     )
 
 
+def _extract_usage_metrics(response: Any) -> LlmUsageMetrics | None:
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return None
+    return LlmUsageMetrics(
+        prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+        completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
+        total_tokens=getattr(usage, "total_tokens", 0) or 0,
+    )
+
+
 class LLMClient:
     """Universal LLM client using OpenAI-compatible interface."""
 
@@ -186,6 +215,22 @@ class LLMClient:
         max_tokens: Optional[int] = None,
         effort: str | None = None,
     ) -> str:
+        return self.generate_text_with_metadata(
+            prompt=prompt,
+            json_mode=json_mode,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            effort=effort,
+        ).content
+
+    def generate_text_with_metadata(
+        self,
+        prompt: str,
+        json_mode: bool = False,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        effort: str | None = None,
+    ) -> LlmTextResponse:
         """
         Generate text from LLM.
 
@@ -243,7 +288,7 @@ class LLMClient:
             if LLM_DEBUG:
                 logger.debug(f"Received response: {content[:200]}...")
 
-            return content
+            return LlmTextResponse(content=content, usage=_extract_usage_metrics(response))
 
         except RateLimitError as e:
             logger.error(f"Rate limit exceeded: {e}")
@@ -263,7 +308,10 @@ class LLMClient:
                 kwargs.pop("response_format", None)
                 response = self.client.chat.completions.create(**kwargs)
                 content = response.choices[0].message.content
-                return _strip_think(content)
+                return LlmTextResponse(
+                    content=_strip_think(content),
+                    usage=_extract_usage_metrics(response),
+                )
             logger.error(f"API error: {e}")
             raise
         except Exception as e:
@@ -381,6 +429,21 @@ def ask_llm_json_free(
     max_tokens: Optional[int] = None,
     effort: str | None = None,
 ) -> Dict[str, Any]:
+    result, _usage = ask_llm_json_free_with_metrics(
+        prompt,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        effort=effort,
+    )
+    return result
+
+
+def ask_llm_json_free_with_metrics(
+    prompt: str,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+    effort: str | None = None,
+) -> tuple[Dict[str, Any], LlmUsageMetrics | None]:
     """Ask the LLM for a JSON response without schema enforcement.
 
     Use this for complex responses (vocab dicts, sentence arrays, validation
@@ -401,17 +464,17 @@ def ask_llm_json_free(
     """
     client = get_llm_client()
     # Use text mode — no schema enforcement so the LLM can return any shape
-    response_text = client.generate_text(
+    response = client.generate_text_with_metadata(
         prompt=prompt,
         json_mode=False,
         temperature=temperature,
         max_tokens=max_tokens,
         effort=effort,
     )
-    parsed = _extract_json(response_text)
+    parsed = _extract_json(response.content)
     if parsed is not None:
-        return parsed
-    preview = (response_text or "").strip()
+        return parsed, response.usage
+    preview = (response.content or "").strip()
     if not preview:
         preview = "<empty response from model>"
     raise ValueError(f"LLM returned invalid JSON: {preview[:200]}")

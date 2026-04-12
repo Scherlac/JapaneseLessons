@@ -25,7 +25,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
-from .llm_client import ask_llm_json_free
+from .llm_client import LlmUsageMetrics, ask_llm_json_free_with_metrics
 
 _DEFAULT_CACHE_DIR = Path.home() / ".jlesson" / "cache"
 
@@ -44,6 +44,9 @@ class LlmCacheTrace:
     call_index: int = 0
     step_name: str | None = None
     step_index: int | None = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
 
 
 @dataclass(frozen=True)
@@ -82,6 +85,7 @@ def build_uncached_llm_trace(
     response: dict[str, Any],
     *,
     effort: str | None = None,
+    usage: LlmUsageMetrics | None = None,
 ) -> LlmCacheTrace:
     return LlmCacheTrace(
         prompt_hash=_sha256_text(prompt),
@@ -91,6 +95,9 @@ def build_uncached_llm_trace(
         prompt_file=None,
         response_file=None,
         effort=effort,
+        prompt_tokens=usage.prompt_tokens if usage is not None else 0,
+        completion_tokens=usage.completion_tokens if usage is not None else 0,
+        total_tokens=usage.total_tokens if usage is not None else 0,
     )
 
 
@@ -116,6 +123,7 @@ def build_llm_cache_trace(
     cache_path: Path,
     cache_hit: bool,
     effort: str | None = None,
+    usage: LlmUsageMetrics | None = None,
 ) -> LlmCacheTrace:
     return LlmCacheTrace(
         prompt_hash=_sha256_text(prompt),
@@ -125,6 +133,9 @@ def build_llm_cache_trace(
         prompt_file=str(cache_path.with_suffix(".prompt.txt")),
         response_file=str(cache_path),
         effort=effort,
+        prompt_tokens=usage.prompt_tokens if usage is not None and not cache_hit else 0,
+        completion_tokens=usage.completion_tokens if usage is not None and not cache_hit else 0,
+        total_tokens=usage.total_tokens if usage is not None and not cache_hit else 0,
     )
 
 
@@ -162,7 +173,7 @@ def ask_llm_cached(
             )
         return result
 
-    result = ask_llm_json_free(prompt, effort=effort)
+    result, usage = ask_llm_json_free_with_metrics(prompt, effort=effort)
     resolved.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(result, ensure_ascii=False, indent=2),
@@ -177,6 +188,7 @@ def ask_llm_cached(
                 cache_path=path,
                 cache_hit=False,
                 effort=effort,
+                usage=usage,
             )
         )
     return result

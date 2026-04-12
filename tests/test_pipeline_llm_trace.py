@@ -1,7 +1,9 @@
 import json
 
+import jlesson.llm_cache as cache_mod
 from jlesson.curriculum import CurriculumData
 from jlesson.lesson_pipeline.pipeline_orchestrator import run_pipeline
+from jlesson.llm_client import LlmUsageMetrics
 from jlesson.pipeline_steps.pipeline_core import ActionConfig, ActionStep, LessonConfig, LessonContext, StepAction
 
 
@@ -30,9 +32,15 @@ class _TraceStep(ActionStep[str, dict]):
 
 
 def test_run_pipeline_writes_llm_trace_file(tmp_path, monkeypatch):
-    import jlesson.llm_cache as cache_mod
-
-    monkeypatch.setattr(cache_mod, "ask_llm_json_free", lambda prompt, effort=None: {"prompt": prompt, "effort": effort})
+    monkeypatch.setenv("LLM_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setattr(
+        cache_mod,
+        "ask_llm_json_free_with_metrics",
+        lambda prompt, effort=None: (
+            {"prompt": prompt, "effort": effort},
+            LlmUsageMetrics(prompt_tokens=10, completion_tokens=6, total_tokens=16),
+        ),
+    )
 
     config = LessonConfig(
         theme="traceability",
@@ -61,3 +69,37 @@ def test_run_pipeline_writes_llm_trace_file(tmp_path, monkeypatch):
     assert call["cache_key"] == call["prompt_hash"]
     assert call["response_hash"]
     assert call["effort"] == "medium"
+    assert call["total_tokens"] == 16
+
+
+def test_run_pipeline_records_step_budget_metrics(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setattr(
+        cache_mod,
+        "ask_llm_json_free_with_metrics",
+        lambda prompt, effort=None: (
+            {"prompt": prompt, "effort": effort},
+            LlmUsageMetrics(prompt_tokens=9, completion_tokens=5, total_tokens=14),
+        ),
+    )
+
+    config = LessonConfig(
+        theme="traceability",
+        curriculum_path=tmp_path / "curriculum.json",
+        output_dir=tmp_path,
+        lesson_number=1,
+        use_cache=True,
+        verbose=False,
+    )
+
+    ctx = run_pipeline(
+        config,
+        pipeline=[_TraceStep()],
+        load_curriculum_fn=lambda _path: CurriculumData(),
+    )
+
+    md = ctx.report.render()
+    assert "## Step Budget" in md
+    assert "| trace_step |" in md
+    assert "| **Total** |" in md
+    assert "14" in md

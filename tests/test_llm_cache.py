@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 
 import jlesson.llm_cache as cache_mod
+from jlesson.llm_client import LlmUsageMetrics
 from jlesson.llm_cache import (
     _cache_path,
     _resolve_cache_dir,
@@ -41,6 +42,10 @@ _STUB_RESPONSE = {"sentences": [{"english": "test", "japanese": "テスト"}]}
 
 def _stub_llm(prompt: str, effort: str | None = None) -> dict:  # noqa: ARG001
     return _STUB_RESPONSE
+
+
+def _stub_llm_with_metrics(prompt: str, effort: str | None = None):  # noqa: ARG001
+    return _STUB_RESPONSE, LlmUsageMetrics(prompt_tokens=11, completion_tokens=7, total_tokens=18)
 
 
 # ---------------------------------------------------------------------------
@@ -90,14 +95,14 @@ class TestCachePath:
 
 class TestAskLlmCached:
     def test_cache_miss_calls_llm_and_writes_file(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free_with_metrics", _stub_llm_with_metrics)
         result = ask_llm_cached("my prompt", cache_dir=tmp_path)
         assert result == _STUB_RESPONSE
         expected_file = _cache_path("my prompt", tmp_path)
         assert expected_file.exists()
 
     def test_cache_hit_returns_stored_result_without_llm(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free_with_metrics", _stub_llm_with_metrics)
         # Prime the cache
         ask_llm_cached("cached prompt", cache_dir=tmp_path)
 
@@ -105,40 +110,40 @@ class TestAskLlmCached:
         def _should_not_be_called(_prompt):
             raise AssertionError("LLM should not be called on cache hit")
 
-        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _should_not_be_called)
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free_with_metrics", _should_not_be_called)
         result = ask_llm_cached("cached prompt", cache_dir=tmp_path)
         assert result == _STUB_RESPONSE
 
     def test_written_cache_file_is_valid_json(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free_with_metrics", _stub_llm_with_metrics)
         ask_llm_cached("json check", cache_dir=tmp_path)
         path = _cache_path("json check", tmp_path)
         loaded = json.loads(path.read_text(encoding="utf-8"))
         assert loaded == _STUB_RESPONSE
 
     def test_cache_dir_created_automatically(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free_with_metrics", _stub_llm_with_metrics)
         nested = tmp_path / "a" / "b" / "cache"
         ask_llm_cached("auto-create dir", cache_dir=nested)
         assert nested.is_dir()
 
     def test_env_var_selects_cache_dir(self, tmp_path, monkeypatch):
         monkeypatch.setenv("LLM_CACHE_DIR", str(tmp_path))
-        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free_with_metrics", _stub_llm_with_metrics)
         ask_llm_cached("env prompt")
         # File should land in tmp_path, not the default dir
         expected = _cache_path("env prompt", tmp_path)
         assert expected.exists()
 
     def test_different_prompts_yield_different_files(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free_with_metrics", _stub_llm_with_metrics)
         ask_llm_cached("prompt one", cache_dir=tmp_path)
         ask_llm_cached("prompt two", cache_dir=tmp_path)
         files = list(tmp_path.glob("*.json"))
         assert len(files) == 2
 
     def test_records_trace_metadata_on_cache_miss(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free_with_metrics", _stub_llm_with_metrics)
         traces = []
 
         ask_llm_cached("trace prompt", cache_dir=tmp_path, trace_recorder=traces.append)
@@ -149,9 +154,10 @@ class TestAskLlmCached:
         assert trace.cache_key == _cache_path("trace prompt", tmp_path).stem
         assert trace.cache_hit is False
         assert trace.response_hash
+        assert trace.total_tokens == 18
 
     def test_records_trace_metadata_on_cache_hit(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free_with_metrics", _stub_llm_with_metrics)
         ask_llm_cached("trace hit", cache_dir=tmp_path)
         traces = []
 
@@ -159,6 +165,7 @@ class TestAskLlmCached:
 
         assert len(traces) == 1
         assert traces[0].cache_hit is True
+        assert traces[0].total_tokens == 0
 
 
 class TestBuildLlmCacheTrace:
@@ -195,6 +202,17 @@ class TestTypedTraceHelpers:
         assert trace.cache_key is None
         assert trace.effort == "low"
 
+    def test_build_uncached_trace_carries_token_usage(self):
+        trace = build_uncached_llm_trace(
+            "prompt",
+            _STUB_RESPONSE,
+            usage=LlmUsageMetrics(prompt_tokens=3, completion_tokens=4, total_tokens=7),
+        )
+
+        assert trace.prompt_tokens == 3
+        assert trace.completion_tokens == 4
+        assert trace.total_tokens == 7
+
     def test_bind_trace_to_step(self, tmp_path):
         base = build_llm_cache_trace(
             "hello",
@@ -216,7 +234,7 @@ class TestTypedTraceHelpers:
 
 class TestClearCache:
     def test_deletes_all_json_files_and_returns_count(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free_with_metrics", _stub_llm_with_metrics)
         ask_llm_cached("p1", cache_dir=tmp_path)
         ask_llm_cached("p2", cache_dir=tmp_path)
         ask_llm_cached("p3", cache_dir=tmp_path)
@@ -238,7 +256,7 @@ class TestClearCache:
 
 class TestCacheSize:
     def test_returns_count_of_cached_entries(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free_with_metrics", _stub_llm_with_metrics)
         assert cache_size(cache_dir=tmp_path) == 0
         ask_llm_cached("first", cache_dir=tmp_path)
         assert cache_size(cache_dir=tmp_path) == 1
@@ -250,7 +268,7 @@ class TestCacheSize:
         assert cache_size(cache_dir=missing) == 0
 
     def test_decreases_after_clear(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free_with_metrics", _stub_llm_with_metrics)
         ask_llm_cached("a", cache_dir=tmp_path)
         ask_llm_cached("b", cache_dir=tmp_path)
         clear_cache(cache_dir=tmp_path)

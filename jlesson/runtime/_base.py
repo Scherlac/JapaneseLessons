@@ -6,7 +6,7 @@ from typing import Any
 
 from jlesson.curriculum import load_curriculum, save_curriculum
 from jlesson.llm_cache import ask_llm_cached, bind_trace_to_step, build_uncached_llm_trace
-from jlesson.llm_client import ask_llm_json_free
+from jlesson.llm_client import ask_llm_json_free_with_metrics
 from jlesson.retrieval import get_retrieval_service
 from jlesson.vocab_generator import generate_vocab, VOCAB_DIR
 
@@ -48,8 +48,8 @@ class PipelineRuntime:
                 effort=effort,
                 trace_recorder=lambda trace: _record_step_llm_trace(ctx, trace),
             )
-        result = ask_llm_json_free(prompt, effort=effort)
-        _record_step_llm_trace(ctx, build_uncached_llm_trace(prompt, result, effort=effort))
+        result, usage = ask_llm_json_free_with_metrics(prompt, effort=effort)
+        _record_step_llm_trace(ctx, build_uncached_llm_trace(prompt, result, effort=effort, usage=usage))
         return result
 
     @staticmethod

@@ -251,6 +251,7 @@ def run_pipeline(
         _outputs = getattr(step, "_last_outputs", [])
         step_elapsed = time.time() - t_step
         ctx.report.record_time(step.name, step_elapsed)
+        ctx.report.record_llm_usage(step.name, list(ctx.llm_traces))
 
         _save_step_artifacts(ctx, step.name, _chunks, _outputs)
 

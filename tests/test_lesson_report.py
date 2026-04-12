@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from jlesson.llm_cache import LlmCacheTrace
 from jlesson.lesson_report import ReportBuilder, save_report
 
 
@@ -63,6 +64,34 @@ def test_timetable_included(builder):
 def test_timetable_absent_when_no_times(builder):
     md = builder.render()
     assert "## Pipeline Timetable" not in md
+
+
+def test_step_budget_included(builder):
+    builder.record_time("select_vocab", 0.1)
+    builder.record_llm_usage(
+        "select_vocab",
+        [
+            LlmCacheTrace(
+                prompt_hash="p",
+                response_hash="r",
+                cache_key="p",
+                cache_hit=False,
+                prompt_file="prompt.txt",
+                response_file="resp.json",
+                prompt_tokens=12,
+                completion_tokens=8,
+                total_tokens=20,
+            )
+        ],
+    )
+    md = builder.render()
+    assert "## Step Budget" in md
+    assert "| select_vocab | 0.1s | 1 | 0 | 1 | 12 | 8 | 20 |" in md
+
+
+def test_step_budget_absent_when_no_metrics(builder):
+    md = builder.render()
+    assert "## Step Budget" not in md
 
 
 # ---------------------------------------------------------------------------
@@ -325,13 +354,31 @@ def test_full_report_with_artifacts_and_timetable():
     rb.add_artifact("Video", Path("/output/video.mp4"))
     rb.record_time("select_vocab", 0.1)
     rb.record_time("grammar_select", 5.2)
+    rb.record_llm_usage(
+        "select_vocab",
+        [
+            LlmCacheTrace(
+                prompt_hash="p",
+                response_hash="r",
+                cache_key="p",
+                cache_hit=False,
+                prompt_file="prompt.txt",
+                response_file="resp.json",
+                prompt_tokens=12,
+                completion_tokens=8,
+                total_tokens=20,
+            )
+        ],
+    )
     md = rb.render()
     assert "## Artifacts" in md
     assert "video.mp4" in md
     assert "## Pipeline Timetable" in md
+    assert "## Step Budget" in md
     assert "| **Total** | **5.3s** |" in md
     # Artifacts before timetable
     assert md.index("## Artifacts") < md.index("## Pipeline Timetable")
+    assert md.index("## Pipeline Timetable") < md.index("## Step Budget")
 
 
 # ---------------------------------------------------------------------------
