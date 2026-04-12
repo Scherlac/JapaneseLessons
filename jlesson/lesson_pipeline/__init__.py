@@ -5,12 +5,11 @@ Orchestrates the currently active lesson workflow through ten sequential steps:
     step 1   narrative_generator  — create block-by-block story progression
     step 2   canonical_planner    — LLM: two-pass lesson outline (grammar + pacing)
     step 3   lesson_planner       — LLM: resolve canonical items into target language
-    step 4   review_sentences     — LLM: rate naturalness, rewrite awkward sentences
-    step 5   register_lesson      — add+complete the lesson in curriculum.json
-    step 6   compile_assets       — render card images + TTS audio per item (Stage 2)
-    step 7   compile_touches      — profile-driven touch sequencing (Stage 3)
-    step 8   render_video         — assemble MP4 from touch sequence
-    step 9   save_report          — finalize and save Markdown lesson report
+    step 4   register_lesson      — add+complete the lesson in curriculum.json
+    step 5   compile_assets       — render card images + TTS audio per item (Stage 2)
+    step 6   compile_touches      — profile-driven touch sequencing (Stage 3)
+    step 7   render_video         — assemble MP4 from touch sequence
+    step 8   save_report          — finalize and save Markdown lesson report
 """
 
 from __future__ import annotations
@@ -27,7 +26,6 @@ from jlesson.pipeline_steps import (
     PipelineStep,
     RegisterLessonStep,
     RenderVideoStep,
-    ReviewSentencesStep,
     SaveReportStep,
     StepInfo,
 )
@@ -39,7 +37,6 @@ def _build_pipeline() -> list[PipelineStep]:
         NarrativeGeneratorStep(),
         CanonicalPlannerStep(),
         LessonPlannerStep(),
-        ReviewSentencesStep(),
         RegisterLessonStep(),
         CompileAssetsStep(),
         CompileTouchesStep(),
@@ -97,7 +94,6 @@ __all__ = [
     "PipelineStep",
     "RegisterLessonStep",
     "RenderVideoStep",
-    "ReviewSentencesStep",
     "SaveReportStep",
     "StepInfo",
     "load_curriculum",

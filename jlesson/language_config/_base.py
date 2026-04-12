@@ -12,8 +12,6 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from ..models import GrammarItem
-from ..item_generator import ItemGenerator
-from ..prompt_template import PromptInterface
 
 
 @dataclass
@@ -163,11 +161,6 @@ class LanguageConfig:
     # ── Field role mapping ────────────────────────────────────────────────
     field_map: FieldMap = field(default_factory=lambda: FieldMap(source="", target=""))
 
-    # ── Item generator ────────────────────────────────────────────────────
-    generator: Optional[ItemGenerator] = None
-
-    # ── Prompt builders ───────────────────────────────────────────────────
-    prompts: Optional[PromptInterface] = None
 
     @property
     def native_language(self) -> str:

@@ -24,7 +24,6 @@ _STEP_EXPORTS = {
 	"NarrativeGeneratorStep": ".narrative_generator",
 	"RegisterLessonStep": ".register_lesson",
 	"RenderVideoStep": ".render_video",
-	"ReviewSentencesStep": ".review_sentences",
 	"SaveReportStep": ".save_report",
 }
 
@@ -49,7 +48,6 @@ __all__ = [
 	"NarrativeGeneratorStep",
 	"RegisterLessonStep",
 	"RenderVideoStep",
-	"ReviewSentencesStep",
 	"SaveReportStep",
 	"GeneralItemSequence",
 	"LessonConfig",

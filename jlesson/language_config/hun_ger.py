@@ -5,8 +5,6 @@ from __future__ import annotations
 from jlesson.video import tts_engine
 
 from ..curriculum import HUN_TO_GER_GRAMMAR_PROGRESSION
-from ..item_generator import HunGerItemGenerator
-from ..prompt_template import HunGerPrompts, GERMAN_PERSONS
 from ._base import FieldMap, LanguageConfig, PartialFieldMap, PartialLanguageConfig
 from ._partials import GERMAN_LANGUAGE, HUNGARIAN_LANGUAGE
 
@@ -39,13 +37,11 @@ HUN_GER_CONFIG = LanguageConfig(
     voices=tts_engine.VOICES,
 
     grammar_progression=tuple(HUN_TO_GER_GRAMMAR_PROGRESSION),
-    persons=tuple(GERMAN_PERSONS),
 
     vocab_dir="vocab/hungarian_german",
     curriculum_file="curriculum/curriculum_hungarian_german.json",
 
     field_map=FieldMap(source="source", target="target"),
 
-    generator=HunGerItemGenerator(),
-    prompts=HunGerPrompts(),
+
 )

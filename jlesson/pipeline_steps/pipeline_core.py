@@ -16,7 +16,6 @@ from jlesson.curriculum import create_curriculum
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from jlesson.pipeline_steps.review_sentences.action import SentenceReviewResult
     from jlesson.rcm import RCMStore
 
 

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import os
-import random
 from pathlib import Path
 
 import click
@@ -22,13 +21,6 @@ import click
 from .curriculum import load_curriculum
 from .curriculum import summary as curriculum_summary
 from .language_config import get_language_config
-from .prompt_template import (
-    DIMENSIONS_BEGINNER,
-    GRAMMAR_PATTERNS_BEGINNER,
-    PERSONS_BEGINNER,
-    build_lesson_prompt,
-    build_vocab_prompt,
-)
 # load env variables from .env (e.g. LLM API keys, RCM path)
 from dotenv import load_dotenv
 
@@ -78,25 +70,6 @@ def _list_themes(vocab_dir: Path | None = None) -> list[str]:
     return sorted(p.stem for p in d.glob("*.json"))
 
 
-def _load_vocab(theme: str, vocab_dir: Path | None = None) -> dict:
-    d = vocab_dir or VOCAB_DIR
-    path = d / f"{theme}.json"
-    if not path.exists():
-        available = ", ".join(_list_themes(d)) or "(none)"
-        raise click.ClickException(f"theme '{theme}' not found. Available: {available}")
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _pick_items(items: list[dict], count: int, shuffle: bool = True) -> list[dict]:
-    if count >= len(items):
-        return list(items)
-    pool = list(items)
-    if shuffle:
-        random.shuffle(pool)
-    return pool[:count]
-
-
 # ---------------------------------------------------------------------------
 # Root group
 # ---------------------------------------------------------------------------
@@ -127,122 +100,6 @@ def vocab_list(language: str) -> None:
             click.echo(f"  - {t}")
     else:
         click.echo(f"No themes found. Add JSON files to: {vocab_dir}")
-
-
-@vocab.command("create")
-@click.argument("theme")
-@click.option("--count", type=int, default=None, help="Total words to generate (nouns + verbs + adjectives).")
-@click.option("--nouns", type=int, default=None, help="Noun count (exact if no --count, minimum if --count is set).")
-@click.option("--verbs", type=int, default=None, help="Verb count (exact if no --count, minimum if --count is set).")
-@click.option("--adjectives", type=int, default=None, help="Adjective count (exact if no --count, minimum if --count is set).")
-@click.option("--force", is_flag=True, default=False, help="Overwrite existing theme file if it already exists.")
-@click.option(
-    "--level",
-    default="beginner",
-    show_default=True,
-    type=click.Choice(["beginner", "intermediate", "advanced"]),
-    help="Difficulty level.",
-)
-@LANGUAGE_OPTION
-def vocab_create(
-    theme: str,
-    count: int | None,
-    nouns: int | None,
-    verbs: int | None,
-    adjectives: int | None,
-    force: bool,
-    level: str,
-    language: str,
-) -> None:
-    """Generate vocabulary for THEME via LLM and save to vocab/<THEME>.json."""
-    from .vocab_generator import generate_vocab
-    lang_cfg = get_language_config(language)
-    output_dir = Path(__file__).parent.parent / lang_cfg.vocab_dir
-    try:
-        generate_vocab(
-            theme=theme,
-            num_nouns=nouns,
-            num_verbs=verbs,
-            num_adjectives=adjectives,
-            total_count=count,
-            level=level,
-            output_dir=output_dir, language=language, allow_overwrite=force,
-        )
-    except Exception as exc:
-        raise click.ClickException(_friendly_error(exc)) from exc
-
-
-@vocab.command("extend")
-@click.argument("theme")
-@click.option("--count", type=int, default=None, help="Total additional words to generate (nouns + verbs + adjectives).")
-@click.option("--nouns", type=int, default=None, help="Additional noun count (exact if no --count, minimum if --count is set).")
-@click.option("--verbs", type=int, default=None, help="Additional verb count (exact if no --count, minimum if --count is set).")
-@click.option("--adjectives", type=int, default=None, help="Additional adjective count (exact if no --count, minimum if --count is set).")
-@click.option(
-    "--level",
-    default="beginner",
-    show_default=True,
-    type=click.Choice(["beginner", "intermediate", "advanced"]),
-    help="Difficulty level for newly generated items.",
-)
-@LANGUAGE_OPTION
-def vocab_extend(
-    theme: str,
-    count: int | None,
-    nouns: int | None,
-    verbs: int | None,
-    adjectives: int | None,
-    level: str,
-    language: str,
-) -> None:
-    """Extend an existing theme by generating and merging additional vocab."""
-    from .vocab_generator import extend_vocab
-
-    lang_cfg = get_language_config(language)
-    output_dir = Path(__file__).parent.parent / lang_cfg.vocab_dir
-    try:
-        extend_vocab(
-            theme=theme,
-            add_nouns=nouns,
-            add_verbs=verbs,
-            add_adjectives=adjectives,
-            total_count=count,
-            level=level,
-            output_dir=output_dir,
-            language=language,
-        )
-    except Exception as exc:
-        raise click.ClickException(_friendly_error(exc)) from exc
-
-
-@vocab.command("generate-prompt")
-@click.argument("theme")
-@click.option("--nouns", default=12, show_default=True, help="Number of nouns.")
-@click.option("--verbs", default=10, show_default=True, help="Number of verbs.")
-@click.option(
-    "--level",
-    default="beginner",
-    show_default=True,
-    type=click.Choice(["beginner", "intermediate", "advanced"]),
-    help="Difficulty level.",
-)
-@click.option("--output", "-o", type=click.Path(), default=None, help="Write to file instead of stdout.")
-@LANGUAGE_OPTION
-def vocab_generate_prompt(theme: str, nouns: int, verbs: int, level: str, output: str | None, language: str) -> None:
-    """Print the LLM prompt for generating vocabulary for THEME (no LLM call)."""
-    if language == "hun-eng":
-        from .prompt_template import hungarian_build_vocab_prompt
-        prompt = hungarian_build_vocab_prompt(theme=theme, num_nouns=nouns, num_verbs=verbs, level=level)
-    elif language == "eng-fre":
-        from .prompt_template import french_build_vocab_prompt
-        prompt = french_build_vocab_prompt(theme=theme, num_nouns=nouns, num_verbs=verbs, level=level)
-    else:
-        prompt = build_vocab_prompt(theme=theme, num_nouns=nouns, num_verbs=verbs, level=level)
-    if output:
-        Path(output).write_text(prompt, encoding="utf-8")
-        click.echo(f"Prompt written to: {output}", err=True)
-    else:
-        click.echo(prompt)
 
 
 # ---------------------------------------------------------------------------
@@ -723,61 +580,6 @@ def lesson_update(
             regenerate_lesson_id=lesson_id,
             rcm_path=rcm_path,
         )
-
-
-@lesson.command("prompt")
-@click.argument("theme")
-@click.option("--nouns", "-n", default=6, show_default=True, help="Number of nouns.")
-@click.option("--verbs", "-v", default=6, show_default=True, help="Number of verbs.")
-@click.option("--seed", "-s", type=int, default=None, help="Random seed.")
-@click.option("--no-shuffle", is_flag=True, default=False, help="Pick first N items without shuffling.")
-@click.option("--output", "-o", type=click.Path(), default=None, help="Write to file instead of stdout.")
-@LANGUAGE_OPTION
-def lesson_prompt(
-    theme: str,
-    nouns: int,
-    verbs: int,
-    seed: int | None,
-    no_shuffle: bool,
-    output: str | None,
-    language: str,
-) -> None:
-    """Generate a lesson prompt text for THEME (no LLM call, no pipeline)."""
-    if seed is not None:
-        random.seed(seed)
-    lang_cfg = get_language_config(language)
-    vocab_dir = Path(__file__).parent.parent / lang_cfg.vocab_dir
-    vocab = _load_vocab(theme, vocab_dir)
-    selected_nouns = _pick_items(vocab["nouns"], nouns, shuffle=not no_shuffle)
-    selected_verbs = _pick_items(vocab["verbs"], verbs, shuffle=not no_shuffle)
-    if language == "hun-eng":
-        from .prompt_template import hungarian_build_lesson_prompt
-        prompt = hungarian_build_lesson_prompt(
-            theme=theme,
-            nouns=selected_nouns,
-            verbs=selected_verbs,
-        )
-    elif language == "eng-fre":
-        from .prompt_template import french_build_lesson_prompt
-        prompt = french_build_lesson_prompt(
-            theme=theme,
-            nouns=selected_nouns,
-            verbs=selected_verbs,
-        )
-    else:
-        prompt = build_lesson_prompt(
-            theme=theme,
-            nouns=selected_nouns,
-            verbs=selected_verbs,
-            persons=PERSONS_BEGINNER,
-            grammar_patterns=GRAMMAR_PATTERNS_BEGINNER,
-            dimensions=DIMENSIONS_BEGINNER,
-        )
-    if output:
-        Path(output).write_text(prompt, encoding="utf-8")
-        click.echo(f"Prompt written to: {output}", err=True)
-    else:
-        click.echo(prompt)
 
 
 # ---------------------------------------------------------------------------
