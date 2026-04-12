@@ -17,9 +17,11 @@ ENG_JAP_CONFIG = LanguageConfig(
 
     voices=tts_engine.VOICES,
 
+    canonical_language="english",
+
     grammar_progression=tuple(JAP_GRAMMAR_PROGRESSION),
-    vocab_dir="vocab",
-    curriculum_file="curriculum/curriculum.json",
+    vocab_dir="vocab/japanese",
+    curriculum_file="curriculum/curriculum_japanese.json",
 
     field_map=FieldMap(source="source", target="target"),
 

@@ -10,7 +10,6 @@ HUNGARIAN_LANGUAGE = PartialLanguageConfig(
     display_name="Hungarian",
     field_map=PartialFieldMap(
         text_path="display_text",
-        example_sentence_path="extra.example_sentence_hu",
     ),
     label="Magyar",
     font_path="C:/Windows/Fonts/segoeui.ttf",

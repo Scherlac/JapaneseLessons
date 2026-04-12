@@ -10,11 +10,10 @@ FRENCH_LANGUAGE = PartialLanguageConfig(
     display_name="French",
     field_map=PartialFieldMap(
         text_path="display_text",
-        phonetic_path="pronunciation",
-        example_sentence_path="extra.example_sentence_fr",
+        phonetic_path="pronunciation"
     ),
     label="Français",
-    phonetic_label="Pronunciation",
+    phonetic_label="IPA",
     font_path="C:/Windows/Fonts/segoeui.ttf",
     noun_fields=frozenset({"french", "pronunciation", "article"}),
     verb_fields=frozenset({"french", "pronunciation", "past_participle", "auxiliary"}),
@@ -32,8 +31,6 @@ FRENCH_LANGUAGE = PartialLanguageConfig(
         "extra.article: definite article — le/la/les (nouns only)",
         "extra.past_participle: past participle form (verbs only, e.g. 'mangé')",
         "extra.auxiliary: auxiliary verb — avoir or être (verbs only)",
-        "extra.example_sentence_fr: a short, natural French sentence using the word",
-        "extra.example_sentence_en: English translation of the example sentence",
     ),
     rcm_dim_map={
         "verbs": {"dim_1": "auxiliary", "dim_2": "past_participle"},
