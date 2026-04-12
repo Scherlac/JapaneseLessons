@@ -5,12 +5,25 @@ from pathlib import Path
 from typing import Any
 
 from jlesson.curriculum import load_curriculum, save_curriculum
-from jlesson.llm_cache import ask_llm_cached
+from jlesson.llm_cache import ask_llm_cached, bind_trace_to_step, build_uncached_llm_trace
 from jlesson.llm_client import ask_llm_json_free
 from jlesson.retrieval import get_retrieval_service
 from jlesson.vocab_generator import generate_vocab, VOCAB_DIR
 
 _DEFAULT_VOCAB_DIR = VOCAB_DIR
+
+
+def _record_step_llm_trace(ctx: Any, trace) -> None:
+    call_index = len(ctx.llm_traces) + 1
+    step_info = getattr(ctx, "step_info", None)
+    ctx.llm_traces.append(
+        bind_trace_to_step(
+            trace,
+            call_index=call_index,
+            step_name=step_info.name if step_info is not None else None,
+            step_index=step_info.index if step_info is not None else None,
+        )
+    )
 
 
 def _resolve_retrieval_store_path(config: Any) -> Path:
@@ -30,8 +43,14 @@ class PipelineRuntime:
     def ask_llm(ctx, prompt: str, effort: str | None = None) -> dict[str, Any]:
         """Invoke the configured LLM path (cached or direct)."""
         if ctx.config.use_cache:
-            return ask_llm_cached(prompt)
-        return ask_llm_json_free(prompt, effort=effort)
+            return ask_llm_cached(
+                prompt,
+                effort=effort,
+                trace_recorder=lambda trace: _record_step_llm_trace(ctx, trace),
+            )
+        result = ask_llm_json_free(prompt, effort=effort)
+        _record_step_llm_trace(ctx, build_uncached_llm_trace(prompt, result, effort=effort))
+        return result
 
     @staticmethod
     def read_json(path: Path, default: dict[str, Any] | None = None) -> dict[str, Any]:

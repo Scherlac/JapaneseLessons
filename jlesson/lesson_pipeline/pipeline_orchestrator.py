@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 from jlesson.language_config import get_language_config
+from jlesson.llm_cache import StepLlmCacheLog
 from jlesson.pipeline_steps.pipeline_core import LessonConfig, LessonContext, PipelineStep, StepInfo
 
 # ---------------------------------------------------------------------------
@@ -51,7 +52,7 @@ def _step_artifact_dir(ctx: LessonContext, step_name: str) -> Path | None:
 
 
 def _save_step_artifacts(ctx: LessonContext, step_name: str, chunks, outputs) -> None:
-    """Write ``steps/<step_name>/input.json`` and ``output.json``."""
+    """Write ``steps/<step_name>/input.json``, ``output.json``, and LLM traces."""
     artifact_dir = _step_artifact_dir(ctx, step_name)
     if artifact_dir is None:
         return
@@ -67,6 +68,16 @@ def _save_step_artifacts(ctx: LessonContext, step_name: str, chunks, outputs) ->
                 json.dumps(_to_json_safe(outputs), indent=2, ensure_ascii=False),
                 encoding="utf-8",
             )
+        llm_trace_path = artifact_dir / "llm_cache.json"
+        llm_traces = list(ctx.llm_traces)
+        if llm_traces:
+            llm_trace_payload = StepLlmCacheLog(step=step_name, calls=llm_traces)
+            llm_trace_path.write_text(
+                json.dumps(_to_json_safe(llm_trace_payload), indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        elif llm_trace_path.exists():
+            llm_trace_path.unlink()
     except Exception:
         pass  # artifact writing is best-effort; never break the pipeline
 
@@ -229,6 +240,7 @@ def run_pipeline(
             description=step.description,
         )
         ctx.step_info = info
+        ctx.llm_traces.clear()
         if config.verbose:
             print(f"\n  {info.label} {step.description}")
 

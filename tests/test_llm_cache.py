@@ -22,7 +22,11 @@ import jlesson.llm_cache as cache_mod
 from jlesson.llm_cache import (
     _cache_path,
     _resolve_cache_dir,
+    LlmCacheTrace,
     ask_llm_cached,
+    bind_trace_to_step,
+    build_llm_cache_trace,
+    build_uncached_llm_trace,
     cache_size,
     clear_cache,
 )
@@ -35,7 +39,7 @@ from jlesson.llm_cache import (
 _STUB_RESPONSE = {"sentences": [{"english": "test", "japanese": "テスト"}]}
 
 
-def _stub_llm(prompt: str) -> dict:  # noqa: ARG001
+def _stub_llm(prompt: str, effort: str | None = None) -> dict:  # noqa: ARG001
     return _STUB_RESPONSE
 
 
@@ -132,6 +136,78 @@ class TestAskLlmCached:
         ask_llm_cached("prompt two", cache_dir=tmp_path)
         files = list(tmp_path.glob("*.json"))
         assert len(files) == 2
+
+    def test_records_trace_metadata_on_cache_miss(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        traces = []
+
+        ask_llm_cached("trace prompt", cache_dir=tmp_path, trace_recorder=traces.append)
+
+        assert len(traces) == 1
+        trace = traces[0]
+        assert trace.prompt_hash == _cache_path("trace prompt", tmp_path).stem
+        assert trace.cache_key == _cache_path("trace prompt", tmp_path).stem
+        assert trace.cache_hit is False
+        assert trace.response_hash
+
+    def test_records_trace_metadata_on_cache_hit(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(cache_mod, "ask_llm_json_free", _stub_llm)
+        ask_llm_cached("trace hit", cache_dir=tmp_path)
+        traces = []
+
+        ask_llm_cached("trace hit", cache_dir=tmp_path, trace_recorder=traces.append)
+
+        assert len(traces) == 1
+        assert traces[0].cache_hit is True
+
+
+class TestBuildLlmCacheTrace:
+    def test_uses_prompt_hash_and_response_hash(self, tmp_path):
+        cache_path = _cache_path("hello", tmp_path)
+        trace = build_llm_cache_trace(
+            "hello",
+            _STUB_RESPONSE,
+            cache_path=cache_path,
+            cache_hit=False,
+            effort="medium",
+        )
+
+        assert trace.prompt_hash == cache_path.stem
+        assert trace.response_hash
+        assert trace.effort == "medium"
+
+    def test_returns_dataclass(self, tmp_path):
+        trace = build_llm_cache_trace(
+            "hello",
+            _STUB_RESPONSE,
+            cache_path=_cache_path("hello", tmp_path),
+            cache_hit=True,
+        )
+
+        assert isinstance(trace, LlmCacheTrace)
+
+
+class TestTypedTraceHelpers:
+    def test_build_uncached_trace(self):
+        trace = build_uncached_llm_trace("prompt", _STUB_RESPONSE, effort="low")
+
+        assert trace.cache_hit is False
+        assert trace.cache_key is None
+        assert trace.effort == "low"
+
+    def test_bind_trace_to_step(self, tmp_path):
+        base = build_llm_cache_trace(
+            "hello",
+            _STUB_RESPONSE,
+            cache_path=_cache_path("hello", tmp_path),
+            cache_hit=False,
+        )
+
+        bound = bind_trace_to_step(base, call_index=2, step_name="planner", step_index=3)
+
+        assert bound.call_index == 2
+        assert bound.step_name == "planner"
+        assert bound.step_index == 3
 
 
 # ---------------------------------------------------------------------------

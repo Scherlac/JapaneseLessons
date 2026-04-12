@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from jlesson.language_config import LanguageConfig, get_language_config
+from jlesson.llm_cache import LlmCacheTrace
 from jlesson.lesson_report import ReportBuilder
 from jlesson.models import GeneralItem, GeneralItem, GrammarItem, Sentence, Touch, Phase,CanonicalItem
 from jlesson.curriculum import CurriculumData
@@ -105,6 +106,7 @@ class LessonContext:
 
     # Optional RCM store — opened by the pipeline runner when rcm_path is set
     rcm: "RCMStore | None" = None
+    llm_traces: list[LlmCacheTrace] = dataclass_field(default_factory=list)
 
 class PipelineStep(ABC):
     """Abstract base class for pipeline steps."""
