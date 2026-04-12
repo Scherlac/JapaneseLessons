@@ -70,6 +70,66 @@ jlesson vocab extend animals --count 60 --nouns 15 --verbs 10 --adjectives 10
 jlesson vocab generate-prompt shopping
 ```
 
+## RCM — Runtime Content Management
+
+The RCM store is a SQLite database that caches canonical items, compiled assets (audio, cards), and LLM usage records across lessons and language pairs. It allows later lessons to reuse already-generated content without re-calling the LLM or re-rendering assets.
+
+Set the RCM directory once in `.env`:
+
+```env
+JLESSON_RCM_PATH=/path/to/.jlesson/rcm
+```
+
+All `rcm` subcommands read this by default; override per-run with `--rcm <dir>`.
+
+### Importing existing lessons
+
+```bash
+# Import all lessons under a directory tree (language auto-detected from path)
+python tools/import_lessons_to_rcm.py --source-dir output/northern_exposure
+
+# With an explicit fallback language and curriculum for lesson ID mapping
+python tools/import_lessons_to_rcm.py \
+    --source-dir output/northern_exposure \
+    --language eng-fre \
+    --curriculum output/northern_exposure/curriculum_french.json
+```
+
+The importer walks the tree for `steps/lesson_planner/output.json` files, upserts items and branches, copies compiled audio/card assets into the central store, and imports LLM usage token records.
+
+### Inspecting the store
+
+```bash
+# Overall database summary
+jlesson rcm stats
+
+# List all lessons and item counts
+jlesson rcm lessons
+
+# Query canonical items with filters
+jlesson rcm items                               # all items (default limit 50)
+jlesson rcm items --phase verbs                 # only verbs
+jlesson rcm items --language eng-fre            # items with a French branch
+jlesson rcm items --min-branches 2              # items resolved in 2+ languages
+jlesson rcm items --text arriver                # substring match on canonical text
+jlesson rcm items --phase nouns --language eng-fre --text matin --limit 100
+
+# Check asset availability for a lesson
+jlesson rcm lesson-assets 3 --language eng-fre
+# Migrate legacy absolute paths to relative (makes store relocatable)
+jlesson rcm lesson-assets 3 --language eng-fre --fix
+
+# LLM token usage per lesson
+jlesson rcm lesson-usage 3 --language eng-fre
+jlesson rcm lesson-usage 3 --language eng-fre --verbose   # per-call breakdown
+
+# LLM token usage for a single canonical item
+jlesson rcm item-usage verbs_to_arrive_fe2171 --language eng-fre
+```
+
+When the wrong language is passed to a lesson command, the error message lists which languages are actually stored for that lesson.
+
+
 ## How a Lesson Works
 
 Each lesson is driven by the LLM in three steps:

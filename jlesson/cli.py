@@ -1060,6 +1060,87 @@ def rcm() -> None:
     """Query and inspect the RCM database."""
 
 
+@rcm.command("items")
+@RCM_PATH_OPTION
+@click.option("--phase", default=None, type=click.Choice(["nouns", "verbs", "adjectives", "sentences"]), help="Filter by item phase.")
+@click.option("--language", default=None, help="Filter to items that have a branch for this language code.")
+@click.option("--min-branches", type=int, default=None, help="Only show items with at least this many branches.")
+@click.option("--text", "text_filter", default=None, help="Case-insensitive substring filter on canonical text.")
+@click.option("--limit", default=50, show_default=True, help="Maximum rows to display.")
+def rcm_items(
+    rcm_path: Path | None,
+    phase: str | None,
+    language: str | None,
+    min_branches: int | None,
+    text_filter: str | None,
+    limit: int,
+) -> None:
+    """Query canonical items in the RCM store with optional filters.
+
+    Examples:
+
+    \b
+      # Items with more than one branch (shared across languages or duplicates)
+      jlesson rcm items --min-branches 2
+
+      # French verbs containing 'arriver'
+      jlesson rcm items --phase verbs --language eng-fre --text arriver
+
+      # All sentences stored for English-Japanese
+      jlesson rcm items --phase sentences --language eng-jap --limit 100
+    """
+    if rcm_path is None:
+        raise click.UsageError("Specify --rcm or set JLESSON_RCM_PATH.")
+    from sqlalchemy import text as sa_text
+    from .rcm import open_rcm
+
+    with open_rcm(rcm_path) as store:
+        with store._Session() as session:
+            # Build query joining items → branches
+            where: list[str] = []
+            params: dict = {}
+
+            if phase:
+                where.append("i.phase = :phase")
+                params["phase"] = phase
+
+            if text_filter:
+                where.append("i.text_normalized LIKE :text")
+                params["text"] = f"%{text_filter.lower()}%"
+
+            if language:
+                where.append(
+                    "EXISTS (SELECT 1 FROM branches b2 WHERE b2.item_id = i.id AND b2.language_code = :lang)"
+                )
+                params["lang"] = language
+
+            where_clause = ("WHERE " + " AND ".join(where)) if where else ""
+
+            rows = session.execute(sa_text(f"""
+                SELECT i.id, i.text, i.phase, COUNT(b.id) AS branch_count,
+                       GROUP_CONCAT(b.language_code, ', ') AS languages
+                FROM items i
+                LEFT JOIN branches b ON b.item_id = i.id
+                {where_clause}
+                GROUP BY i.id
+                HAVING (:min_b IS NULL OR branch_count >= :min_b)
+                ORDER BY branch_count DESC, i.phase, i.text_normalized
+                LIMIT :lim
+            """), {**params, "min_b": min_branches, "lim": limit}).fetchall()
+
+    if not rows:
+        click.echo("No items match the given filters.")
+        return
+
+    click.echo(f"\n  {'ID':<36}  {'Phase':<12}  {'Br':>2}  {'Languages':<20}  Text")
+    click.echo(f"  {'-'*36}  {'-'*12}  {'--':>2}  {'-'*20}  {'-'*40}")
+    for item_id, text, item_phase, branch_count, languages in rows:
+        langs_str = (languages or "").replace(", ", ",")
+        click.echo(f"  {item_id:<36}  {(item_phase or ''):12}  {branch_count:>2}  {langs_str:<20}  {text}")
+
+    click.echo(f"\n  {len(rows)} row(s) shown (limit={limit}).")
+
+
 @rcm.command("stats")
 @RCM_PATH_OPTION
 def rcm_stats(rcm_path: Path | None) -> None:
